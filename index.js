@@ -9,6 +9,7 @@ if (!global.port) {
 
 const express = require('express');
 const cors = require('cors');
+const { errorMiddleware } = require('./middlewares');
 const { checkConnection } = require('./config/').dbConnection;
 
 
@@ -18,9 +19,16 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 
-app.get('/', (req, res) => {
-    res.send('Salon Management Service is running');
+// Routes declaration
+app.use('/', require('./routes'));
+
+// Handle 404 - Route not found
+app.use((req, res, next) => {
+    res.status(404).json({ error: "Resource not found" });
 });
+
+app.use(errorMiddleware);
+
 
 process.on('uncaughtException', (err) => {
     console.log('uncaught exception', err);
