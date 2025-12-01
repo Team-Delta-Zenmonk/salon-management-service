@@ -1,0 +1,62 @@
+services:
+  # Backend service
+  backend:
+    container_name: salon-management-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dependency-base
+    ports:
+      - ${APP_FORWARD_PORT:-8080}:${APP_PORT:-8080}
+    volumes:
+      - .:/app
+    networks:
+      - salon_management_network
+    restart: on-failure
+    tty: true
+    stdin_open: true
+    expose:
+      - ${APP_PORT:-8080}
+  # postgres DB service
+  database:
+    image: postgres:16.1-alpine3.18
+    container_name: salon-management-database
+    restart: always
+    ports:
+      - ${DB_FORWARD_PORT:-5432}:5432
+    environment:
+      - POSTGRES_USER=${DB_USER:-"postgres"}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-"admin@zm"}
+      - POSTGRES_DB=${DB_DATABASE:-"salon_management_db"}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - salon_management_network
+  
+  #pgAdmin
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: salon-management-pgadmin
+    restart: always
+    ports:
+      - ${PGADMIN_FORWARD_PORT:-8888}:80
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL:-"user@zenmonk.tech"}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD:-"zenmonk"}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - salon_management_network
+
+networks:
+  salon_management_network:
+    name: salon_management_shared_network
+    external: true
+
+volumes:
+  pg_data: {}
+  pgadmin_data: {}
+
+
+
+#docker network create salon_management_shared_network
