@@ -4,4 +4,5 @@ module.exports = {
     error : require('./error'),
     hash : require('./hash'),
     otp : require('./otp'),
+    generateToken : require('./generate-token'),
 };

@@ -11,3 +11,23 @@ exports.loginSalon = async (req, res, next) => {
         return next(error);
     }
 }
+
+exports.forgotPassword = async (req, res, next) => {
+    try {
+        const response = await authService.forgotPassword({ body: req.body });
+        return res.status(200).json(response);
+    } catch (error) {
+        console.log("Error in controller forgotPassword", error);
+        return next(error);
+    }
+}
+
+exports.resetPassword = async (req, res, next) => {
+    try {
+        const response = await authService.resetPassword({ body: req.body });
+        return res.status(200).json(response);
+    } catch (error) {
+        console.log("Error in controller resetPassword", error);
+        return next(error);
+    }
+}

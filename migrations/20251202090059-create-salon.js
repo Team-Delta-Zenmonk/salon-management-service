@@ -19,16 +19,25 @@ module.exports = {
         type: Sequelize.STRING
       },
       email: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true,
       },
       password: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
+        allowNull: false,
       },
       phone: {
         type: Sequelize.STRING
       },
       address: {
         type: Sequelize.STRING
+      },
+      reset_password_token: {
+        type: Sequelize.STRING
+      },
+      reset_token_expiry: {
+        type: Sequelize.DATE
       },
       created_at: {
         allowNull: false,
