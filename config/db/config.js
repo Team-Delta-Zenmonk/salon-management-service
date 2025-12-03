@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 module.exports = {
-  "local": {
+    "local": {
         "username": process.env.DB_USER,
         "password": process.env.DB_PASSWORD,
         "database": process.env.DB_DATABASE,
@@ -10,7 +10,7 @@ module.exports = {
         "seederStorage": "sequelize",
         "logging": console.log,
         "define": {
-            "underscored": true,
+            underscored: true,
         },
     },
     "test": {
@@ -22,7 +22,7 @@ module.exports = {
         "seederStorage": "sequelize",
         "logging": false,
         "define": {
-            "underscored": true,
+            underscored: true,
         },
     },
     "development": {
@@ -34,7 +34,7 @@ module.exports = {
         "seederStorage": "sequelize",
         "logging": false,
         "define": {
-            "underscored": true,
+            underscored: true,
         },
     },
     "production": {
@@ -46,7 +46,7 @@ module.exports = {
         "seederStorage": "sequelize",
         "logging": false,
         "define": {
-            "underscored": true,
+            underscored: true,
         },
     }
 }

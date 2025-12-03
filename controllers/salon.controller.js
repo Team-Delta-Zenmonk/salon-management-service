@@ -1,19 +1,11 @@
-const { salonServices } = require("../services");
+const { salonService } = require("../services");
 
-exports.helloSalon1 = async (req, res) => {
+exports.onBoardSalon = async (req, res, next) => {
     try {
-        const message = await salonServices.helloSalon1();
+        const message = await salonService.onBoardSalon({ body: req.body });
         return res.status(200).json({ message });
     } catch (error) {
-        return next(error);
-    }
-}
-
-exports.helloSalon2 = async (req, res, next) => {
-    try {
-        const message = await salonServices.helloSalon2();
-        return res.status(200).json({ message });
-    } catch (error) {
+        console.log("Error in controller onBoardSalon", error);
         return next(error);
     }
 }

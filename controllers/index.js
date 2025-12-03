@@ -1,3 +1,4 @@
 module.exports = {
-    salonController: require('./salon.controller')
+    salonController: require('./salon.controller'),
+    salonOnboardingController: require('./salon-onboarding.controller')
 }

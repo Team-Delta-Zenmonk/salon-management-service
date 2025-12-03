@@ -1,3 +1,4 @@
 module.exports = {
-    dbConnection: require('./db/db-connection')
+    dbConnection: require('./db/db-connection'),
+    mailConfig: require('./mail/config')
 };
