@@ -1,6 +1,8 @@
+const { authMiddleware } = require('../middlewares');
+
 const router = require('express').Router();
 
-router.use('/salons', require('./salon.router'));
+router.use('/salons', authMiddleware.authSalonMiddleware, require('./salon.router'));
 router.use('/salon-onboardings', require('./salon-onboarding.router'));
 router.use('/auth', require('./auth.router'));
 

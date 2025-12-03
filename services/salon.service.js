@@ -1,22 +1,25 @@
-const mailService = require("./mail.service");
 const { error } = require("../libs");
 const { salonRepository } = require("../repository");
 
-exports.onBoardSalon = async (payload) => {
-    const { email, name, password } = payload.body;
+exports.updateSalon = async (payload) => {
+    const { uuid } = payload.salon;
 
-    if (!email || !name || !password) {
-        throw new error.BadRequest('All fields are required');
+    let salon = await salonRepository.findOne({ uuid });
+
+    if (!salon) {
+        throw new error.NotFound("Salon not found");
     }
 
-    const salon = await salonRepository.findOne({ email });
+    const allowedFields = ["name", "address", "phone"];
 
-    if (salon) {
-        throw new error.BadRequest('Salon already exists');
+    for (let key of Object.keys(payload.body)) {
+        if (!allowedFields.includes(key)) {
+            throw new error.BadRequest(`Field not allowed: ${key}`);
+        }
     }
 
-    const newSalon = await salonRepository.create({ email, name, });
-    await mailService.sendMailToUser(email, 'Welcome to Salon', 'Welcome to Salon');
-
-    return newSalon;
+    return await salonRepository.update({
+        payload: payload.body,
+        criteria: { uuid }
+    });
 }
