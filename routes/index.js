@@ -2,9 +2,10 @@ const { authMiddleware } = require('../middlewares');
 
 const router = require('express').Router();
 
-router.use('/salons', authMiddleware.authSalonMiddleware, require('./salon.router'));
-router.use('/salon-onboardings', require('./salon-onboarding.router'));
 router.use('/auth', require('./auth.router'));
+router.use('/salon-onboardings', require('./salon-onboarding.router'));
+router.use('/salons', authMiddleware.authSalonMiddleware, require('./salon.router'));
+router.use('/salons/categories', authMiddleware.authSalonMiddleware, require('./category.router'));
 
 router.get('/', (req, res, next) => {
     res.send('Salon Management Service is running');

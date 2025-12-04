@@ -1,11 +1,21 @@
 "use strict";
 const { Model } = require("sequelize");
+const { SalonType } = require("./salon-types");
 
 module.exports = (sequelize, DataTypes) => {
     class Salon extends Model {
 
         static associate(models) {
             // define association here
+            this.hasMany(models.Category, {
+                foreignKey: "salon_id",
+                as: "categories"
+            });
+
+            this.hasMany(models.Service, {
+                foreignKey: "salon_id",
+                as: "services"
+            });
         }
     }
     Salon.init(
@@ -39,6 +49,26 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false
             },
             address: {
+                type: DataTypes.STRING,
+                allowNull: true
+            },
+            owner_name: {
+                type: DataTypes.STRING,
+                allowNull: true
+            },
+            type: {
+                type: DataTypes.ENUM(SalonType.getValues()),
+                allowNull: true
+            },
+            map_link: {
+                type: DataTypes.STRING,
+                allowNull: true
+            },
+            about: {
+                type: DataTypes.TEXT,
+                allowNull: true
+            },
+            logo: {
                 type: DataTypes.STRING,
                 allowNull: true
             },

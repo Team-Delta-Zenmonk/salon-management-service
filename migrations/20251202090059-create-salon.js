@@ -1,7 +1,18 @@
 'use strict';
 
+const { SalonType } = require("../models/salon/salon-types");
+
 module.exports = {
   async up(queryInterface, Sequelize) {
+
+    await queryInterface.sequelize.query(`
+    CREATE TYPE "enum_salon_type" AS ENUM (
+    '${SalonType.ENUM.FEMALE}',
+    '${SalonType.ENUM.MALE}', 
+    '${SalonType.ENUM.UNISEX}'
+    );
+    `);
+
     await queryInterface.createTable('salons', {
       id: {
         allowNull: false,
@@ -23,6 +34,9 @@ module.exports = {
         allowNull: false,
         unique: true,
       },
+      owner_name: {
+        type: Sequelize.STRING
+      },
       password: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -32,6 +46,18 @@ module.exports = {
       },
       address: {
         type: Sequelize.STRING
+      },
+      map_link: {
+        type: Sequelize.STRING
+      },
+      about: {
+        type: Sequelize.TEXT
+      },
+      logo: {
+        type: Sequelize.STRING
+      },
+      type: {
+        type: Sequelize.ENUM('enum_salon_type'),
       },
       reset_password_token: {
         type: Sequelize.STRING
@@ -53,6 +79,9 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
+    await queryInterface.sequelize.query(`
+    DROP TYPE "enum_salon_type";
+    `);
     await queryInterface.dropTable('salons');
   }
 };

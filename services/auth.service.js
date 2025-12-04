@@ -1,7 +1,7 @@
 const { error } = require("../libs");
 const { generateResetToken } = require("../libs/generate-token");
 const { salonRepository } = require("../repository");
-const bcrypt = require('bcrypt');
+const crypto = require("crypto");
 const jwt = require('jsonwebtoken');
 const mailService = require('./mail.service');
 const { hashPassword, comparePassword } = require("../libs/hash");
@@ -13,7 +13,7 @@ exports.loginSalon = async (payload) => {
         throw new error.BadRequest('Email and password required');
     }
 
-    const salon = await salonRepository.model.scope('withPassword').findOne({ email });
+    const salon = await salonRepository.findByEmailReturnWithPassword(email);
 
     if (!salon) {
         throw new error.BadRequest('Salon not found');
@@ -46,7 +46,7 @@ exports.forgotPassword = async (payload) => {
     const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
 
     await salonRepository.update({
-        payload: { reset_token: hashed, reset_token_expiry: expiry },
+        payload: { reset_password_token: hashed, reset_token_expiry: expiry },
         criteria: { email }
     });
 
@@ -72,7 +72,7 @@ exports.resetPassword = async (payload) => {
 
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-    const salon = await salonRepository.findOne({ reset_token: hashedToken });
+    const salon = await salonRepository.findOne({ reset_password_token: hashedToken });
 
     if (!salon) {
         throw new error.BadRequest('Invalid token');
@@ -85,7 +85,7 @@ exports.resetPassword = async (payload) => {
     const hashedPassword = await hashPassword(password);
 
     await salonRepository.update({
-        payload: { password: hashedPassword, reset_token: null, reset_token_expiry: null },
+        payload: { password: hashedPassword, reset_password_token: null, reset_token_expiry: null },
         criteria: { id: salon.id }
     });
 
