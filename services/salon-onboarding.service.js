@@ -9,140 +9,156 @@ const OTP_LENGTH = parseInt(process.env.OTP_LENGTH || '6');
 const RESEND_MAX_PER_HOUR = parseInt(process.env.OTP_RESEND_MAX_PER_HOUR || '3');
 
 exports.init = async (payload) => {
-    const { email, name, password } = payload.body;
-    if (!email || !name || !password) {
-        throw new error.BadRequest('All fields required');
-    }
+    return await salonOnboardingRepository.handleManagedTransaction(async (transaction) => {
 
-    //If fully registered already
-    const existing = await salonRepository.findOne({ email });
-    if (existing) {
-        throw new error.BadRequest('Email already registered. Please login.');
-    }
+        const { email, name, password } = payload.body;
+        if (!email || !name || !password) {
+            throw new error.BadRequest('All fields required');
+        }
 
-    //check onboarding entry
-    let onboarding = await salonOnboardingRepository.findOne({ email });
+        //If fully registered already
+        const existing = await salonRepository.findOne({ email }, [], {}, { transaction });
+        if (existing) throw new error.BadRequest('Email already registered. Please login.');
 
-    const nowTime = now();
+        //check onboarding entry
+        let onboarding = await salonOnboardingRepository.findOne({ email }, [], {}, { transaction });
+        const nowTime = now();
 
-    //If entry exists and OTP is still valid -> tell user to use existing OTP
-    if (onboarding && onboarding.otp_expires_at && new Date(onboarding.otp_expires_at) > nowTime) {
-        return { message: 'OTP already sent. Please check your email.' };
-    }
+        //If entry exists and OTP is still valid -> tell user to use existing OTP
+        if (onboarding && onboarding.otp_expires_at && new Date(onboarding.otp_expires_at) > nowTime) {
+            return { message: 'OTP already sent. Please check your email.' };
+        }
 
-    // Generate new OTP
-    const otp = generateOtp(OTP_LENGTH);
-    const otpCreatedAt = nowTime;
-    const otpExpiresAt = addMinutes(otpCreatedAt, OTP_TTL_MINUTES);
-    const hashedPassword = await hashPassword(password);
+        // Generate new OTP
+        const otp = generateOtp(OTP_LENGTH);
+        const otpExpiresAt = addMinutes(nowTime, OTP_TTL_MINUTES);
+        const hashedPassword = await hashPassword(password);
 
-    if (!onboarding) {
-        onboarding = await salonOnboardingRepository.create({
-            email,
-            name,
-            password: hashedPassword,
-            otp,
-            otp_created_at: otpCreatedAt,
-            otp_expires_at: otpExpiresAt,
-            resend_count_hour: 0,
-            last_resend_at: nowTime,
-        });
-    } else {
-        // update existing onboarding
-        onboarding = await salonOnboardingRepository.update({
-            payload: {
-                otp,
-                otp_created_at: otpCreatedAt,
-                otp_expires_at: otpExpiresAt,
+        if (!onboarding) {
+            onboarding = await salonOnboardingRepository.create({
+                email,
+                name,
                 password: hashedPassword,
-            },
-            criteria: { email }
-        });
-    }
+                otp,
+                otp_created_at: nowTime,
+                otp_expires_at: otpExpiresAt,
+                resend_count_hour: 0,
+                last_resend_at: nowTime,
+            }, { transaction });
 
-    // send email
-    await mailService.sendMailToUser(email, 'Your verification code', `Your OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`);
+        } else {
+            // update existing onboarding
+            onboarding = await salonOnboardingRepository.update({
+                payload: {
+                    otp,
+                    otp_created_at: nowTime,
+                    otp_expires_at: otpExpiresAt,
+                    password: hashedPassword
+                },
+                criteria: { email },
+                options: { transaction }
+            });
+        }
 
-    return { message: 'OTP sent to your email', email };
+        // send email
+        await mailService.sendMailToUser(
+            email,
+            'Your verification code',
+            `Your OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`
+        );
+
+        return { message: 'OTP sent to your email', email };
+    });
 };
 
 exports.verify = async (payload) => {
-    const { email, otp } = payload.body;
-    if (!email || !otp) throw new error.BadRequest('Email and OTP required');
+    return await salonOnboardingRepository.handleManagedTransaction(async (transaction) => {
 
-    const record = await salonOnboardingRepository.findOne({ email });
-    if (!record) throw new error.BadRequest('No onboarding found for this email. Please register first.');
+        const { email, otp } = payload.body;
+        if (!email || !otp) throw new error.BadRequest('Email and OTP required');
 
-    const nowTime = now();
+        const record = await salonOnboardingRepository.findOne({ email }, [], {}, { transaction });
+        if (!record) throw new error.BadRequest('No onboarding found. Register first.');
 
-    if (!record.otp || String(record.otp) !== String(otp)) {
-        throw new error.BadRequest('Invalid OTP');
-    }
+        const nowTime = now();
+        if (!record.otp || String(record.otp) !== String(otp))
+            throw new error.BadRequest('Invalid OTP');
 
-    if (new Date(record.otp_expires_at) < nowTime) {
-        throw new error.BadRequest('OTP expired. Please request resend.');
-    }
+        if (new Date(record.otp_expires_at) < nowTime)
+            throw new error.BadRequest('OTP expired. Request resend.');
 
-    // create salon
-    await salonRepository.create({
-        email: record.email,
-        name: record.name,
-        password: record.password,
+        // create salon
+        await salonRepository.create({
+            email: record.email,
+            name: record.name,
+            password: record.password,
+        }, { transaction });
+
+        // delete onboarding entry
+        await salonOnboardingRepository.softDelete({ email }, { transaction });
+
+        // send email
+        await mailService.sendMailToUser(
+            email,
+            'Welcome to Salon',
+            'Your account is ready. You can login now.'
+        );
+
+        return { message: 'OTP verified. Salon created.' };
     });
-
-    // delete onboarding entry
-    await salonOnboardingRepository.softDelete({ email });
-
-    // optionally send welcome mail
-    await mailService.sendMailToUser(email, 'Welcome to Salon', 'Your account is ready. You can login now.');
-
-    return { message: 'OTP verified. Salon created.' };
 };
 
 exports.resend = async (payload) => {
-    const { email } = payload.body;
-    if (!email) throw new error.BadRequest('Email required');
+    return await salonOnboardingRepository.handleManagedTransaction(async (transaction) => {
 
-    const record = await salonOnboardingRepository.findOne({ email });
-    if (!record) throw new error.BadRequest('No onboarding found. Please register first.');
+        const { email } = payload.body;
+        if (!email) throw new error.BadRequest('Email required');
 
-    const nowTime = now();
+        const record = await salonOnboardingRepository.findOne({ email }, [], {}, { transaction });
+        if (!record) throw new error.BadRequest('No onboarding found. Please register first.');
 
-    // reset hourly counter when last_resend_at older than 1 hour
-    if (!record.last_resend_at || (nowTime - new Date(record.last_resend_at) > 60 * 60 * 1000)) {
+        const nowTime = now();
+
+        // reset hourly counter when last_resend_at older than 1 hour
+        if (!record.last_resend_at || (nowTime - new Date(record.last_resend_at) > 60 * 60 * 1000)) {
+            await salonOnboardingRepository.update({
+                payload: { resend_count_hour: 0 },
+                criteria: { email },
+                options: { transaction }
+            });
+            record.resend_count_hour = 0;
+        }
+
+        if (record.resend_count_hour >= RESEND_MAX_PER_HOUR)
+            throw new error.BadRequest('Resend limit reached. Try again later.');
+
+        // If existing OTP still valid, disallow immediate resend (optional)
+        if (new Date(record.otp_expires_at) > nowTime) {
+            return { message: 'Your OTP is still valid. Check your email.' };
+        }
+
+        // generate new otp, update counts
+        const otp = generateOtp(OTP_LENGTH);
+        const otpExpiresAt = addMinutes(nowTime, OTP_TTL_MINUTES);
+
         await salonOnboardingRepository.update({
-            payload: { resend_count_hour: 0 },
-            criteria: { email }
+            payload: {
+                otp,
+                otp_created_at: nowTime,
+                otp_expires_at: otpExpiresAt,
+                resend_count_hour: (record.resend_count_hour || 0) + 1,
+                last_resend_at: nowTime
+            },
+            criteria: { email },
+            options: { transaction }
         });
-        record.resend_count_hour = 0;
-    }
 
-    if (record.resend_count_hour >= RESEND_MAX_PER_HOUR) {
-        throw new error.BadRequest('Resend limit reached. Try again later.');
-    }
+        await mailService.sendMailToUser(
+            email,
+            'Your new verification code',
+            `Your new OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`
+        );
 
-    // If existing OTP still valid, disallow immediate resend (optional)
-    if (new Date(record.otp_expires_at) > nowTime) {
-        // you can choose to allow resending same OTP; we send a message instead
-        return { message: 'Your OTP is still valid. Please check your email.' };
-    }
-
-    // generate new otp, update counts
-    const otp = generateOtp(OTP_LENGTH);
-    const otpExpiresAt = addMinutes(nowTime, parseInt(process.env.OTP_TTL_MINUTES || '5'));
-
-    await salonOnboardingRepository.update({
-        payload: {
-            otp,
-            otp_created_at: nowTime,
-            otp_expires_at: otpExpiresAt,
-            resend_count_hour: (record.resend_count_hour || 0) + 1,
-            last_resend_at: nowTime,
-        },
-        criteria: { email }
+        return { message: 'OTP resent successfully.' };
     });
-
-    await mailService.sendMailToUser(email, 'Your new verification code', `Your new OTP is ${otp}. It expires in ${process.env.OTP_TTL_MINUTES || '5'} minutes.`);
-
-    return { message: 'OTP resent successfully.' };
-};
+}

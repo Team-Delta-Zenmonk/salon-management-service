@@ -79,11 +79,11 @@ module.exports = {
         defaultValue: false
       },
       gender: {
-        type: Sequelize.ENUM('enum_service_gender'),
+        type: 'enum_service_gender',
         allowNull: false
       },
       price_type: {
-        type: Sequelize.ENUM('enum_service_price_type'),
+        type: 'enum_service_price_type',
         allowNull: false
       },
       price: {
@@ -94,7 +94,7 @@ module.exports = {
         type: Sequelize.INTEGER
       },
       discount_type: {
-        type: Sequelize.ENUM('enum_service_discount_type'),
+        type: 'enum_service_discount_type',
       },
       created_at: {
         allowNull: false,
@@ -110,6 +110,8 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable('services');
+
     await queryInterface.sequelize.query(`
     DROP TYPE "enum_service_gender";
     `);
@@ -122,6 +124,5 @@ module.exports = {
     DROP TYPE "enum_service_discount_type";
     `);
 
-    await queryInterface.dropTable('services');
   }
 };

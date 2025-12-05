@@ -57,7 +57,7 @@ module.exports = {
         type: Sequelize.STRING
       },
       type: {
-        type: Sequelize.ENUM('enum_salon_type'),
+        type: 'enum_salon_type',
       },
       reset_password_token: {
         type: Sequelize.STRING
@@ -79,9 +79,10 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
+    await queryInterface.dropTable('salons');
+    
     await queryInterface.sequelize.query(`
     DROP TYPE "enum_salon_type";
     `);
-    await queryInterface.dropTable('salons');
   }
 };

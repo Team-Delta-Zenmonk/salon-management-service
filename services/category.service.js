@@ -20,7 +20,7 @@ exports.getCategories = async (payload) => {
     const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
     if (!currentSalon) throw new error.NotFound('Salon not found');
 
-    return await categoryRepository.findAll({ salon_id: currentSalon.id });
+    return await categoryRepository.findAndCountAll({ criteria: { salon_id: currentSalon.id } });
 }
 
 exports.updateCategory = async (payload) => {
@@ -32,10 +32,14 @@ exports.updateCategory = async (payload) => {
     const category = await categoryRepository.findOne({ uuid: params.uuid, salon_id: currentSalon.id });
     if (!category) throw new error.NotFound('Category not found');
 
-    return await categoryRepository.update({
+    const response = await categoryRepository.update({
         payload: body,
-        criteria: { uuid: params.uuid, salon_id: currentSalon.id },
+        criteria: { uuid: params.uuid },
     });
+
+    if (response[0] === 1) return { message: "Successfully updated category" }
+
+    throw new error.BadRequest('Failed to update category');
 }
 
 exports.deleteCategory = async (payload) => {
@@ -47,7 +51,7 @@ exports.deleteCategory = async (payload) => {
     const category = await categoryRepository.findOne({ uuid: params.uuid, salon_id: currentSalon.id });
     if (!category) throw new error.NotFound('Category not found');
 
-    await categoryRepository.softDelete({ uuid: params.uuid, salon_id: currentSalon.id });
+    await categoryRepository.softDelete({ uuid: params.uuid });
 
-    return 'Category deleted successfully';
+    return { message: 'Category deleted successfully' };
 }
