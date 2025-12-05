@@ -4,9 +4,11 @@ const { SalonType } = require("./salon-types");
 
 module.exports = (sequelize, DataTypes) => {
     class Salon extends Model {
-
         static associate(models) {
-            // define association here
+            this.hasMany(models.Staff, {
+                foreignKey: "salon_id",
+                as: "staff",
+            });
             this.hasMany(models.Category, {
                 foreignKey: "salon_id",
                 as: "categories"

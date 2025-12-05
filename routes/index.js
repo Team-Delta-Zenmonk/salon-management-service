@@ -7,6 +7,8 @@ router.use('/salon-onboardings', require('./salon-onboarding.router'));
 router.use('/salons', authMiddleware.authSalonMiddleware, require('./salon.router'));
 router.use('/salons/categories', authMiddleware.authSalonMiddleware, require('./category.router'));
 router.use('/salons/services', authMiddleware.authSalonMiddleware, require('./service.router'));
+router.use('/salons/staffs', authMiddleware.authSalonMiddleware, require('./staff.router'));
+router.use('/salons/staff-services', authMiddleware.authSalonMiddleware, require('./staff-service.router'));
 
 router.get('/', (req, res, next) => {
     res.send('Salon Management Service is running');

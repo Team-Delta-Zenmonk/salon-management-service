@@ -3,5 +3,7 @@ module.exports = {
     salonRepository: require('./salon.repository'),
     salonOnboardingRepository: require('./salon-onboarding.repository'),
     categoryRepository: require('./category.repository'),
-    serviceRepository: require('./service.repository')
+    staffRepository: require('./staff.repository'),
+    serviceRepository: require('./service.repository'),
+    staffServiceRepository: require('./staff-service.repository')   
 }

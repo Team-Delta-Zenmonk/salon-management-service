@@ -24,6 +24,12 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: "parent_id",
                 as: "children"
             });
+            this.hasMany(models.StaffService, {
+                foreignKey: "service_id",
+                as: "staff_service",
+                onDelete: "CASCADE",
+                onUpdate: "CASCADE",
+            });
         }
     }
     Service.init(
