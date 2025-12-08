@@ -13,6 +13,7 @@ exports.init = async (req, res, next) => {
 exports.verify = async (req, res, next) => {
     try {
         const result = await onboardService.verify({ body: req.body });
+        res.cookie('jwt', result.token, { httpOnly: true, secure: true, maxAge: 36000000, sameSite: 'none' });
         return res.status(200).json(result);
     } catch (err) {
         console.log('Error in controller verifyOtp', err);

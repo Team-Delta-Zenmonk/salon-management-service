@@ -88,7 +88,7 @@ exports.verify = async (payload) => {
             throw new error.BadRequest('OTP expired. Request resend.');
 
         // create salon
-        await salonRepository.create({
+        const salon = await salonRepository.create({
             email: record.email,
             name: record.name,
             password: record.password,
@@ -104,7 +104,8 @@ exports.verify = async (payload) => {
             'Your account is ready. You can login now.'
         );
 
-        return { message: 'OTP verified. Salon created.' };
+        const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET);
+        return { token, salon };
     });
 };
 
