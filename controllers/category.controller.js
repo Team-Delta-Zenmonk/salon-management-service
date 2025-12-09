@@ -12,12 +12,12 @@ exports.createCategory = async (req, res, next) => {
     }
 }
 
-exports.getCategories = async (req, res, next) => {
+exports.listCategories = async (req, res, next) => {
     try {
-        const response = await categoryService.getCategories({ salon: req.salon })
+        const response = await categoryService.listCategories({ salon: req.salon })
         return res.status(SUCCESS).json(response)
     } catch (error) {
-        console.log("Error in controller getCategories", error)
+        console.log("Error in controller listCategories", error)
         return next(error)
     }
 }
@@ -42,3 +42,12 @@ exports.deleteCategory = async (req, res, next) => {
     }
 }
 
+exports.getCategory = async (req, res, next) => {
+    try {
+        const response = await categoryService.getCategory({ salon: req.salon, params: req.params })
+        return res.status(SUCCESS).json(response)
+    } catch (error) {
+        console.log("Error in controller getCategory", error)
+        return next(error)
+    }
+}

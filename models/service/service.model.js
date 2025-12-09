@@ -97,13 +97,16 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: false
             },
             price: {
-                type: DataTypes.INTEGER
+                type: DataTypes.INTEGER,
+                allowNull: false
             },
             discount: {
-                type: DataTypes.INTEGER
+                type: DataTypes.INTEGER,
+                allowNull: true
             },
             discount_type: {
                 type: DataTypes.ENUM(DiscountType.getValues()),
+                allowNull: true
             },
             created_at: {
                 type: DataTypes.DATE,

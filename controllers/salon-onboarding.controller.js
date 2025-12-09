@@ -1,8 +1,8 @@
 const onboardService = require('../services/salon-onboarding.service');
 
-exports.init = async (req, res, next) => {
+exports.initOnboarding = async (req, res, next) => {
     try {
-        const result = await onboardService.init({ body: req.body });
+        const result = await onboardService.initOnboarding({ body: req.body });
         return res.status(200).json(result);
     } catch (err) {
         console.log('Error in controller onBoardSalon', err);
@@ -10,9 +10,9 @@ exports.init = async (req, res, next) => {
     }
 };
 
-exports.verify = async (req, res, next) => {
+exports.verifyOnboarding = async (req, res, next) => {
     try {
-        const result = await onboardService.verify({ body: req.body });
+        const result = await onboardService.verifyOnboarding({ body: req.body });
         res.cookie('jwt', result.token, { httpOnly: true, secure: true, maxAge: 36000000, sameSite: 'none' });
         return res.status(200).json(result);
     } catch (err) {
@@ -21,9 +21,9 @@ exports.verify = async (req, res, next) => {
     }
 };
 
-exports.resend = async (req, res, next) => {
+exports.resendOtp = async (req, res, next) => {
     try {
-        const result = await onboardService.resend({ body: req.body });
+        const result = await onboardService.resendOtp({ body: req.body });
         return res.status(200).json(result);
     } catch (err) {
         console.log('Error in controller resendOtp', err);

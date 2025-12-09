@@ -3,18 +3,16 @@ const { salonRepository, salonOnboardingRepository } = require("../repository");
 const mailService = require('./mail.service');
 const { hashPassword } = require('../libs/hash');
 const { generateOtp, now, addMinutes } = require('../libs/otp');
+const jwt = require('jsonwebtoken');
 
 const OTP_TTL_MINUTES = parseInt(process.env.OTP_TTL_MINUTES || '5');
 const OTP_LENGTH = parseInt(process.env.OTP_LENGTH || '6');
 const RESEND_MAX_PER_HOUR = parseInt(process.env.OTP_RESEND_MAX_PER_HOUR || '3');
 
-exports.init = async (payload) => {
+exports.initOnboarding = async (payload) => {
     return await salonOnboardingRepository.handleManagedTransaction(async (transaction) => {
 
         const { email, name, password } = payload.body;
-        if (!email || !name || !password) {
-            throw new error.BadRequest('All fields required');
-        }
 
         //If fully registered already
         const existing = await salonRepository.findOne({ email }, [], {}, { transaction });
@@ -71,11 +69,10 @@ exports.init = async (payload) => {
     });
 };
 
-exports.verify = async (payload) => {
+exports.verifyOnboarding = async (payload) => {
     return await salonOnboardingRepository.handleManagedTransaction(async (transaction) => {
 
         const { email, otp } = payload.body;
-        if (!email || !otp) throw new error.BadRequest('Email and OTP required');
 
         const record = await salonOnboardingRepository.findOne({ email }, [], {}, { transaction });
         if (!record) throw new error.BadRequest('No onboarding found. Register first.');
@@ -109,11 +106,10 @@ exports.verify = async (payload) => {
     });
 };
 
-exports.resend = async (payload) => {
+exports.resendOtp = async (payload) => {
     return await salonOnboardingRepository.handleManagedTransaction(async (transaction) => {
 
         const { email } = payload.body;
-        if (!email) throw new error.BadRequest('Email required');
 
         const record = await salonOnboardingRepository.findOne({ email }, [], {}, { transaction });
         if (!record) throw new error.BadRequest('No onboarding found. Please register first.');

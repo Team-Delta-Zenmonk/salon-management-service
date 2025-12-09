@@ -9,10 +9,6 @@ const { hashPassword, comparePassword } = require("../libs/hash");
 exports.loginSalon = async (payload) => {
     const { email, password } = payload.body;
 
-    if (!email || !password) {
-        throw new error.BadRequest('Email and password required');
-    }
-
     const salon = await salonRepository.findByEmailReturnWithPassword(email);
 
     if (!salon) {
@@ -31,10 +27,6 @@ exports.loginSalon = async (payload) => {
 
 exports.forgotPassword = async (payload) => {
     const { email } = payload.body;
-
-    if (!email) {
-        throw new error.BadRequest('Email required');
-    }
 
     const salon = await salonRepository.findOne({ email });
 

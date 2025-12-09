@@ -1,4 +1,5 @@
 const { ZodError } = require('zod');
+const { BAD_REQUEST } = require('../libs/constants');
 
 exports.validate = (schema) => (req, res, next) => {
   try {
@@ -10,7 +11,7 @@ exports.validate = (schema) => (req, res, next) => {
     next();
   } catch (error) {
     if (error instanceof ZodError) {
-      return res.status(400).json({
+      return res.status(BAD_REQUEST).json({
         errors: error.errors.map((e) => ({
           path: e.path.join("."),
           message: e.message,

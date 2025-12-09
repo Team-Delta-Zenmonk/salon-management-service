@@ -6,14 +6,8 @@ exports.createService = async (payload) => {
 
     const { category_id, parent_id } = body;
 
-    const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-
-    if (!currentSalon) {
-        throw new error.NotFound("Salon not found");
-    }
-
     if (parent_id) {
-        const parent = await serviceRepository.findOne({ uuid: parent_id, salon_id: currentSalon.id });
+        const parent = await serviceRepository.findOne({ uuid: parent_id, salon_id: salon.id });
 
         if (!parent) {
             throw new error.NotFound("Parent service not found");
@@ -22,41 +16,35 @@ exports.createService = async (payload) => {
         body.parent_id = parent.id;
         // body.category_id = parent.category_id;
 
-        return await serviceRepository.create({ ...body, salon_id: currentSalon.id, category_id: null });
+        return await serviceRepository.create({ ...body, salon_id: salon.id, category_id: null });
 
     }
 
-    const category = await categoryRepository.findOne({ uuid: category_id, salon_id: currentSalon.id });
+    const category = await categoryRepository.findOne({ uuid: category_id, salon_id: salon.id });
 
     if (!category) {
         throw new error.NotFound("Category not found");
     }
 
-    return await serviceRepository.create({ ...body, salon_id: currentSalon.id, category_id: category.id });
+    return await serviceRepository.create({ ...body, salon_id: salon.id, category_id: category.id });
 }
 
 exports.getService = async (payload) => {
     const { params, salon } = payload;
 
-    const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
+    const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
 
-    if (!currentSalon) {
-        throw new error.NotFound("Salon not found");
+    if (!service) {
+        throw new error.NotFound("Service not found");
     }
 
-    return await serviceRepository.findOne({ uuid: params.uuid, salon_id: currentSalon.id });
+    return service;
 }
 
 exports.listSubServices = async (payload) => {
     const { params, salon } = payload;
 
-    const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-
-    if (!currentSalon) {
-        throw new error.NotFound("Salon not found");
-    }
-
-    const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: currentSalon.id });
+    const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
 
     if (!service) {
         throw new error.NotFound("Service not found");
@@ -67,14 +55,8 @@ exports.listSubServices = async (payload) => {
 
 exports.listServicesByCategory = async (payload) => {
     const { params, salon } = payload;
-
-    const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-
-    if (!currentSalon) {
-        throw new error.NotFound("Salon not found");
-    }
-
-    const category = await categoryRepository.findOne({ uuid: params.uuid, salon_id: currentSalon.id });
+    
+    const category = await categoryRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
 
     if (!category) {
         throw new error.NotFound("Category not found");
@@ -86,13 +68,7 @@ exports.listServicesByCategory = async (payload) => {
 exports.updateService = async (payload) => {
     const { params, salon, body } = payload;
 
-    const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-
-    if (!currentSalon) {
-        throw new error.NotFound("Salon not found");
-    }
-
-    const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: currentSalon.id });
+    const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
 
     if (!service) {
         throw new error.NotFound("Service not found");
@@ -111,13 +87,7 @@ exports.updateService = async (payload) => {
 exports.deleteService = async (payload) => {
     const { params, salon } = payload;
 
-    const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-
-    if (!currentSalon) {
-        throw new error.NotFound("Salon not found");
-    }
-
-    const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: currentSalon.id });
+    const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
 
     if (!service) {
         throw new error.NotFound("Service not found");

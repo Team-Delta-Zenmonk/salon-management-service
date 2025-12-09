@@ -44,6 +44,12 @@ module.exports = {
       phone: {
         type: Sequelize.STRING
       },
+      latitude: {
+        type: Sequelize.STRING
+      },
+      longitude: {
+        type: Sequelize.STRING
+      },
       address: {
         type: Sequelize.STRING
       },
@@ -80,7 +86,7 @@ module.exports = {
   },
   async down(queryInterface, Sequelize) {
     await queryInterface.dropTable('salons');
-    
+
     await queryInterface.sequelize.query(`
     DROP TYPE "enum_salon_type";
     `);
