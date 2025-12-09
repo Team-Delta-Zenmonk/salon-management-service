@@ -1,5 +1,6 @@
 "use strict";
 const { Model } = require("sequelize");
+const { ServiceGender } = require("../service/service-types");
 
 module.exports = (sequelize, DataTypes) => {
   class Staff extends Model {
@@ -79,6 +80,10 @@ module.exports = (sequelize, DataTypes) => {
       emergency_contact: {
         type: DataTypes.JSON,
         allowNull: false,
+      },
+      gender: {
+        type: DataTypes.ENUM(ServiceGender.getValues()),
+        allowNull: false
       },
       created_at: {
         type: DataTypes.DATE,

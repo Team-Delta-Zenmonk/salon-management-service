@@ -1,5 +1,5 @@
 const { error } = require("../libs");
-const { salonRepository, categoryRepository, serviceRepository } = require("../repository");
+const { salonRepository, categoryRepository, serviceRepository, staffServiceRepository } = require("../repository");
 
 exports.createService = async (payload) => {
     const { body, salon } = payload;
@@ -27,6 +27,21 @@ exports.createService = async (payload) => {
     }
 
     return await serviceRepository.create({ ...body, salon_id: salon.id, category_id: category.id });
+}
+
+exports.listStaff = async(payload) => {
+    const { params, salon } = payload;
+
+    const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
+
+    if (!currentSalon) {
+        throw new error.NotFound("Salon not found");
+    }
+
+    const service = await serviceRepository.findOne({uuid: params.uuid, salon_id: currentSalon.id});
+
+    const staffs = await staffServiceRepository.findAll({criteria: {service_id: service.id}});
+    return staffs;
 }
 
 exports.getService = async (payload) => {

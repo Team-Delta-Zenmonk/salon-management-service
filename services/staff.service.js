@@ -1,5 +1,5 @@
 const { error } = require("../libs");
-const { salonRepository, staffRepository } = require("../repository");
+const { salonRepository, staffRepository, staffServiceRepository } = require("../repository");
 
 exports.create = async (payload) => {
   const { body, salon } = payload;
@@ -50,7 +50,7 @@ exports.list = async (payload) => {
   return staff;
 };
 
-exports.get = async () => {
+exports.get = async (payload) => {
   const { salon, params } = payload;
 
   const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
@@ -64,7 +64,26 @@ exports.get = async () => {
   return staff;
 };
 
-exports.remove = async () => {
+exports.listServices = async (payload) => {
+  const { params, salon } = payload;
+
+  const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
+
+  if (!currentSalon) {
+    throw new error.NotFound("Salon not found");
+  }
+
+  const staff = await staffRepository.findOne({
+    uuid: params.uuid,
+    salon_id: currentSalon.id,
+  });
+  const services = await staffServiceRepository.findAll({
+    criteria: { staff_id: staff.id },
+  });
+  return services;
+};
+
+exports.remove = async (payload) => {
   const { salon, params } = payload;
 
   const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
@@ -75,6 +94,8 @@ exports.remove = async () => {
     uuid: params.uuid,
   });
   if (!staff) throw new error.NotFound("Staff not found");
+
+  // check if cascade works for staff-service, and only delete if there are no bookings in future for this staff
   
   await staffRepository.softDelete({
     salon_id: currentSalon.id,

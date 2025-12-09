@@ -2,7 +2,7 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable('service_staff', {
+    await queryInterface.createTable('staff_services', {
       id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
@@ -29,7 +29,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'staff',
+          model: 'staffs',
           key: 'id',
         },
         onDelete: 'CASCADE',
@@ -63,16 +63,16 @@ module.exports = {
       },
     });
 
-    await queryInterface.addConstraint('service_staff', {
+    await queryInterface.addConstraint('staff_services', {
       fields: ['service_id', 'staff_id'],
       type: 'unique',
-      name: 'unique_service_staff_pair',
+      name: 'unique_staff_service_pair',
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.removeConstraint('service_staff', 'unique_service_staff_pair');
+    await queryInterface.removeConstraint('staff_services', 'unique_staff_service_pair');
 
-    await queryInterface.dropTable('service_staff');
+    await queryInterface.dropTable('staff_services');
   },
 };

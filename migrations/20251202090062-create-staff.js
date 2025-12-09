@@ -2,7 +2,7 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("staff", {
+    await queryInterface.createTable("staffs", {
       id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
@@ -73,6 +73,10 @@ module.exports = {
         type: Sequelize.JSON,
         allowNull: false,
       },
+      gender: {
+        type: 'enum_service_gender',
+        allowNull: false
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -89,6 +93,6 @@ module.exports = {
   },
 
   async down(queryInterface) {
-    await queryInterface.dropTable("staff");
+    await queryInterface.dropTable("staffs");
   },
 };

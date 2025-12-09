@@ -32,8 +32,9 @@ class BaseRepository {
     return res
   }
 
-  async findAll({ criteria = {}, include = [], order, attributes = {}, offset = 0, paranoid = true, limit = null }) {
+  async findAll({ criteria = {}, include = [], order, attributes = {}, offset = 0, paranoid = true, limit = null, transaction = null }) {
     let findQuery = { where: criteria, include, attributes, offset, order, paranoid, subQuery: false };
+    if (transaction) findQuery.transaction = transaction; 
     if (limit) findQuery.limit = limit;
     return await this.model.findAll(findQuery);
   }

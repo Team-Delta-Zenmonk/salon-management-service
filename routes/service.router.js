@@ -7,8 +7,10 @@ const { deleteServiceSchema } = require('../schema/service/delete-service.schema
 const { getServiceSchema } = require('../schema/service/get-service.schema');
 const { listSubServicesSchema } = require('../schema/service/list-sub-services.schema');
 const { listServicesByCategorySchema } = require('../schema/service/list-services-by-category.schema');
+const { listServiceStaffSchema } = require('../schema/service/list-staff.schema')
 
 router.post('/', validate(createServiceSchema), serviceController.createService);
+router.get('/:uuid/staffs', validate(listServiceStaffSchema), serviceController.listStaff);
 router.get('/:uuid', validate(getServiceSchema), serviceController.getService);
 router.get('/:uuid/sub-services', validate(listSubServicesSchema), serviceController.listSubServices);
 router.get('/category/:uuid', validate(listServicesByCategorySchema), serviceController.listServicesByCategory);
