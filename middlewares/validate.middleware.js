@@ -8,16 +8,19 @@ exports.validate = (schema) => (req, res, next) => {
       query: req.query,
       params: req.params,
     });
+
     next();
   } catch (error) {
     if (error instanceof ZodError) {
       return res.status(BAD_REQUEST).json({
-        errors: error.errors.map((e) => ({
-          path: e.path.join("."),
-          message: e.message,
+        success: false,
+        errors: error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
         })),
       });
     }
+
     next(error);
   }
 };
