@@ -32,13 +32,7 @@ exports.createService = async (payload) => {
 exports.listStaff = async(payload) => {
     const { params, salon } = payload;
 
-    const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-
-    if (!currentSalon) {
-        throw new error.NotFound("Salon not found");
-    }
-
-    const service = await serviceRepository.findOne({uuid: params.uuid, salon_id: currentSalon.id});
+    const service = await serviceRepository.findOne({uuid: params.uuid, salon_id: salon.id});
 
     const staffs = await staffServiceRepository.findAll({criteria: {service_id: service.id}});
     return staffs;

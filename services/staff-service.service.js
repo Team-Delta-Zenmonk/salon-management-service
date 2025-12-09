@@ -9,10 +9,7 @@ const {
 exports.bulkCreate = async (payload) => {
   return await staffServiceRepository.handleManagedTransaction(
     async (transaction) => {
-      const { body, salon } = payload;
-
-      const currentSalon = await salonRepository.findOne({ uuid: salon.uuid }, [], {}, { transaction });
-      if (!currentSalon) throw new error.NotFound("Salon not found");
+      const { body } = payload;
 
       const serviceUUIDs = [...new Set(body.staff_services.map((i) => i.service_uuid))];
       const staffUUIDs = [...new Set(body.staff_services.map((i) => i.staff_uuid))];

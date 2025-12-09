@@ -4,30 +4,24 @@ const { salonRepository, staffRepository, staffServiceRepository } = require("..
 exports.create = async (payload) => {
   const { body, salon } = payload;
 
-  const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-  if (!currentSalon) throw new error.NotFound("Salon not found");
-
   return await staffRepository.create({
     ...body,
-    salon_id: currentSalon.id,
+    salon_id: salon.id,
   });
 };
 
 exports.update = async (payload) => {
   const { body, salon, params } = payload;
 
-  const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-  if (!currentSalon) throw new error.NotFound("Salon not found");
-
   const staff = await staffRepository.findOne({
     uuid: params.uuid,
-    salon_id: currentSalon.id,
+    salon_id: salon.id,
   });
   if (!staff) throw new error.NotFound("Staff not found");
 
   const response = await staffRepository.update({
     payload: body,
-    criteria: { uuid: params.uuid, salon_id: currentSalon.id },
+    criteria: { uuid: params.uuid, salon_id: salon.id },
   });
 
   if (response[0] === 1) return { message: "Successfully updated staff" };
@@ -39,11 +33,8 @@ exports.list = async (payload) => {
   const { salon, query } = payload;
   const { page = 1, limit = 10 } = query;
 
-  const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-  if (!currentSalon) throw new error.NotFound("Salon not found");
-
   const staff = await staffRepository.findAndCountAll({
-    criteria: { salon_id: currentSalon.id },
+    criteria: { salon_id: salon.id },
     limit: limit,
     offset: (page - 1) * limit,
   });
@@ -53,11 +44,8 @@ exports.list = async (payload) => {
 exports.get = async (payload) => {
   const { salon, params } = payload;
 
-  const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-  if (!currentSalon) throw new error.NotFound("Salon not found");
-
   const staff = await staffRepository.findOne({
-    salon_id: currentSalon.id,
+    salon_id: salon.id,
     uuid: params.uuid,
   });
 
@@ -67,15 +55,9 @@ exports.get = async (payload) => {
 exports.listServices = async (payload) => {
   const { params, salon } = payload;
 
-  const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-
-  if (!currentSalon) {
-    throw new error.NotFound("Salon not found");
-  }
-
   const staff = await staffRepository.findOne({
     uuid: params.uuid,
-    salon_id: currentSalon.id,
+    salon_id: salon.id,
   });
   const services = await staffServiceRepository.findAll({
     criteria: { staff_id: staff.id },
@@ -85,12 +67,9 @@ exports.listServices = async (payload) => {
 
 exports.remove = async (payload) => {
   const { salon, params } = payload;
-
-  const currentSalon = await salonRepository.findOne({ uuid: salon.uuid });
-  if (!currentSalon) throw new error.NotFound("Salon not found");
   
   const staff = await staffRepository.findOne({
-    salon_id: currentSalon.id,
+    salon_id: salon.id,
     uuid: params.uuid,
   });
   if (!staff) throw new error.NotFound("Staff not found");
@@ -98,7 +77,7 @@ exports.remove = async (payload) => {
   // check if cascade works for staff-service, and only delete if there are no bookings in future for this staff
   
   await staffRepository.softDelete({
-    salon_id: currentSalon.id,
+    salon_id: salon.id,
     uuid: params.uuid,
   });
 
