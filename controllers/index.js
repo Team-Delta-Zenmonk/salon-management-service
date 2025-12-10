@@ -7,5 +7,6 @@ module.exports = {
     categoryController: require('./category.controller'),
     staffController: require('./staff.controller'),
     serviceController: require('./service.controller'),
-    staffServiceController: require('./staff-service.controller')
+    staffServiceController: require('./staff-service.controller'),
+    uploadController: require('./upload.controller'), 
 }

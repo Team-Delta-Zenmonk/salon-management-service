@@ -6,5 +6,6 @@ module.exports = {
     staffService: require('./staff.service'),
     categoryService: require('./category.service'),
     serviceService: require('./service.service'),
-    staffServicesService: require('./staff-service.service')
+    staffServicesService: require('./staff-service.service'),
+    uploadService: require('./upload.service'),
 }
