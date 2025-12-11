@@ -1,6 +1,7 @@
 "use strict";
 const { Model } = require("sequelize");
 const { SalonType } = require("./salon-types");
+const { HolidayType } = require("../holiday/holiday-types");
 
 module.exports = (sequelize, DataTypes) => {
     class Salon extends Model {
@@ -17,6 +18,15 @@ module.exports = (sequelize, DataTypes) => {
             this.hasMany(models.Service, {
                 foreignKey: "salon_id",
                 as: "services"
+            });
+
+            this.hasMany(models.Holiday, {
+                foreignKey: "parent_id",
+                constraints: false,
+                as: "holidays",
+                scope: {
+                    holiday_type: HolidayType.ENUM.SALON
+                }
             });
         }
     }

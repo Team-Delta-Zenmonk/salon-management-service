@@ -9,4 +9,5 @@ module.exports = {
     serviceController: require('./service.controller'),
     staffServiceController: require('./staff-service.controller'),
     uploadController: require('./upload.controller'), 
+    holidayController: require('./holiday.controller'),
 }

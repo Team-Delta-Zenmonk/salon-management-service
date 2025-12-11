@@ -5,5 +5,6 @@ module.exports = {
     categoryRepository: require('./category.repository'),
     staffRepository: require('./staff.repository'),
     serviceRepository: require('./service.repository'),
-    staffServiceRepository: require('./staff-service.repository')   
+    staffServiceRepository: require('./staff-service.repository'),
+    holidayRepository: require('./holiday.repository')
 }
