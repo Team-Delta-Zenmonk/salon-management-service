@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       uuid: {
         type: DataTypes.UUID,
-        defaultValue: DataTypes.UUIDV4,
+        defaultValue: Sequelize.literal("uuid_generate_v4()"),
         unique: true,
         allowNull: false,
       },
