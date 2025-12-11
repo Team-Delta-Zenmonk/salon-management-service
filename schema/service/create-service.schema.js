@@ -4,12 +4,12 @@ const { ServiceGender, PriceType, DiscountType } = require("../../models/service
 exports.createServiceSchema = z.object({
     body: z.object({
         name: z.string().min(1, "Name is required"),
-        description: z.string(),
-        duration: z.number(),
-        category_id: z.string(),
-        parent_id: z.string(),
-        is_active: z.boolean(),
-        is_popular: z.boolean(),
+        description: z.string().optional(),
+        duration: z.number().optional(),
+        category_id: z.string().optional(),
+        parent_id: z.string().optional(),
+        is_active: z.boolean().optional(),
+        is_popular: z.boolean().optional(),
         gender: z.enum(ServiceGender.getValues(), {
             required_error: "Gender is required",
         }),
@@ -17,9 +17,9 @@ exports.createServiceSchema = z.object({
             required_error: "Price type is required",
         }),
         price: z.number().min(1, "Price is required"),
-        discount: z.number(),
+        discount: z.number().optional(),
         discount_type: z.enum(DiscountType.getValues(), {
             required_error: "Discount type is required",
-        }),
+        }).optional(),
     })
 });
