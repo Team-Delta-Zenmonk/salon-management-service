@@ -1,8 +1,7 @@
 const { cloudinary } = require("../config");
 
-exports.uploadImages = async (file, folder) => {
-  if (!file) throw new Error("No file provided");
-
+exports.uploadImages = async (payload) => {
+  const { file, folder } = payload;
   const base64 = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
 
   const result = await cloudinary.uploader.upload(base64, {
