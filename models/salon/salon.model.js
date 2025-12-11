@@ -100,6 +100,14 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.DATE,
                 allowNull: true
             },
+            business_hours: {
+                type: DataTypes.JSON,
+                allowNull: true,
+            },
+            photos: {
+                type: DataTypes.JSON,
+                allowNull: true
+            },
             created_at: {
                 type: DataTypes.DATE,
                 allowNull: false

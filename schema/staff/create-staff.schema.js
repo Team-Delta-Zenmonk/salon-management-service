@@ -1,5 +1,13 @@
 const { z } = require("zod");
 
+const activeDaySchema = z
+  .object({
+    start_time: z.string(),
+    end_time: z.string(),
+  })
+  .nullable()
+  .optional();
+
 exports.createStaffSchema = z.object({
   body: z.object({
     first_name: z.string().min(1, "First name is required"),
@@ -44,5 +52,17 @@ exports.createStaffSchema = z.object({
       phone: z.string().min(8),
       relation: z.string().optional(),
     }),
+
+    active_hours: z
+      .object({
+        monday: activeDaySchema,
+        tuesday: activeDaySchema,
+        wednesday: activeDaySchema,
+        thursday: activeDaySchema,
+        friday: activeDaySchema,
+        saturday: activeDaySchema,
+        sunday: activeDaySchema,
+      })
+      .optional(),
   }),
 });

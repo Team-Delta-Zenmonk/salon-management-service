@@ -1,8 +1,22 @@
 const { error } = require("../libs");
-const { salonRepository, staffRepository, staffServiceRepository } = require("../repository");
+const { DayOfWeek } = require("../models/salon/salon-types");
+const { staffRepository, staffServiceRepository } = require("../repository");
+
+const numberToDay = Object.fromEntries(
+  Object.entries(DayOfWeek.ENUM).map(([day, num]) => [num, day])
+);
 
 exports.create = async (payload) => {
   const { body, salon } = payload;
+
+  if(body?.active_hours) {
+    const result = {};
+    for(const [day, value] of Object.entries(body.active_hours)) {
+      result[DayOfWeek.ENUM[day]] = value;
+    }
+    
+    body.active_hours = result;
+  }
 
   return await staffRepository.create({
     ...body,
@@ -19,6 +33,15 @@ exports.update = async (payload) => {
   });
   if (!staff) throw new error.NotFound("Staff not found");
 
+  if(body?.active_hours) {
+    const result = {};
+    for(const [day, value] of Object.entries(body.active_hours)) {
+      result[DayOfWeek.ENUM[day]] = value;
+    }
+    
+    body.active_hours = result;
+  }
+
   const response = await staffRepository.update({
     payload: body,
     criteria: { uuid: params.uuid, salon_id: salon.id },
@@ -33,12 +56,23 @@ exports.list = async (payload) => {
   const { salon, query } = payload;
   const { page = 1, limit = 10 } = query;
 
-  const staff = await staffRepository.findAndCountAll({
+  const staffs = await staffRepository.findAndCountAll({
     criteria: { salon_id: salon.id },
     limit: limit,
     offset: (page - 1) * limit,
   });
-  return staff;
+
+  const updatedStaffs = staffs.rows.map((staff)=> {
+    if(staff?.active_hours) {
+        const result = {};
+        for(const [num, value] of Object.entries(staff.active_hours)) {
+            result[numberToDay[num]] = value;
+        }
+        staff.active_hours = result;
+    }
+    return staff;
+  })
+  return updatedStaffs;
 };
 
 exports.get = async (payload) => {
@@ -49,6 +83,13 @@ exports.get = async (payload) => {
     uuid: params.uuid,
   });
 
+  if (staff?.active_hours) {
+    const result = {};
+    for (const [num, value] of Object.entries(staff.active_hours)) {
+      result[numberToDay[num]] = value;
+    }
+    staff.active_hours = result;
+  }
   return staff;
 };
 

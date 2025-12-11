@@ -71,6 +71,12 @@ module.exports = {
       reset_token_expiry: {
         type: Sequelize.DATE
       },
+      business_hours: {
+        type: Sequelize.JSON
+      },
+      photos: {
+        type: Sequelize.JSON
+      },
       created_at: {
         allowNull: false,
         type: Sequelize.DATE

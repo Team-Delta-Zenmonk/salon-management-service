@@ -95,7 +95,11 @@ module.exports = (sequelize, DataTypes) => {
       },
       gender: {
         type: DataTypes.ENUM(ServiceGender.getValues()),
-        allowNull: false
+        allowNull: false,
+      },
+      active_hours: {
+        type: DataTypes.JSON,
+        allowNull: true,
       },
       created_at: {
         type: DataTypes.DATE,

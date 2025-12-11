@@ -77,6 +77,9 @@ module.exports = {
         type: 'enum_service_gender',
         allowNull: false
       },
+      active_hours: {
+        type: Sequelize.JSON
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
