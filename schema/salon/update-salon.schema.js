@@ -34,6 +34,7 @@ exports.updateSalonSchema = z.object({
         type: z.enum(SalonType.getValues(), { message: "Invalid salon type" }).optional(),
         map_link: z.string().optional(),
         logo: z.string().optional(),
+        is_onboarded: z.boolean().optional(),
         photos: z.array(photoSchema).optional(),
         business_hours: z.object({
             monday: businessDaySchema,

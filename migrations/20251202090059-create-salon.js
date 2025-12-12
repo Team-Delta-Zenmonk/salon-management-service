@@ -65,6 +65,10 @@ module.exports = {
       type: {
         type: 'enum_salon_type',
       },
+      is_onboarded: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+      },
       reset_password_token: {
         type: Sequelize.STRING
       },

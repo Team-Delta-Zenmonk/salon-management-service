@@ -88,6 +88,10 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.TEXT,
                 allowNull: true
             },
+            is_onboarded: {
+                type: DataTypes.BOOLEAN,
+                defaultValue: false,
+            },
             logo: {
                 type: DataTypes.STRING,
                 allowNull: true
