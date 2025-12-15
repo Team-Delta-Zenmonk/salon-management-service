@@ -10,3 +10,14 @@ exports.updateSalon = async (req, res, next) => {
         return next(error);
     }
 }
+
+exports.getAvailableSlots = async (req, res, next) => {
+    try {
+        const message = await salonService.getAvailableSlots({ query: req.query});
+        return res.status(SUCCESS).json({ message });
+    } catch (error) {
+        console.log("Error in controller getAvailableSlots", error);
+        return next(error);
+    }
+}
+    

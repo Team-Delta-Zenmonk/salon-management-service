@@ -20,7 +20,7 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "staff_id",
         as: "cart_items",
       });
-      
+
       this.hasMany(models.Holiday, {
         foreignKey: "parent_id",
         constraints: false,
@@ -28,6 +28,11 @@ module.exports = (sequelize, DataTypes) => {
         scope: {
           holiday_type: HolidayType.ENUM.STAFF
         }
+      });
+
+      this.hasMany(models.BookingService, {
+        foreignKey: "staff_id",
+        as: "booking_services",
       });
 
     }

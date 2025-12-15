@@ -1,25 +1,28 @@
 "use strict";
+
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-    class CartItem extends Model {
+    class BookingService extends Model {
         static associate(models) {
-            this.belongsTo(models.Cart, {
-                foreignKey: "cart_id",
-                as: "cart",
+            this.belongsTo(models.Booking, {
+                foreignKey: "booking_id",
+                as: "booking",
             });
-            this.belongsTo(models.Staff, {
-                foreignKey: "staff_id",
-                as: "staff",
-            });
+
             this.belongsTo(models.Service, {
                 foreignKey: "service_id",
                 as: "service",
             });
+
+            this.belongsTo(models.Staff, {
+                foreignKey: "staff_id",
+                as: "staff",
+            });
         }
     }
 
-    CartItem.init(
+    BookingService.init(
         {
             id: {
                 type: DataTypes.INTEGER,
@@ -30,22 +33,14 @@ module.exports = (sequelize, DataTypes) => {
             uuid: {
                 type: DataTypes.UUID,
                 defaultValue: DataTypes.UUIDV4,
+                allowNull: false,
                 unique: true,
-                allowNull: false,
             },
-            cart_id: {
+            booking_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
                 references: {
-                    model: "carts",
-                    key: "id",
-                },
-            },
-            staff_id: {
-                type: DataTypes.INTEGER,
-                allowNull: false,
-                references: {
-                    model: "staffs",
+                    model: "bookings",
                     key: "id",
                 },
             },
@@ -57,38 +52,43 @@ module.exports = (sequelize, DataTypes) => {
                     key: "id",
                 },
             },
-            price: {
+            staff_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
-                defaultValue: 0,
-            },
-            duration: {
-                type: DataTypes.INTEGER, // in minutes
-                allowNull: false,
-                defaultValue: 0,
+                references: {
+                    model: "staff",
+                    key: "id",
+                },
             },
             sequence: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
-                defaultValue: 0,
             },
-            created_at: {
+            offset_minutes: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+            },
+            start_time: {
                 type: DataTypes.DATE,
                 allowNull: false,
             },
-            updated_at: {
+            end_time: {
                 type: DataTypes.DATE,
                 allowNull: false,
             },
-            deleted_at: {
-                type: DataTypes.DATE,
-                allowNull: true,
+            duration_minutes: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+            },
+            price: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
             },
         },
         {
             sequelize,
-            modelName: "CartItem",
-            tableName: "cart_items",
+            modelName: "BookingService",
+            tableName: "booking_services",
             paranoid: true,
             timestamps: true,
             createdAt: "created_at",
@@ -97,5 +97,5 @@ module.exports = (sequelize, DataTypes) => {
         }
     );
 
-    return CartItem;
+    return BookingService;
 };

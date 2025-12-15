@@ -12,6 +12,7 @@ router.use('/salons/staff-services', authMiddleware.authSalonMiddleware, require
 router.use('/salons/holidays', authMiddleware.authSalonMiddleware, require('./holiday.router'));
 router.use('/salons/upload-images', require('./upload.router'));
 router.use('/cart', authMiddleware.authCustomerMiddleware, require('./cart.router'));
+router.use('/customers', require('./customer.router'));
 
 router.get('/', (req, res, next) => {
     res.send('Salon Management Service is running');

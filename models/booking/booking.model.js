@@ -1,76 +1,93 @@
 "use strict";
+
 const { Model } = require("sequelize");
+const {
+    BookingType,
+    BookingExecutionMode,
+    BookingStatus,
+} = require("./booking-types");
 
 module.exports = (sequelize, DataTypes) => {
-    class CartItem extends Model {
+    class Booking extends Model {
         static associate(models) {
-            this.belongsTo(models.Cart, {
-                foreignKey: "cart_id",
-                as: "cart",
+            this.hasMany(models.BookingService, {
+                foreignKey: "booking_id",
+                as: "booking_services",
             });
-            this.belongsTo(models.Staff, {
-                foreignKey: "staff_id",
-                as: "staff",
+
+            this.belongsTo(models.Customer, {
+                foreignKey: "customer_id",
+                as: "customer",
             });
-            this.belongsTo(models.Service, {
-                foreignKey: "service_id",
-                as: "service",
+
+            this.belongsTo(models.Salon, {
+                foreignKey: "salon_id",
+                as: "salon",
             });
         }
     }
 
-    CartItem.init(
+    Booking.init(
         {
             id: {
                 type: DataTypes.INTEGER,
+                allowNull: false,
                 primaryKey: true,
                 autoIncrement: true,
-                allowNull: false,
             },
             uuid: {
                 type: DataTypes.UUID,
                 defaultValue: DataTypes.UUIDV4,
+                allowNull: false,
                 unique: true,
-                allowNull: false,
             },
-            cart_id: {
+            customer_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
                 references: {
-                    model: "carts",
+                    model: "customers",
                     key: "id",
                 },
             },
-            staff_id: {
+            salon_id: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
                 references: {
-                    model: "staffs",
+                    model: "salons",
                     key: "id",
                 },
             },
-            service_id: {
+            total_price: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
-                references: {
-                    model: "services",
-                    key: "id",
-                },
             },
-            price: {
+            total_duration: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
-                defaultValue: 0,
             },
-            duration: {
-                type: DataTypes.INTEGER, // in minutes
+            booking_type: {
+                type: DataTypes.ENUM(BookingType.getValues()),
                 allowNull: false,
-                defaultValue: 0,
             },
-            sequence: {
-                type: DataTypes.INTEGER,
+            booking_execution_mode: {
+                type: DataTypes.ENUM(BookingExecutionMode.getValues()),
                 allowNull: false,
-                defaultValue: 0,
+            },
+            status: {
+                type: DataTypes.ENUM(BookingStatus.getValues()),
+                allowNull: false,
+            },
+            booking_start_time: {
+                type: DataTypes.DATE,
+                allowNull: false,
+            },
+            booking_end_time: {
+                type: DataTypes.DATE,
+                allowNull: false,
+            },
+            booking_date: {
+                type: DataTypes.DATE,
+                allowNull: false,
             },
             created_at: {
                 type: DataTypes.DATE,
@@ -82,13 +99,12 @@ module.exports = (sequelize, DataTypes) => {
             },
             deleted_at: {
                 type: DataTypes.DATE,
-                allowNull: true,
             },
         },
         {
             sequelize,
-            modelName: "CartItem",
-            tableName: "cart_items",
+            modelName: "Booking",
+            tableName: "bookings",
             paranoid: true,
             timestamps: true,
             createdAt: "created_at",
@@ -97,5 +113,5 @@ module.exports = (sequelize, DataTypes) => {
         }
     );
 
-    return CartItem;
+    return Booking;
 };

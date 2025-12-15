@@ -11,10 +11,12 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: "salon_id",
                 as: "salon"
             });
+
             this.belongsTo(models.Category, {
                 foreignKey: "category_id",
                 as: "category"
             });
+
             this.belongsTo(models.Service, {
                 foreignKey: "parent_id",
                 as: "parent"
@@ -24,15 +26,23 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: "parent_id",
                 as: "children"
             });
+
             this.hasMany(models.StaffService, {
                 foreignKey: "service_id",
                 as: "staff_service",
                 onUpdate: "CASCADE",
             });
+
             this.hasMany(models.CartItem, {
                 foreignKey: "service_id",
                 as: "cart_items",
             });
+            
+            this.hasMany(models.BookingService, {
+                foreignKey: "service_id",
+                as: "booking_services",
+            });
+
         }
     }
     Service.init(

@@ -2,7 +2,7 @@
 
 module.exports = {
     async up(queryInterface, Sequelize) {
-        await queryInterface.createTable("cart_items", {
+        await queryInterface.createTable("booking_services", {
             id: {
                 type: Sequelize.INTEGER,
                 primaryKey: true,
@@ -15,21 +15,11 @@ module.exports = {
                 allowNull: false,
                 unique: true,
             },
-            cart_id: {
+            booking_id: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
                 references: {
-                    model: "carts",
-                    key: "id",
-                },
-                onUpdate: "CASCADE",
-                onDelete: "CASCADE",
-            },
-            staff_id: {
-                type: Sequelize.INTEGER,
-                allowNull: false,
-                references: {
-                    model: "staffs",
+                    model: "bookings",
                     key: "id",
                 },
                 onUpdate: "CASCADE",
@@ -45,20 +35,39 @@ module.exports = {
                 onUpdate: "CASCADE",
                 onDelete: "CASCADE",
             },
-            price: {
+            staff_id: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
-                defaultValue: 0,
-            },
-            duration: {
-                type: Sequelize.INTEGER,
-                allowNull: false,
-                defaultValue: 0,
+                references: {
+                    model: "staffs",
+                    key: "id",
+                },
+                onUpdate: "CASCADE",
+                onDelete: "CASCADE",
             },
             sequence: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
-                defaultValue: 0,
+            },
+            offset_minutes: {
+                type: Sequelize.INTEGER,
+                allowNull: false,
+            },
+            start_time: {
+                type: Sequelize.DATE,
+                allowNull: false,
+            },
+            end_time: {
+                type: Sequelize.DATE,
+                allowNull: false,
+            },
+            duration_minutes: {
+                type: Sequelize.INTEGER,
+                allowNull: false,
+            },
+            price: {
+                type: Sequelize.INTEGER,
+                allowNull: false,
             },
             created_at: {
                 type: Sequelize.DATE,
@@ -70,12 +79,11 @@ module.exports = {
             },
             deleted_at: {
                 type: Sequelize.DATE,
-                allowNull: true,
             },
         });
     },
 
     async down(queryInterface) {
-        await queryInterface.dropTable("cart_items");
+        await queryInterface.dropTable("booking_services");
     },
 };

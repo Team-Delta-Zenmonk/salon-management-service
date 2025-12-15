@@ -32,6 +32,11 @@ module.exports = (sequelize, DataTypes) => {
                     holiday_type: HolidayType.ENUM.SALON
                 }
             });
+
+            this.hasMany(models.Booking, {
+                foreignKey: "salon_id",
+                as: "bookings",
+            });
         }
     }
     Salon.init(
