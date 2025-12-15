@@ -27,8 +27,11 @@ module.exports = (sequelize, DataTypes) => {
             this.hasMany(models.StaffService, {
                 foreignKey: "service_id",
                 as: "staff_service",
-                onDelete: "CASCADE",
                 onUpdate: "CASCADE",
+            });
+            this.hasMany(models.CartItem, {
+                foreignKey: "service_id",
+                as: "cart_items",
             });
         }
     }

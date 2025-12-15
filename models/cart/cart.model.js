@@ -2,16 +2,24 @@
 const { Model } = require("sequelize");
 
 module.exports = (sequelize, DataTypes) => {
-  class Customer extends Model {
+  class Cart extends Model {
     static associate(models) {
-      this.hasOne(models.Cart, {
+      this.belongsTo(models.Customer, {
         foreignKey: "customer_id",
-        as: "cart",
+        as: "customer",
+      });
+      this.belongsTo(models.Salon, {
+        foreignKey: "salon_id",
+        as: "salon",
+      });
+      this.hasMany(models.CartItem, {
+        foreignKey: "cart_id",
+        as: "cart_items",
       });
     }
   }
 
-  Customer.init(
+  Cart.init(
     {
       id: {
         type: DataTypes.INTEGER,
@@ -25,22 +33,31 @@ module.exports = (sequelize, DataTypes) => {
         unique: true,
         allowNull: false,
       },
-      name: {
-        type: DataTypes.STRING,
+      customer_id: {
+        type: DataTypes.INTEGER,
         allowNull: false,
+        references: {
+          model: "customers",
+          key: "id",
+        },
       },
-      email: {
-        type: DataTypes.STRING,
+      salon_id: {
+        type: DataTypes.INTEGER,
         allowNull: false,
-        validate: { isEmail: true },
+        references: {
+          model: "salons",
+          key: "id",
+        },
       },
-      gender: {
-        type: DataTypes.STRING,
-        allowNull: true,
-      },
-      phone_number: {
-        type: DataTypes.STRING,
+      total_price: {
+        type: DataTypes.INTEGER,
         allowNull: false,
+        defaultValue: 0,
+      },
+      total_duration: {
+        type: DataTypes.INTEGER, // in minutes
+        allowNull: false,
+        defaultValue: 0,
       },
       created_at: {
         type: DataTypes.DATE,
@@ -57,8 +74,8 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       sequelize,
-      modelName: "Customer",
-      tableName: "customers",
+      modelName: "Cart",
+      tableName: "carts",
       paranoid: true,
       timestamps: true,
       createdAt: "created_at",
@@ -67,5 +84,5 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
-  return Customer;
+  return Cart;
 };

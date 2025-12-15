@@ -9,4 +9,5 @@ module.exports = {
     staffServicesService: require('./staff-service.service'),
     uploadService: require('./upload.service'),
     holidayService: require('./holiday.service'),
+    cartService: require('./cart.service'),
 }

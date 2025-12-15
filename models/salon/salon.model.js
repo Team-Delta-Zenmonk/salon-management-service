@@ -19,6 +19,10 @@ module.exports = (sequelize, DataTypes) => {
                 foreignKey: "salon_id",
                 as: "services"
             });
+            this.hasMany(models.Cart, {
+                foreignKey: "salon_id",
+                as: "carts",
+            });
 
             this.hasMany(models.Holiday, {
                 foreignKey: "parent_id",

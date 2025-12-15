@@ -8,6 +8,7 @@ module.exports = {
     staffController: require('./staff.controller'),
     serviceController: require('./service.controller'),
     staffServiceController: require('./staff-service.controller'),
-    uploadController: require('./upload.controller'), 
+    uploadController: require('./upload.controller'),
+    cartController: require('./cart.controller'),
     holidayController: require('./holiday.controller'),
 }
