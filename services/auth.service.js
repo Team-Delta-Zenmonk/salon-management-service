@@ -28,7 +28,7 @@ exports.loginSalon = async (payload) => {
 
 exports.loginCustomer = async (payload) => {
     const { token } = payload.body;
-    if (!token) throw new error.BadRequest("Token is required");
+
 
     const decodedToken = await admin.auth().verifyIdToken(token);
     const { email, uid, name, picture, phone_number } = decodedToken;
