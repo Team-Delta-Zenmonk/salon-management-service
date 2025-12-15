@@ -9,5 +9,6 @@ module.exports = {
     holidayRepository: require('./holiday.repository'),
     cartRepository: require('./cart.repository'),
     cartItemRepository: require('./cart-item.repository'),
-    customerRepository: require('./customer.repository')
+    customerRepository: require('./customer.repository'),
+    holidayRepository: require('./holiday.repository')
 }

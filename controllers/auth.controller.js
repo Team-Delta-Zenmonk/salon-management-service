@@ -31,3 +31,15 @@ exports.resetPassword = async (req, res, next) => {
         return next(error);
     }
 }
+
+exports.loginCustomer = async (req, res, next) => {
+    try {
+        const response = await authService.loginCustomer({ body: req.body });
+        res.cookie('jwt', response.token, { httpOnly: true, secure: true, maxAge: 36000000, sameSite: 'none' });
+        return res.status(200).json(response);
+
+    } catch (error) {
+        console.log("Error in controller loginCustomer", error);
+        return next(error);
+    }
+}

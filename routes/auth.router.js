@@ -9,4 +9,6 @@ router.post('/login/salon', validate(loginSalonSchema), authController.loginSalo
 router.post('/forgot-password/salon', validate(forgotPasswordSchema), authController.forgotPassword);
 router.post('/reset-password/salon', validate(resetPasswordSchema), authController.resetPassword);
 
+router.post('/login/customer', authController.loginCustomer);
+
 module.exports = router;

@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const jwt = require('jsonwebtoken');
 const mailService = require('./mail.service');
 const { hashPassword, comparePassword } = require("../libs/hash");
+const admin = require('../config/firebase');
 
 exports.loginSalon = async (payload) => {
     const { email, password } = payload.body;
@@ -23,6 +24,30 @@ exports.loginSalon = async (payload) => {
 
     const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET);
     return { token, salon };
+}
+
+exports.loginCustomer = async (payload) => {
+    const { token } = payload.body;
+    if (!token) throw new error.BadRequest("Token is required");
+
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const { email, uid, name, picture, phone_number } = decodedToken;
+
+    const { customerRepository } = require('../repository');
+
+    let customer = await customerRepository.findOne({ email });
+
+    if (!customer) {
+        customer = await customerRepository.create({
+            email,
+            name: name,
+            phone_number: phone_number || null,
+        });
+    }
+
+    const jwtToken = jwt.sign({ email: customer.email, uuid: customer.uuid, role: 'customer' }, process.env.JWT_SECRET);
+    return { token: jwtToken, customer };
+
 }
 
 exports.forgotPassword = async (payload) => {
