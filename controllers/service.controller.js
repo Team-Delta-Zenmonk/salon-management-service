@@ -11,6 +11,16 @@ exports.createService = async (req, res, next) => {
     }
 }
 
+exports.listServices = async (req, res, next) => {
+    try {
+        const response = await serviceService.listServices({ query: req.query, salon: req.salon });
+        return res.status(SUCCESS).json(response);
+    } catch (error) {
+        console.log("Error in listServices controller", error);
+        return next(error);
+    }
+}
+
 exports.listStaff = async(req, res, next) => {
     try {
         const response = await serviceService.listStaff({ params: req.params, salon: req.salon });
@@ -37,16 +47,6 @@ exports.getService = async (req, res, next) => {
         return res.status(SUCCESS).json(response);
     } catch (error) {
         console.log("Error in getService controller", error);
-        return next(error);
-    }
-}
-
-exports.listServicesByCategory = async (req, res, next) => {
-    try {
-        const response = await serviceService.listServicesByCategory({ params: req.params, salon: req.salon });
-        return res.status(SUCCESS).json(response);
-    } catch (error) {
-        console.log("Error in listServicesByCategory controller", error);
         return next(error);
     }
 }

@@ -29,6 +29,23 @@ exports.createService = async (payload) => {
     return await serviceRepository.create({ ...body, salon_id: salon.id, category_id: category.id });
 }
 
+exports.listServices = async (payload) => {
+    const { query, salon } = payload;
+    const { category_uuid } = query || {};
+
+    let criteria = { salon_id: salon.id };
+
+    if (category_uuid) {
+        const category = await categoryRepository.findOne({ uuid: category_uuid, salon_id: salon.id });
+        if (!category) {
+            throw new error.NotFound("Category not found");
+        }
+        criteria.category_id = category.id;
+    }
+
+    return await serviceRepository.findAndCountAll({ criteria });
+}
+
 exports.listStaff = async(payload) => {
     const { params, salon } = payload;
 
@@ -60,18 +77,6 @@ exports.listSubServices = async (payload) => {
     }
 
     return await serviceRepository.findAndCountAll({ criteria: { parent_id: service.id } });
-}
-
-exports.listServicesByCategory = async (payload) => {
-    const { params, salon } = payload;
-    
-    const category = await categoryRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
-
-    if (!category) {
-        throw new error.NotFound("Category not found");
-    }
-
-    return await serviceRepository.findAndCountAll({ criteria: { category_id: category.id } });
 }
 
 exports.updateService = async (payload) => {
