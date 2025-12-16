@@ -2,6 +2,7 @@ const { error } = require("../libs");
 const {
     cartRepository,
     cartItemRepository,
+    customerRepository,
     salonRepository,
     serviceRepository,
     staffRepository
@@ -26,11 +27,13 @@ const updateCartTotals = async (cartId, transaction = null) => {
 };
 
 exports.createCart = async (payload) => {
-    const { body, user } = payload;
-    const { salon_id, items } = body;
+    const { body } = payload;
+    const { salon_id, items  , user_id} = body;
 
     const salon = await salonRepository.findOne({ uuid: salon_id });
     if (!salon) throw new error.NotFound("Salon not found");
+    const user = await customerRepository.findOne({ uuid: user_id });
+    if (!user) throw new error.NotFound("Customer not found");
 
     const transaction = await cartRepository.startTransaction();
 
@@ -51,8 +54,8 @@ exports.createCart = async (payload) => {
                 cart_id: cart.id,
                 service_id: service.id,
                 staff_id: staff.id,
-                price: service.price,
-                duration: service.duration
+                price: itemData.price !== undefined ? itemData.price : service.price,
+                duration: itemData.duration !== undefined ? itemData.duration : service.duration
             }, { transaction });
         }
 
@@ -60,7 +63,7 @@ exports.createCart = async (payload) => {
 
         await cartRepository.commitTransaction(transaction);
 
-        return await cartRepository.findOne({ criteria: { id: cart.id }, include: ['cart_items'] });
+        return await cartRepository.findOne({ id: cart.id }, ['cart_items']);
 
     } catch (err) {
         await cartRepository.rollbackTransaction(transaction);
@@ -85,8 +88,8 @@ exports.addItem = async (payload) => {
         cart_id: cart.id,
         service_id: service.id,
         staff_id: staff.id,
-        price: service.price,
-        duration: service.duration
+        price: body.price !== undefined ? body.price : service.price,
+        duration: body.duration !== undefined ? body.duration : service.duration
     });
 
     await updateCartTotals(cart.id);
@@ -108,8 +111,9 @@ exports.updateItem = async (payload) => {
         const service = await serviceRepository.findOne({ uuid: service_id });
         if (!service) throw new error.NotFound("Service not found");
         updateData.service_id = service.id;
-        updateData.price = service.price;
-        updateData.duration = service.duration;
+
+        if (body.price === undefined) updateData.price = service.price;
+        if (body.duration === undefined) updateData.duration = service.duration;
     }
 
     if (staff_id) {
@@ -117,6 +121,9 @@ exports.updateItem = async (payload) => {
         if (!staff) throw new error.NotFound("Staff not found");
         updateData.staff_id = staff.id;
     }
+
+    if (body.price !== undefined) updateData.price = body.price;
+    if (body.duration !== undefined) updateData.duration = body.duration;
 
     await cartItemRepository.update({
         payload: updateData,
