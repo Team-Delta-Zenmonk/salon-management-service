@@ -74,11 +74,11 @@ module.exports = (sequelize, DataTypes) => {
                 allowNull: true
             },
             latitude: {
-                type: DataTypes.STRING,
+                type: DataTypes.DOUBLE,
                 allowNull: true
             },
             longitude: {
-                type: DataTypes.STRING,
+                type: DataTypes.DOUBLE,
                 allowNull: true
             },
             owner_name: {
