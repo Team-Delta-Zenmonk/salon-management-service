@@ -45,10 +45,6 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: true,
       },
-      country: {
-        type: Sequelize.STRING(2),
-        allowNull: false,
-      },
       dob: {
         type: Sequelize.STRING,
         allowNull: false,
@@ -66,7 +62,7 @@ module.exports = {
         allowNull: true,
       },
       address: {
-        type: Sequelize.JSON,
+        type: Sequelize.STRING,
         allowNull: false,
       },
       emergency_contact: {
@@ -78,6 +74,9 @@ module.exports = {
         allowNull: false
       },
       active_hours: {
+        type: Sequelize.JSON
+      },
+      photos: {
         type: Sequelize.JSON
       },
       created_at: {

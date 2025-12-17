@@ -96,6 +96,10 @@ module.exports = {
       discount_type: {
         type: 'enum_service_discount_type',
       },
+      duration: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+      },
       created_at: {
         allowNull: false,
         type: Sequelize.DATE

@@ -121,6 +121,10 @@ module.exports = (sequelize, DataTypes) => {
                 type: DataTypes.ENUM(DiscountType.getValues()),
                 allowNull: true
             },
+            duration: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
+            },
             created_at: {
                 type: DataTypes.DATE,
                 allowNull: false

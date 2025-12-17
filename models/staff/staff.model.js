@@ -73,10 +73,6 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: true,
       },
-      country: {
-        type: DataTypes.STRING(2),
-        allowNull: false,
-      },
       dob: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -94,7 +90,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       address: {
-        type: DataTypes.JSON,
+        type: DataTypes.STRING,
         allowNull: false,
       },
       emergency_contact: {
@@ -106,6 +102,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       active_hours: {
+        type: DataTypes.JSON,
+        allowNull: true,
+      },
+      photos: {
         type: DataTypes.JSON,
         allowNull: true,
       },

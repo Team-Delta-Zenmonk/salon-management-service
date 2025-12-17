@@ -88,9 +88,23 @@ exports.updateService = async (payload) => {
         throw new error.NotFound("Service not found");
     }
 
+    const updatePayload = { ...body };
+
+    if (body.category_id) {
+        const category = await categoryRepository.findOne({ uuid: body.category_id, salon_id: salon.id, });
+
+        if (!category) {
+            throw new error.NotFound("Category not found");
+        }
+
+        updatePayload.category_id = category.id;
+    } else {
+        delete updatePayload.category_id;
+    }
+
     const response = await serviceRepository.update({
-        payload: body,
-        criteria: { uuid: params.uuid },
+        payload: updatePayload,
+        criteria: { uuid: params.uuid, salon_id: salon.id },
     });
 
     if (response[0] === 1) return { message: "Successfully updated service" }
