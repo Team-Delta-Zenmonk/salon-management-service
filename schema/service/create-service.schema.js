@@ -21,5 +21,10 @@ exports.createServiceSchema = z.object({
         discount_type: z.enum(DiscountType.getValues(), {
             required_error: "Discount type is required",
         }).optional(),
+        duration: z
+          .number()
+          .int({ message: "duration must be an integer" })
+          .positive({ message: "duration must be greater than 0" })
+          .max(600, { message: "duration too long" }),
     })
 });

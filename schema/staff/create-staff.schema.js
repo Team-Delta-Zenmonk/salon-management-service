@@ -20,11 +20,6 @@ exports.createStaffSchema = z.object({
 
     additional_phone_number: z.string().min(8).optional(),
 
-    country: z
-      .string()
-      .length(2, "Country must be an ISO2 code")
-      .toUpperCase(),
-
     dob: z
       .string()
       .regex(/^\d{2}-\d{2}-\d{4}$/, "DOB must be in DD-MM-YYYY format"),
@@ -40,12 +35,7 @@ exports.createStaffSchema = z.object({
       .regex(/^\d{2}-\d{2}-\d{4}$/, "End date must be in DD-MM-YYYY format")
       .optional(),
 
-    address: z.object({
-      name: z.string().min(1),
-      address: z.string().min(1),
-      longitude: z.number().min(-180).max(180),
-      latitude: z.number().min(-90).max(90),
-    }),
+    address: z.string(),
 
     emergency_contact: z.object({
       name: z.string().min(1),
