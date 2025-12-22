@@ -43,7 +43,7 @@ exports.listServices = async (payload) => {
         criteria.category_id = category.id;
     }
 
-    return await serviceRepository.findAndCountAll({ criteria });
+    return await serviceRepository.findAndCountAll({ criteria, include:["category"] });
 }
 
 exports.listStaff = async(payload) => {
