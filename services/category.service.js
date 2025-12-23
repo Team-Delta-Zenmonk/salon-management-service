@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { error } = require('../libs');
 const { categoryRepository } = require("../repository");
 
@@ -12,9 +13,33 @@ exports.createCategory = async (payload) => {
 }
 
 exports.listCategories = async (payload) => {
-    const { salon } = payload;
+    const { salon, query } = payload;
 
-    return await categoryRepository.findAndCountAll({ criteria: { salon_id: salon.id } });
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const search = query.search;
+
+    const where = { salon_id: salon.id };
+    
+    if (search) {
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+
+    const { count, rows } = await categoryRepository.findAndCountAll({
+      criteria: where,
+      limit: limit,
+      offset: (page - 1) * limit,
+    });
+
+    return {
+      total: count,
+      page,
+      limit,
+      data: rows
+    };
 }
 
 exports.updateCategory = async (payload) => {

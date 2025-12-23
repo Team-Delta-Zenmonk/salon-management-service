@@ -14,7 +14,7 @@ exports.createCategory = async (req, res, next) => {
 
 exports.listCategories = async (req, res, next) => {
     try {
-        const response = await categoryService.listCategories({ salon: req.salon })
+        const response = await categoryService.listCategories({ salon: req.salon, query: req.query })
         return res.status(SUCCESS).json(response)
     } catch (error) {
         console.log("Error in controller listCategories", error)
