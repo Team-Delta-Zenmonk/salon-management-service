@@ -10,5 +10,4 @@ module.exports = {
     cartRepository: require('./cart.repository'),
     cartItemRepository: require('./cart-item.repository'),
     customerRepository: require('./customer.repository'),
-    holidayRepository: require('./holiday.repository')
 }

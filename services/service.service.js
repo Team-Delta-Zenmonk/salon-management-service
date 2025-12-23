@@ -33,6 +33,10 @@ exports.listServices = async (payload) => {
     const { query, salon } = payload;
     const { category_uuid } = query || {};
 
+    const page = Number(query?.page) || 1;
+    const limit = Number(query?.limit) || 10;
+    const offset = query?.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
+
     let criteria = { salon_id: salon.id };
 
     if (category_uuid) {
@@ -43,15 +47,22 @@ exports.listServices = async (payload) => {
         criteria.category_id = category.id;
     }
 
-    return await serviceRepository.findAndCountAll({ criteria, include:["category"] });
+    const { count, rows } = await serviceRepository.findAndCountAll({ criteria, include: ["category"], limit, offset });
+
+    return {
+        total: count,
+        page,
+        limit,
+        data: rows
+    };
 }
 
-exports.listStaff = async(payload) => {
+exports.listStaff = async (payload) => {
     const { params, salon } = payload;
 
-    const service = await serviceRepository.findOne({uuid: params.uuid, salon_id: salon.id});
+    const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
 
-    const staffs = await staffServiceRepository.findAll({criteria: {service_id: service.id}});
+    const staffs = await staffServiceRepository.findAll({ criteria: { service_id: service.id } });
     return staffs;
 }
 

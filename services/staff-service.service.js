@@ -36,7 +36,7 @@ exports.bulkCreate = async (payload) => {
         if (!service_id || !staff_id) {
           throw new Error(`Invalid service_uuid or staff_uuid in payload`);
         }
-        
+
         return {
           service_id,
           staff_id,
@@ -46,7 +46,7 @@ exports.bulkCreate = async (payload) => {
         };
       });
 
-      const staffServices =  await staffServiceRepository.createBulk(finalData, {
+      const staffServices = await staffServiceRepository.createBulk(finalData, {
         conflictAttributes: ["service_id", "staff_id"],
         updateOnDuplicate: ["duration", "price_type", "price"],
         transaction,
@@ -58,4 +58,30 @@ exports.bulkCreate = async (payload) => {
     }
   );
 };
+exports.unassignStaffService = async (payload) => {
+  const { params } = payload;
+  const { staff_uuid, service_uuid } = params;
 
+  const staff = await staffRepository.findOne({ uuid: staff_uuid });
+  if (!staff) {
+    throw new error.NotFound("Staff not found");
+  }
+
+  const service = await serviceRepository.findOne({ uuid: service_uuid });
+  if (!service) {
+    throw new error.NotFound("Service not found");
+  }
+
+  const staffService = await staffServiceRepository.findOne({
+    staff_id: staff.id,
+    service_id: service.id
+  });
+
+  if (!staffService) {
+    throw new error.NotFound("Staff is not assigned to this service");
+  }
+
+  await staffServiceRepository.softDelete({ id: staffService.id }, { force: true });
+
+  return { message: "Staff unassigned from service successfully" };
+};
