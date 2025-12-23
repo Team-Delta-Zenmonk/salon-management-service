@@ -1,10 +1,19 @@
+const { error } = require("../libs");
 const { DayOfWeek } = require("../models/salon/salon-types");
-const { salonRepository , cartRepository} = require("../repository");
+const {
+    salonRepository,
+    cartRepository,
+    holidayRepository,
+    staffRepository,
+    staffServiceRepository,
+    bookingServiceRepository,
+} = require("../repository");
 const { Op } = require("sequelize");
 const { Category, sequelize } = require("../models");
 
 exports.updateSalon = async (payload) => {
     const { uuid } = payload.salon;
+
     if (payload?.body?.business_hours) {
         const result = {};
         for (const [day, value] of Object.entries(payload.body.business_hours)) {
@@ -13,127 +22,416 @@ exports.updateSalon = async (payload) => {
         payload.body.business_hours = result;
     }
 
-    return await salonRepository.update({
+    const result = await salonRepository.update({
         payload: payload.body,
-        criteria: { uuid }
+        criteria: { uuid },
     });
-}
 
-// exports.getAvailableSlots = async (payload) => {
-//     const { cart_id, start_date, days = 1 } = payload.query;
+    if (result[0] === 0) {
+        throw new error.BadRequest("Salon not updated");
+    }
 
-//     const cart = await cartRepository.findOne(
-//         { cart_id },
-//         ['cart_items']
-//     );
-
-//     if (!cart) throw new Error('Cart not found');
-
-//     const services = [];
-
-//     for (const item of cart.cart_items) {
-//         const service = await getService(item.service_id);
-
-//         let staffIds = [];
-
-//         if (item.staff_id) {
-//             staffIds = [item.staff_id];
-//         } else {
-//             const staff = await getEligibleStaff(item.service_id);
-//             staffIds = staff.map(s => s.staff_id);
-//         }
-
-//         services.push({
-//             service_id: item.service_id,
-//             duration: service.duration_minutes,
-//             staffIds
-//         });
-//     }
-
-//     const response = {};
-//     const start = new Date(start_date);
-
-//     for (let d = 0; d < days; d++) {
-//         const date = new Date(start);
-//         date.setDate(start.getDate() + d);
-
-//         const staffCalendars = {};
-//         const staffSet = new Set(
-//             services.flatMap(s => s.staffIds)
-//         );
-
-//         for (const staffId of staffSet) {
-//             staffCalendars[staffId] = await getStaffCalendar(staffId, date);
-//         }
-
-//         const slots = await findSlotsForDay(
-//             services,
-//             staffCalendars,
-//             9 * 60,
-//             18 * 60
-//         );
-
-//         response[date.toISOString().split('T')[0]] =
-//             slots.map(m => {
-//                 const h = Math.floor(m / 60);
-//                 const min = m % 60;
-//                 return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
-//             });
-//     }
-
-//     return response;
-// };
-
-
-// async function loadStaffWorkingHours(staffId, date) {
-//     // Example response expected from DB
-//     // [{ start: "09:00", end: "18:00" }]
-
-//     const rows = await staffWorkingHourRepository.getForDate(staffId, date);
-
-//     return rows.map(r => ({
-//         start: minutes(...r.start.split(':')),
-//         end: minutes(...r.end.split(':'))
-//     }));
-// }
-
-// async function loadStaffBookings(staffId, date) {
-//     const bookings = await bookingRepository.getForStaffDate(staffId, date);
-
-//     return bookings.map(b => ({
-//         start: toMinutesFromDate(new Date(b.start_datetime)),
-//         end: toMinutesFromDate(new Date(b.end_datetime))
-//     }));
-// }
-
-// async function loadStaffTimeOff(staffId, date) {
-//     const leaves = await staffTimeOffRepository.getForStaffDate(staffId, date);
-
-//     return leaves.map(l => ({
-//         start: toMinutesFromDate(new Date(l.start_datetime)),
-//         end: toMinutesFromDate(new Date(l.end_datetime))
-//     }));
-// }
-
-
+    return "Salon updated successfully";
+};
 
 exports.getAvailableSlots = async (payload) => {
-    const { cart_id, start_date, days = 1 } = payload.query;
+    const { cart_id, start_date, days } = payload.query;
 
-    const cart = await cartRepository.findOne(
-        { cart_id },
-        ['cart_items']
-    );
+    // 1️⃣ Load cart
+    let cart = await cartRepository.getCardByUuid(cart_id);
+    if (!cart) throw new error.BadRequest("Cart not found");
 
-    if (!cart) throw new Error('Cart not found');
-    const normalizedCart = await exports.normalizeCart(cart);
+    cart = cart.toJSON();
+    const salon = cart.salon;
+    if (!salon) throw new error.BadRequest("Salon not found");
 
+    const cartItems = cart.cart_items.sort((a, b) => a.sequence - b.sequence);
 
+    // 2️⃣ Validate duration
+    const totalDuration = cartItems.reduce((acc, i) => acc + i.duration, 0);
+    if (totalDuration !== cart.total_duration) {
+        throw new error.BadRequest("Cart total duration mismatch");
+    }
+
+    // 3️⃣ Holidays
+    const salonHolidays = await holidayRepository.getSalonHolidaysByDate(salon.id, start_date, days);
+
+    const allStaffs = await staffRepository.findAll({
+        criteria: { salon_id: salon.id },
+    });
+    const staffIds = allStaffs.map((s) => s.id);
+
+    const staffHolidays = await holidayRepository.getStaffHolidaysByDate(staffIds, start_date, days);
+
+    // 4️⃣ Staff by service (ALREADY NORMALIZED)
+    const staffByService = await staffServiceRepository.getStaffByService({
+        service_ids: cartItems.map((i) => i.service_id),
+        salon_id: salon.id,
+    });
+    /**
+     * staffByService = {
+     *   1: [Staff, Staff],
+     *   2: [Staff, Staff]
+     * }
+     */
+
+    // 5️⃣ Existing bookings
+    const bookingsByStaff = await bookingServiceRepository.getBookingsByStaff({
+        salon_id: salon.id,
+        start_date,
+        days,
+    });
+
+    /** return of bookingsByStaff
+     * {
+     *   staffId: [{ start, end }]
+     * }
+     */
+
+    const result = [];
+
+    // 6️⃣ Iterate days
+    for (let d = 0; d < days; d++) {
+        const date = new Date(start_date);
+        date.setDate(date.getDate() + d);
+        const dateStr = date.toISOString().slice(0, 10);
+        const dayOfWeek = date.getDay();
+
+        if (salonHolidays.includes(dateStr)) continue;
+
+        const businessHours = salon.business_hours?.[dayOfWeek];
+        if (!businessHours?.start_time || !businessHours?.end_time) continue; // no business hours
+
+        const dayStart = toMinutes(businessHours.start_time);
+        const dayEnd = toMinutes(businessHours.end_time);
+
+        const slots = [];
+
+        // 7️⃣ Generate 15-min slots
+        for (let slotStart = dayStart; slotStart + totalDuration <= dayEnd; slotStart += 15) {
+            let offset = 0;
+            let validSlot = true;
+            const serviceOptions = [];
+
+            // 8️⃣ Validate each service
+            for (const cartItem of cartItems) {
+                const serviceStart = slotStart + offset;
+                const serviceEnd = serviceStart + cartItem.duration;
+                offset += cartItem.duration;
+
+                const staffList = staffByService[cartItem.service_id] || [];
+
+                // Fixed staff
+                if (cartItem.staff_id) {
+                    const staff = staffList.find((s) => s.id === cartItem.staff_id);
+                    if (!staff || !isStaffAvailable(staff, serviceStart, serviceEnd, dateStr, staffHolidays, bookingsByStaff)) {
+                        validSlot = false;
+                        break;
+                    }
+
+                    serviceOptions.push({
+                        service_id: cartItem.service_id,
+                        staff_options: [staff.id],
+                    });
+                }
+                else {
+                    let assignedStaff = null;
+
+                    for (const staff of staffList) {
+
+                        if (
+                            isStaffAvailable(
+                                staff,
+                                serviceStart,
+                                serviceEnd,
+                                dateStr,
+                                staffHolidays,
+                                bookingsByStaff
+                            )
+                        ) {
+                            assignedStaff = staff;
+                            break; // FIRST COME FIRST SERVE
+                        }
+                    }
+
+                    // No staff available → slot invalid
+                    if (!assignedStaff) {
+                        validSlot = false;
+                        break;
+                    }
+
+                    // mark staff as used for this slot
+                    serviceOptions.push({
+                        service_id: cartItem.service_id,
+                        staff_id: assignedStaff.id
+                    });
+                }
+
+            }
+
+            // ✅ PUSH SLOT ONCE
+            if (validSlot) {
+                slots.push({
+                    start: toTimeString(slotStart),
+                    end: toTimeString(slotStart + totalDuration),
+                    services: serviceOptions,
+                });
+            }
+        }
+
+        if (slots.length) {
+            result.push({ date: dateStr, slots });
+        }
+    }
+
+    return result;
 };
+
+const isStaffAvailable = (staff, serviceStart, serviceEnd, dateStr, staffHolidays, bookingsByStaff) => {
+    //staff holidays
+    if (staffHolidays.get(staff.id)?.has(dateStr)) {
+        return false;
+    }
+
+    //ACtive hours
+    const day = new Date(dateStr).getDay();
+
+    const active = staff.active_hours[day];
+    if (!active) {
+        return false;
+    }
+
+    const activeStart = toMinutes(active.start_time);
+    const activeEnd = toMinutes(active.end_time);
+
+    if (serviceStart < activeStart || serviceEnd > activeEnd) {
+        //not available
+        return false;
+    }
+
+    //booking conflicts
+    const staffBookings = bookingsByStaff[staff.id] || [];
+
+    for (const booking of staffBookings) {
+        if (serviceStart < booking.end && serviceEnd > booking.start) {
+            return false; // overlap
+        }
+    }
+
+    return true;
+};
+
+const toMinutes = (dateTime) => {
+    const d = new Date(dateTime);
+    return d.getUTCHours() * 60 + d.getUTCMinutes();
+};
+
+const toTimeString = (minutes) => {
+    const h = String(Math.floor(minutes / 60)).padStart(2, "0");
+    const m = String(minutes % 60).padStart(2, "0");
+    return `${h}:${m}`;
+};
+
+// exports.getAvailableSlots = async (payload) => {
+//     const { cart_id, start_date, days } = payload.query;
+//     console.log(cart_id, start_date, days);
+
+//     // get cart
+//     let cart = await cartRepository.getCardByUuid(cart_id);
+//     cart = cart.toJSON();
+//     if (!cart) {
+//         throw new error.BadRequest("Cart not found");
+//     }
+
+//     // console.log("cart-------------------", cart.toJSON(), "-------------------");
+//     const salon = cart.salon;
+//     console.log("salon-------------------", salon, "-------------------");
+//     if (!salon) {
+//         throw new error.BadRequest("Salon not found");
+//     }
+
+//     const cartItems = cart.cart_items.sort((a, b) => a.sequence - b.sequence);
+//     // console.log("services-------------------", services, "-------------------");
+
+//     // calculate total duration
+//     const totalDuration = cartItems.reduce((acc, service) => acc + service.duration, 0);
+
+//     if (totalDuration != cart.total_duration) {
+//         throw new error.BadRequest("Cart total duration not matched");
+//     }
+
+//     // console.log("totalDuration-------------------", totalDuration, "-------------------");
+
+//     // get holidays
+//     const salonHolidays = await holidayRepository.getSalonHolidaysByDate(salon.id,
+//         start_date,
+//         days);
+
+//     const allStaffs = await staffRepository.findAll({ criteria: { salon_id: salon.id } });
+//     const staffIds = allStaffs.map((staff) => staff.id);
+
+//     const staffHolidays = await holidayRepository.getStaffHolidaysByDate(staffIds,
+//         start_date,
+//         days);
+
+//     //load eligible staff per service
+//     const serviceIds = cartItems.map((item) => item.service_id);
+//     console.log("serviceIds-------------------", serviceIds, "-------------------");
+
+//     const staffByService = await staffServiceRepository.getStaffByService({ service_ids: serviceIds, salon_id: salon.id })
+//     /**   return of staffByService
+//      * {
+//      *   serviceId: [ staff, staff, ... ]
+//      * }
+//      */
+
+//     //load existing bookings
+//     const bookingsByStaff = await bookingServiceRepository.getBookingsByStaff({
+//         salon_id: salon.id,
+//         start_date,
+//         days,
+//     });
+
+//     console.log("bookingsByStaff-------------------", bookingsByStaff, "-------------------");
+
+//     /** return of bookingsByStaff
+//          * {
+//          *   staffId: [{ start, end }]
+//          * }
+//          */
+
+//     const result = [];
+
+//     //iterate over days
+
+//     for (let d = 0; d < days; d++) {
+
+//         const date = new Date(start_date);
+//         date.setDate(date.getDate() + d);
+
+//         const dateStr = date.toISOString().slice(0, 10);
+//         const dayOfWeek = date.getDay(); //0-6
+//         console.log("dayOfWeek-------------------", dayOfWeek, "-------------------");
+
+//         //skip salon holiday
+//         if (salonHolidays.includes(dateStr)) {
+//             console.log("salon holiday-------------------");
+//             continue;
+//         }
+
+//         // Skip if salon is closed that day
+//         const businessHours = salon.business_hours?.[dayOfWeek];
+
+//         if (!businessHours || !businessHours.start_time || !businessHours.end_time) {
+//             // Salon not available on this day
+//             continue;
+//         }
+
+//         const dayStart = toMinutes(businessHours.start_time);
+//         const dayEnd = toMinutes(businessHours.end_time);
+
+//         console.log("dayStart-------------------", businessHours.start_time, dayStart, "-------------------");
+//         console.log("dayEnd-------------------", businessHours.end_time, dayEnd, "-------------------");
+//         console.log("totalDuration-------------------", totalDuration, "-------------------");
+
+//         const slots = [];
+
+//         //generation of 15min slots
+
+//         for (let slotStart = dayStart; slotStart + totalDuration <= dayEnd; slotStart += 15) {
+//             let offSet = 0;
+//             let validSlot = true;
+
+//             const serviceOptions = [];
+
+//             for (let cartItem of cartItems) {
+//                 const serviceStart = slotStart + offSet;
+//                 const serviceEnd = serviceStart + cartItem.duration;
+
+//                 offSet += cartItem.duration;
+
+//                 //             //fixed staff case
+//                 if (cartItem.staff_id) {
+//                     console.log("staffByService cartItem.service_id," + cartItem.service_id + "-------------------", staffByService, "-------------------");
+//                     const staffList = staffByService[cartItem.service_id] || [];
+//                     const staff = staffList.find(s => s.id === cartItem.staff_id);
+
+//                     if (!staff) { //staff not found
+//                         validSlot = false;
+//                         break;
+//                     }
+//                     if (!isStaffAvailable(staff, serviceStart, serviceEnd, dateStr, staffHolidays, bookingsByStaff)) {
+//                         validSlot = false;
+//                         break;
+//                     }
+
+//                     serviceOptions.push({
+//                         staff_id: cartItem.service_id,
+//                         staff_options: [staff.id]
+//                     });
+
+//                 } else {//random staff case
+//                     //                 const candidates = staffByService[service.service_id].filter((staff) =>
+//                     //                     this.isStaffAvailable(staff, serviceStart, serviceEnd, dateStr, staffHolidays, bookingsByStaff));
+
+//                     //                 if (!candidates || candidates.length === 0) { //no available staff
+//                     //                     validSlot = false;
+//                     //                     break;
+//                     //                 }
+
+//                     //                 serviceOptions.push({
+//                     //                     staff_id: service.service_id,
+//                     //                     staff_options: candidates.map((staff) => staff.id)
+//                     //                 });
+
+//                     //             }
+//                 }
+
+//             }
+//             if (validSlot) {
+//                 slots.push({
+//                     start: toTimeString(slotStart),
+//                     end: toTimeString(slotStart + totalDuration),
+//                     serviceOptions
+//                 });
+//             }
+
+//             if (slots.length > 0) {
+//                 result.push({
+//                     dateStr,
+//                     slots
+//                 });
+//             }
+
+//         }
+
+//         return result;
+
+//     }
+// }
+
+
+
+// Random staff
+// else {
+//     const candidates = staffList.filter((staff) =>
+//         isStaffAvailable(staff, serviceStart, serviceEnd, dateStr, staffHolidays, bookingsByStaff)
+//     );
+
+//     if (!candidates.length) {
+//         validSlot = false;
+//         break;
+//     }
+
+//     serviceOptions.push({
+//         service_id: cartItem.service_id,
+//         staff_options: candidates.map((s) => s.id),
+//     });
+// }
 
 exports.listSalons = async (payload) => {
     let { page = 1, limit = 10, search, category, latitude, longitude, range = 10 } = payload.query;
-    
+
     const offset = (page - 1) * limit;
 
     const where = {};
@@ -162,7 +460,7 @@ exports.listSalons = async (payload) => {
 
     let order = [['created_at', 'DESC']];
     let attributes = undefined;
-    
+
     if (latitude && longitude) {
         const latRange = range / 111;
         const minLat = latitude - latRange;
@@ -170,7 +468,7 @@ exports.listSalons = async (payload) => {
 
         const radLat = latitude * (Math.PI / 180);
         const lonRange = range / (111 * Math.cos(radLat));
-        
+
         const minLon = longitude - lonRange;
         const maxLon = longitude + lonRange;
 
@@ -178,7 +476,7 @@ exports.listSalons = async (payload) => {
         where.longitude = { [Op.between]: [minLon, maxLon] };
 
         const distanceLiteral = sequelize.literal(
-          `(6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude)
+            `(6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude)
            - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(latitude))))`
         );
 
