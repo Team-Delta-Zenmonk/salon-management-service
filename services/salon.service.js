@@ -172,8 +172,8 @@ exports.getAvailableSlots = async (payload) => {
             // ✅ PUSH SLOT ONCE
             if (validSlot) {
                 slots.push({
-                    start: toTimeString(slotStart),
-                    end: toTimeString(slotStart + totalDuration),
+                    start: toISODateTime(dateStr, slotStart),
+                    end: toISODateTime(dateStr, slotStart + totalDuration),
                     services: serviceOptions,
                 });
             }
@@ -220,6 +220,12 @@ const isStaffAvailable = (staff, serviceStart, serviceEnd, dateStr, staffHoliday
 
     return true;
 };
+const toISODateTime = (dateStr, minutes) => {
+    const d = new Date(dateStr);
+    d.setUTCHours(0, 0, 0, 0);
+    d.setUTCMinutes(minutes);
+    return d.toISOString();
+};
 
 const toMinutes = (dateTime) => {
     const d = new Date(dateTime);
@@ -231,6 +237,84 @@ const toTimeString = (minutes) => {
     const m = String(minutes % 60).padStart(2, "0");
     return `${h}:${m}`;
 };
+
+exports.listSalons = async (payload) => {
+    let { page = 1, limit = 10, search, category, latitude, longitude, range = 10 } = payload.query;
+
+    const offset = (page - 1) * limit;
+
+    const where = {};
+    const include = [];
+
+    if (search) {
+        where.name = { [Op.iLike]: `%${search}%` };
+    }
+
+    if (category) {
+        include.push({
+            model: Category,
+            as: 'categories',
+            where: {
+                name: { [Op.iLike]: `%${category}%` }
+            },
+            required: true
+        });
+    } else {
+        include.push({
+            model: Category,
+            as: 'categories',
+            required: false
+        });
+    }
+
+    let order = [['created_at', 'DESC']];
+    let attributes = undefined;
+
+    if (latitude && longitude) {
+        const latRange = range / 111;
+        const minLat = latitude - latRange;
+        const maxLat = latitude + latRange;
+
+        const radLat = latitude * (Math.PI / 180);
+        const lonRange = range / (111 * Math.cos(radLat));
+
+        const minLon = longitude - lonRange;
+        const maxLon = longitude + lonRange;
+
+        where.latitude = { [Op.between]: [minLat, maxLat] };
+        where.longitude = { [Op.between]: [minLon, maxLon] };
+
+        const distanceLiteral = sequelize.literal(
+            `(6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude)
+           - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(latitude))))`
+        );
+
+        attributes = {
+            include: [
+                [distanceLiteral, 'distance']
+            ]
+        };
+
+        order = [[sequelize.literal('distance'), 'ASC']];
+    }
+
+    const { count, rows } = await salonRepository.findAndCountAll({
+        criteria: where,
+        include,
+        offset,
+        limit,
+        attributes,
+        order
+    });
+
+    return {
+        total: count,
+        page,
+        limit,
+        data: rows
+    };
+}
+
 
 // exports.getAvailableSlots = async (payload) => {
 //     const { cart_id, start_date, days } = payload.query;
@@ -429,79 +513,3 @@ const toTimeString = (minutes) => {
 //     });
 // }
 
-exports.listSalons = async (payload) => {
-    let { page = 1, limit = 10, search, category, latitude, longitude, range = 10 } = payload.query;
-
-    const offset = (page - 1) * limit;
-
-    const where = {};
-    const include = [];
-
-    if (search) {
-        where.name = { [Op.iLike]: `%${search}%` };
-    }
-
-    if (category) {
-        include.push({
-            model: Category,
-            as: 'categories',
-            where: {
-                name: { [Op.iLike]: `%${category}%` }
-            },
-            required: true
-        });
-    } else {
-        include.push({
-            model: Category,
-            as: 'categories',
-            required: false
-        });
-    }
-
-    let order = [['created_at', 'DESC']];
-    let attributes = undefined;
-
-    if (latitude && longitude) {
-        const latRange = range / 111;
-        const minLat = latitude - latRange;
-        const maxLat = latitude + latRange;
-
-        const radLat = latitude * (Math.PI / 180);
-        const lonRange = range / (111 * Math.cos(radLat));
-
-        const minLon = longitude - lonRange;
-        const maxLon = longitude + lonRange;
-
-        where.latitude = { [Op.between]: [minLat, maxLat] };
-        where.longitude = { [Op.between]: [minLon, maxLon] };
-
-        const distanceLiteral = sequelize.literal(
-            `(6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude)
-           - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(latitude))))`
-        );
-
-        attributes = {
-            include: [
-                [distanceLiteral, 'distance']
-            ]
-        };
-
-        order = [[sequelize.literal('distance'), 'ASC']];
-    }
-
-    const { count, rows } = await salonRepository.findAndCountAll({
-        criteria: where,
-        include,
-        offset,
-        limit,
-        attributes,
-        order
-    });
-
-    return {
-        total: count,
-        page,
-        limit,
-        data: rows
-    };
-}

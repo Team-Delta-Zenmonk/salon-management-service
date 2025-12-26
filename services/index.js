@@ -10,4 +10,5 @@ module.exports = {
     uploadService: require('./upload.service'),
     holidayService: require('./holiday.service'),
     cartService: require('./cart.service'),
+    bookingService: require('./booking.service'),
 }
