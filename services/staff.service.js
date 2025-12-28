@@ -1,6 +1,7 @@
 const { error } = require("../libs");
 const { DayOfWeek } = require("../models/salon/salon-types");
 const { staffRepository, staffServiceRepository } = require("../repository");
+const { Op, fn, col, where: sequelizeWhere } = require("sequelize");
 
 const numberToDay = Object.fromEntries(
   Object.entries(DayOfWeek.ENUM).map(([day, num]) => [num, day])
@@ -54,25 +55,49 @@ exports.update = async (payload) => {
 
 exports.list = async (payload) => {
   const { salon, query } = payload;
-  const { page = 1, limit = 10 } = query;
+
+  const page = Number(query?.page) || 1;
+  const limit = Number(query?.limit) || 10;
+  const search = query?.search;
+
+  const criteria = { salon_id: salon.id };
+
+  if (search) {
+    criteria[Op.or] = [
+      { first_name: { [Op.iLike]: `%${search}%` } },
+      { last_name: { [Op.iLike]: `%${search}%` } },
+      { email: { [Op.iLike]: `%${search}%` } },
+
+      sequelizeWhere(
+        fn("concat", col("first_name")," ", col("last_name")),
+        { [Op.iLike]: `%${search}%` }
+      ),
+    ];
+  }
 
   const staffs = await staffRepository.findAndCountAll({
-    criteria: { salon_id: salon.id },
-    limit: limit,
+    criteria,
+    limit,
     offset: (page - 1) * limit,
   });
 
   const updatedStaffs = staffs.rows.map((staff)=> {
     if(staff?.active_hours) {
-        const result = {};
-        for(const [num, value] of Object.entries(staff.active_hours)) {
-            result[numberToDay[num]] = value;
-        }
-        staff.active_hours = result;
+      const result = {};
+      for(const [num, value] of Object.entries(staff.active_hours)) {
+        result[numberToDay[num]] = value;
+      }
+      staff.active_hours = result;
     }
     return staff;
-  })
-  return updatedStaffs;
+  });
+
+  return {
+    total: staffs.count,
+    page,
+    limit,
+    data: updatedStaffs,
+  };
 };
 
 exports.get = async (payload) => {
