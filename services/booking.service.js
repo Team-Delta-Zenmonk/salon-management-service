@@ -102,3 +102,39 @@ exports.createBooking = async (payload) => {
         await bookingServiceRepository.createBulk(bookingServicesPayload, { transaction });
     });
 }
+
+exports.listBookings = async (payload) => {
+    const { page, limit, filter } = payload;
+
+    const start = new Date();
+    const end = new Date();
+
+    if (filter === "day") {
+        start.setHours(0, 0, 0, 0);
+        end.setHours(23, 59, 59, 999);
+    }
+
+    if (filter === "week") {
+        const day = start.getDay();
+        const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+        start.setDate(diff);
+        start.setHours(0, 0, 0, 0);
+
+        end.setDate(start.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+    }
+
+    if (filter === "month") {
+        start.setDate(1);
+        start.setHours(0, 0, 0, 0);
+
+        end.setMonth(start.getMonth() + 1, 0);
+        end.setHours(23, 59, 59, 999);
+    }
+
+    const { salon } = payload;
+
+    const { rows: bookings, count } = await bookingRepository.findAllBookings({ page, limit, start, end, salon_id: salon.id });
+
+    return bookings;
+}

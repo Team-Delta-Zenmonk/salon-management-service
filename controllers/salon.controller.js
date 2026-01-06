@@ -31,3 +31,13 @@ exports.listSalons = async (req, res, next) => {
     }
 }
     
+exports.getSalon = async (req, res, next) => {
+    try {
+        const message = await salonService.getSalon({ params: req.params });
+        
+        return res.status(SUCCESS).json(message);
+    } catch (error) {
+        console.log("Error in controller getSalon", error);
+        return next(error);
+    }
+}

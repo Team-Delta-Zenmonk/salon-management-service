@@ -25,6 +25,7 @@
   },
   "homepage": "https://github.com/Team-Delta-Zenmonk/salon-management-service#readme",
   "dependencies": {
+    "@faker-js/faker": "^10.2.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.8.0",
     "cookie-parser": "^1.4.7",

@@ -11,3 +11,13 @@ exports.createBooking = async (req, res, next) => {
         next(error);
     }
 };
+
+exports.listBookings = async (req, res, next) => {
+    try {
+        const bookings = await bookingService.listBookings({body: req.body, salon : req.salon});
+        return res.status(200).json({ data: bookings });
+    } catch (error) {
+        console.log("error in listBookings controller", error);
+        next(error);
+    }
+}

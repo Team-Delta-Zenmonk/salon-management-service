@@ -239,10 +239,16 @@ const toTimeString = (minutes) => {
 };
 
 exports.listSalons = async (payload) => {
-    let { page = 1, limit = 10, search, category, latitude, longitude, range = 10 } = payload.query;
+    let {
+        page,
+        limit ,
+        search,
+        category,
+        latitude,
+        longitude
+    } = payload.query;
 
-    const offset = (page - 1) * limit;
-
+   const offset = (page && limit) ? (page - 1) * limit : 0;
     const where = {};
     const include = [];
 
@@ -267,32 +273,22 @@ exports.listSalons = async (payload) => {
         });
     }
 
-    let order = [['created_at', 'DESC']];
     let attributes = undefined;
+    let order = [['created_at', 'DESC']];
 
     if (latitude && longitude) {
-        const latRange = range / 111;
-        const minLat = latitude - latRange;
-        const maxLat = latitude + latRange;
-
-        const radLat = latitude * (Math.PI / 180);
-        const lonRange = range / (111 * Math.cos(radLat));
-
-        const minLon = longitude - lonRange;
-        const maxLon = longitude + lonRange;
-
-        where.latitude = { [Op.between]: [minLat, maxLat] };
-        where.longitude = { [Op.between]: [minLon, maxLon] };
-
         const distanceLiteral = sequelize.literal(
-            `(6371 * acos(cos(radians(${latitude})) * cos(radians(latitude)) * cos(radians(longitude)
-           - radians(${longitude})) + sin(radians(${latitude})) * sin(radians(latitude))))`
+            `(6371 * acos(
+                cos(radians(${latitude}))
+                * cos(radians(latitude))
+                * cos(radians(longitude) - radians(${longitude}))
+                + sin(radians(${latitude}))
+                * sin(radians(latitude))
+            ))`
         );
 
         attributes = {
-            include: [
-                [distanceLiteral, 'distance']
-            ]
+            include: [[distanceLiteral, 'distance']]
         };
 
         order = [[sequelize.literal('distance'), 'ASC']];
@@ -313,7 +309,21 @@ exports.listSalons = async (payload) => {
         limit,
         data: rows
     };
+};
+
+exports.getSalon = async (payload) => {
+    const { uuid } = payload.params;
+    console.log('uuid: ', uuid);
+
+  const salon = await salonRepository.findByUuid(uuid);
+
+    if (!salon) {
+        throw new error.BadRequest("Salon not found");
+    }
+
+    return salon;
 }
+
 
 
 // exports.getAvailableSlots = async (payload) => {

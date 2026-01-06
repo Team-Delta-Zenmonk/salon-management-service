@@ -30,6 +30,22 @@ class BookingRepository extends BaseRepository {
             ],
         });
     }
+
+    async findAllBookings({ page, limit, start, end, salon_id }) {
+        const offset = (page - 1) * limit;
+
+        return await this.model.findAndCountAll({
+            where: {
+                salon_id,
+                booking_date: {
+                    [Op.between]: [start, end],
+                },
+            },
+            order: [['booking_date', 'DESC']],
+            limit,
+            offset,
+        });
+    }
 }
 
 module.exports = new BookingRepository({ model: Booking });
