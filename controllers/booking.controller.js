@@ -12,9 +12,20 @@ exports.createBooking = async (req, res, next) => {
     }
 };
 
+exports.createAdminBooking = async (req, res, next) => {
+    try {
+        await bookingService.createAdminBooking({ body: req.body, salon: req.salon });
+        return res.status(CREATED).json({ message: "Booking created successfully" });
+
+    } catch (error) {
+        console.log("error in createAdminBooking controller", error);
+        next(error);
+    }
+};
+
 exports.listBookings = async (req, res, next) => {
     try {
-        const bookings = await bookingService.listBookings({body: req.body, salon : req.salon});
+        const bookings = await bookingService.listBookings({query: req.query, salon : req.salon});
         return res.status(200).json({ data: bookings });
     } catch (error) {
         console.log("error in listBookings controller", error);

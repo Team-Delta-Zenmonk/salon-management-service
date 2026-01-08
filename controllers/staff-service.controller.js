@@ -11,12 +11,13 @@ exports.bulkCreate = async (req, res, next) => {
     }
 }
 
-exports.unassignStaffService = async (req, res, next) => {
+exports.bulkUnassignStaffService = async (req, res, next) => {
     try {
-        const response = await staffServicesService.unassignStaffService({ params: req.params });
+        const response = await staffServicesService.bulkUnassignStaffService({ body: req.body });
         return res.status(SUCCESS).json(response);
     } catch (error) {
-        console.log("Error in unassignStaffService controller", error);
+        console.log("Error in bulkUnassignStaffService controller", error);
         return next(error);
     }
 }
+

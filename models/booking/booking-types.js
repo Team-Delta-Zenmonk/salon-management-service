@@ -29,3 +29,11 @@ class BookingStatus extends ENUM {
 }
 
 exports.BookingStatus = BookingStatus;
+
+class BookingSource extends ENUM {
+    static ENUM = {
+        CUSTOMER: 'CUSTOMER',
+        ADMIN: 'ADMIN',
+    };
+}
+exports.BookingSource = BookingSource;

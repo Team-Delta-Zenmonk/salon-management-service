@@ -5,6 +5,7 @@ const {
     BookingType,
     BookingExecutionMode,
     BookingStatus,
+    BookingSource,
 } = require("./booking-types");
 
 module.exports = (sequelize, DataTypes) => {
@@ -43,7 +44,7 @@ module.exports = (sequelize, DataTypes) => {
             },
             customer_id: {
                 type: DataTypes.INTEGER,
-                allowNull: false,
+                allowNull: true,
                 references: {
                     model: "customers",
                     key: "id",
@@ -63,6 +64,14 @@ module.exports = (sequelize, DataTypes) => {
             },
             total_duration: {
                 type: DataTypes.INTEGER,
+                allowNull: false,
+            },
+            admin_booking: {
+                type: DataTypes.JSONB,
+                allowNull: true,
+            },
+            created_by: {
+                type: DataTypes.ENUM(BookingSource.getValues()),
                 allowNull: false,
             },
             booking_type: {

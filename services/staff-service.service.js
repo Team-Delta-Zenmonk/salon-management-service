@@ -58,30 +58,26 @@ exports.bulkCreate = async (payload) => {
     }
   );
 };
-exports.unassignStaffService = async (payload) => {
-  const { params } = payload;
-  const { staff_uuid, service_uuid } = params;
 
-  const staff = await staffRepository.findOne({ uuid: staff_uuid });
-  if (!staff) {
-    throw new error.NotFound("Staff not found");
+exports.bulkUnassignStaffService = async (payload) => {
+  const { body } = payload;
+  const { staff_services } = body;
+
+
+  if (!Array.isArray(staff_services) || staff_services.length === 0) {
+    throw new error.BadRequest("staff_services must be a non-empty array of UUIDs");
   }
 
-  const service = await serviceRepository.findOne({ uuid: service_uuid });
-  if (!service) {
-    throw new error.NotFound("Service not found");
-  }
-
-  const staffService = await staffServiceRepository.findOne({
-    staff_id: staff.id,
-    service_id: service.id
+  const existing = await staffServiceRepository.findAll({
+    criteria: { uuid: staff_services },
   });
 
-  if (!staffService) {
-    throw new error.NotFound("Staff is not assigned to this service");
+  if (existing.length !== staff_services.length) {
+    throw new error.NotFound("One or more staff_service UUIDs not found");
   }
 
-  await staffServiceRepository.softDelete({ id: staffService.id }, { force: true });
+  await staffServiceRepository.softDelete({ uuid: staff_services });
 
-  return { message: "Staff unassigned from service successfully" };
+  return { message: "Staff unassigned from services successfully" };
 };
+
