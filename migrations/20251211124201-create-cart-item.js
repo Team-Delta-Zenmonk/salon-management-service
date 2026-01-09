@@ -45,10 +45,13 @@ module.exports = {
                 onUpdate: "CASCADE",
                 onDelete: "CASCADE",
             },
-            price: {
+            base_price: {
                 type: Sequelize.INTEGER,
                 allowNull: false,
-                defaultValue: 0,
+            },
+            final_price: {
+                type: Sequelize.INTEGER,
+                allowNull: false,
             },
             duration: {
                 type: Sequelize.INTEGER,

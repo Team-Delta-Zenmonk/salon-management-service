@@ -57,15 +57,18 @@ module.exports = (sequelize, DataTypes) => {
                     key: "id",
                 },
             },
-            price: {
+
+            base_price: {
                 type: DataTypes.INTEGER,
                 allowNull: false,
-                defaultValue: 0,
+            },
+            final_price: {
+                type: DataTypes.INTEGER,
+                allowNull: false,
             },
             duration: {
                 type: DataTypes.INTEGER, // in minutes
                 allowNull: false,
-                defaultValue: 0,
             },
             sequence: {
                 type: DataTypes.INTEGER,

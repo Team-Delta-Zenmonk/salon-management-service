@@ -1,6 +1,6 @@
 const { error } = require("../libs");
 const { generateResetToken } = require("../libs/generate-token");
-const { salonRepository } = require("../repository");
+const { salonRepository, customerRepository } = require("../repository");
 const crypto = require("crypto");
 const jwt = require('jsonwebtoken');
 const mailService = require('./mail.service');
@@ -32,8 +32,6 @@ exports.loginCustomer = async (payload) => {
 
     const decodedToken = await admin.auth().verifyIdToken(token);
     const { email, uid, name, picture, phone_number } = decodedToken;
-
-    const { customerRepository } = require('../repository');
 
     let customer = await customerRepository.findOne({ email });
 

@@ -102,6 +102,8 @@ exports.createBooking = async (payload) => {
         }));
 
         await bookingServiceRepository.createBulk(bookingServicesPayload, { transaction });
+
+        return booking;
     });
 }
 
