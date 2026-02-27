@@ -1,4 +1,5 @@
 const { error } = require("../libs");
+const { staffServiceRepository } = require("../repository"); 
 const { DiscountType } = require("../models/service/service-types");
 const {
     cartRepository,
@@ -64,8 +65,10 @@ exports.createCart = async (payload) => {
             const service = await serviceRepository.findOne({ uuid: itemData.service_id });
             if (!service) throw new error.NotFound(`Service with UUID ${itemData.service_id} not found`);
 
-            const staff = await staffRepository.findOne({ uuid: itemData.staff_id });
-            if (!staff) throw new error.NotFound(`Staff with UUID ${itemData.staff_id} not found`);
+            let staff = null;
+            if (itemData.staff_id) {
+                staff = await staffRepository.findOne({ uuid: itemData.staff_id });
+            }
 
             const basePrice = itemData.base_price ?? service.price;
 
@@ -78,7 +81,7 @@ exports.createCart = async (payload) => {
             await cartItemRepository.create({
                 cart_id: cart.id,
                 service_id: service.id,
-                staff_id: staff.id,
+                staff_id: staff?.id ?? null,
                 base_price: basePrice,
                 final_price: finalPrice,
                 duration: itemData.duration !== undefined ? itemData.duration : service.duration
@@ -89,7 +92,7 @@ exports.createCart = async (payload) => {
 
         await cartRepository.commitTransaction(transaction);
 
-        return await cartRepository.findOne({ id: cart.id }, ['cart_items']);
+        return await cartRepository.getCartById(cart.id);
 
     } catch (err) {
         await cartRepository.rollbackTransaction(transaction);
@@ -104,11 +107,17 @@ exports.addItem = async (payload) => {
     const cart = await cartRepository.findOne({ uuid: cart_id });
     if (!cart) throw new error.NotFound("Cart not found");
 
+    const existingItem = await cartItemRepository.findOne({
+    cart_id: cart.id,
+    service_id: (await serviceRepository.findOne({ uuid: service_id }))?.id
+  });
+  
+  if (existingItem) {
+    throw new error.BadRequest("Service already exists in cart");
+  }
+
     const service = await serviceRepository.findOne({ uuid: service_id });
     if (!service) throw new error.NotFound("Service not found");
-
-    const staff = await staffRepository.findOne({ uuid: staff_id });
-    if (!staff) throw new error.NotFound("Staff not found");
 
     const basePrice = base_price ?? service.price;
 
@@ -121,7 +130,6 @@ exports.addItem = async (payload) => {
     const item = await cartItemRepository.create({
         cart_id: cart.id,
         service_id: service.id,
-        staff_id: staff.id,
         base_price: basePrice,
         final_price: finalPrice,
         duration: body.duration !== undefined ? body.duration : service.duration
@@ -154,9 +162,19 @@ exports.updateItem = async (payload) => {
     if (staff_id) {
         const staff = await staffRepository.findOne({ uuid: staff_id });
         if (!staff) throw new error.NotFound("Staff not found");
-        updateData.staff_id = staff.id;
-    }
 
+        // get price and duration from StaffService table
+        const staffService = await staffServiceRepository.findOne({ 
+            staff_id: staff.id, 
+            service_id: item.service_id 
+        });
+
+        if (!staffService) throw new error.NotFound("This staff is not assigned to this service");
+
+        updateData.staff_id = staff.id;
+        updateData.final_price = staffService.price ? parseFloat(staffService.price) : item.base_price;
+        updateData.duration = staffService.duration;
+    }
     if (body.price !== undefined) updateData.price = body.price;
     if (body.duration !== undefined) updateData.duration = body.duration;
 
@@ -167,7 +185,9 @@ exports.updateItem = async (payload) => {
 
     await updateCartTotals(item.cart_id);
 
-    return { message: "Cart item updated successfully" };
+    return await cartRepository.getCartById(item.cart_id);
+
+    // return { message: "Cart item updated successfully" };
 };
 
 exports.removeItem = async (payload) => {

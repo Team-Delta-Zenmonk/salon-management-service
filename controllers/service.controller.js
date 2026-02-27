@@ -23,7 +23,7 @@ exports.listServices = async (req, res, next) => {
 
 exports.listStaff = async(req, res, next) => {
     try {
-        const response = await serviceService.listStaff({ params: req.params, salon: req.salon });
+        const response = await serviceService.listStaff({ params: req.params, query: req.query });
         return res.status(SUCCESS).json(response);
     } catch (error) {
         console.log("Error in list staff for a service controller", error);

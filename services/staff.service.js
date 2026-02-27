@@ -1,6 +1,6 @@
 const { error } = require("../libs");
 const { DayOfWeek } = require("../models/salon/salon-types");
-const { staffRepository, staffServiceRepository } = require("../repository");
+const { staffRepository, staffServiceRepository, salonRepository } = require("../repository");
 const { Op, fn, col, where: sequelizeWhere } = require("sequelize");
 
 const numberToDay = Object.fromEntries(
@@ -101,7 +101,10 @@ exports.list = async (payload) => {
 };
 
 exports.get = async (payload) => {
-  const { salon, params } = payload;
+  const { query, params } = payload;
+
+  const salon = await salonRepository.findOne({ uuid: query.salon_id });
+  if (!salon) throw new error.NotFound("Salon not found");
 
   const staff = await staffRepository.findOne({
     salon_id: salon.id,

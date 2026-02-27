@@ -43,12 +43,13 @@ exports.bulkCreate = async (payload) => {
           duration: item.duration,
           price_type: item.price_type,
           price: item.price,
+          deleted_at: null,
         };
       });
 
       const staffServices = await staffServiceRepository.createBulk(finalData, {
         conflictAttributes: ["service_id", "staff_id"],
-        updateOnDuplicate: ["duration", "price_type", "price"],
+        updateOnDuplicate: ["duration", "price_type", "price", "deleted_at"],
         transaction,
       });
 

@@ -11,4 +11,5 @@ module.exports = {
     holidayService: require('./holiday.service'),
     cartService: require('./cart.service'),
     bookingService: require('./booking.service'),
+    customerService: require('./customer.service'),
 }

@@ -12,4 +12,5 @@ module.exports = {
     cartController: require('./cart.controller'),
     holidayController: require('./holiday.controller'),
     bookingController: require('./booking.controller'),
+    customerController: require("./customer.controller"),
 }

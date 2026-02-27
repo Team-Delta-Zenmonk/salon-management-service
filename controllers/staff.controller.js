@@ -33,7 +33,7 @@ exports.list = async(req, res, next) => {
 
 exports.get = async(req, res, next) => {
     try {
-        const response = await staffService.get({ salon: req.salon , params: req.params });
+        const response = await staffService.get({ query: req.query, params: req.params });
         return res.status(SUCCESS).json(response);
     } catch (error) {
         console.log("Error in get staff controller", error);

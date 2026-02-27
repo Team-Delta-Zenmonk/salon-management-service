@@ -67,11 +67,15 @@ exports.listServices = async (payload) => {
 }
 
 exports.listStaff = async (payload) => {
-    const { params, salon } = payload;
+    const { params, query } = payload;
+
+    const salon = await salonRepository.findOne({ uuid: query.salon_id });
+    if (!salon) throw new error.NotFound("Salon not found");
 
     const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
+    if (!service) throw new error.NotFound("Service not found");
 
-    const staffs = await staffServiceRepository.findAll({ criteria: { service_id: service.id } });
+    const staffs = await staffServiceRepository.findAll({ criteria: { service_id: service.id },include: ["staff"] });
     return staffs;
 }
 
