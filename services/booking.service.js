@@ -7,7 +7,7 @@ exports.createBooking = async (payload) => {
     const { cart_id, date, slot } = payload.body;
     const createdBy = BookingSource.ENUM.CUSTOMER;
 
-    let cart = await cartRepository.getCardByUuid(cart_id);
+    let cart = await cartRepository.getCartByUuid(cart_id);
     if (!cart) throw new error.BadRequest("Cart not found");
 
     const cartItems = cart.cart_items.sort((a, b) => a.sequence - b.sequence);
@@ -36,7 +36,7 @@ exports.createBooking = async (payload) => {
             sequence: cartItem.sequence,
             offset_minutes: offset,
             duration_minutes: cartItem.duration,
-            price: cartItem.price,
+            price: cartItem.final_price ?? cartItem.base_price,
             start_time: serviceStart,
             end_time: serviceEnd
         });

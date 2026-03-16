@@ -38,7 +38,7 @@ exports.getAvailableSlots = async (payload) => {
     const { cart_id, start_date, days } = payload.query;
 
     // 1️⃣ Load cart
-    let cart = await cartRepository.getCardByUuid(cart_id);
+    let cart = await cartRepository.getCartByUuid(cart_id);
     if (!cart) throw new error.BadRequest("Cart not found");
 
     cart = cart.toJSON();

@@ -27,7 +27,7 @@ cartIncludes() {
         },
         {
             association: "salon",
-            attributes: ["id", "uuid", "name", "logo", "address", "type"],
+            attributes: ["id", "uuid", "name", "logo", "address", "type", "business_hours"],
         },
     ];
 }
