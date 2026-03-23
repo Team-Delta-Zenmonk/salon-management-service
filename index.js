@@ -1,6 +1,7 @@
 require('dotenv').config();
 global.argv = process.argv.slice(2);
 global.port = global.argv[0] || process.env.APP_PORT;
+const stripeRouter = require('./routes/stripe.router');
 
 if (!global.port) {
     console.log('port is not defined. argv = ', global.argv);
@@ -17,6 +18,7 @@ const cookieParser = require('cookie-parser');
 const app = express();
 
 app.use(cookieParser());
+app.use('/stripe', stripeRouter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
