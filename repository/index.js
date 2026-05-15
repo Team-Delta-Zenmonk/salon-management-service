@@ -14,4 +14,5 @@ module.exports = {
   bookingRepository: require("./booking.repository"),
   bookingServiceRepository: require("./booking-service.repository"),
   paymentRepository: require("./payment.repository"),
+  webhookEventRepository: require("./webhook-event.repository"),
 };

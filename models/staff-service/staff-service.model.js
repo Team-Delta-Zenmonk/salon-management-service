@@ -1,6 +1,6 @@
 "use strict";
 const { Model } = require("sequelize");
-const { PriceType } = require('../service/service-types');
+const { PriceType } = require("../service/service-types");
 
 module.exports = (sequelize, DataTypes) => {
   class StaffService extends Model {
@@ -77,7 +77,7 @@ module.exports = (sequelize, DataTypes) => {
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
-    }
+    },
   );
 
   return StaffService;

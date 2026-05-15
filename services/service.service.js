@@ -15,7 +15,6 @@ exports.createService = async (payload) => {
         }
 
         body.parent_id = parent.id;
-        // body.category_id = parent.category_id;
 
         return await serviceRepository.create({ ...body, salon_id: salon.id, category_id: null });
 

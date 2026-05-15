@@ -30,10 +30,6 @@ module.exports = (sequelize, DataTypes) => {
       booking_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: {
-          model: "bookings",
-          key: "id",
-        },
       },
       amount: {
         type: DataTypes.INTEGER,
@@ -58,6 +54,24 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: PaymentStatus.ENUM.PENDING,
       },
+      attempt_no: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+      },
+      idempotency_key: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        unique: true,
+      },
+      failure_reason: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      captured_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
@@ -79,6 +93,11 @@ module.exports = (sequelize, DataTypes) => {
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
+      indexes: [
+        {
+          fields: ["booking_id"],
+        },
+      ],
     },
   );
 

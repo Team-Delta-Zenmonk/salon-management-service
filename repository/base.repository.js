@@ -1,5 +1,5 @@
-const { sequelize } = require('../config/db/db-connection');
-const { badRequest } = require('../libs/error');
+const { sequelize } = require("../config/db/db-connection");
+const { badRequest } = require("../libs/error");
 
 class BaseRepository {
   constructor({ model }) {
@@ -24,20 +24,32 @@ class BaseRepository {
   }
 
   findById(id) {
-    return this.items.find(item => item.id === id);
+    return this.items.find((item) => item.id === id);
   }
 
   async findOne(criteria, include = [], attributes = {}, options = {}) {
-    const res = await this.model.findOne({ where: criteria, include, attributes, ...options })
-    return res
+    const query = { where: criteria, include, attributes };
+    if (options) Object.assign(query, options);
+
+    return await this.model.findOne(query);
   }
 
-  async findAll({ criteria = {}, include = [], order, attributes = {}, offset = 0, paranoid = true, limit = null, transaction = null,lock = null }) {
+  async findAll({
+    criteria = {},
+    include = [],
+    order,
+    attributes = {},
+    offset = 0,
+    paranoid = true,
+    limit = null,
+    transaction = null,
+    lock = null,
+  }) {
     let findQuery = { where: criteria, include, attributes, offset, order, paranoid, subQuery: false };
-    if (transaction) findQuery.transaction = transaction; 
+    if (transaction) findQuery.transaction = transaction;
     if (limit) findQuery.limit = limit;
     if (lock) findQuery.lock = lock;
-    
+
     return await this.model.findAll(findQuery);
   }
 
@@ -47,6 +59,10 @@ class BaseRepository {
 
   async createBulk(payload, options) {
     return await this.model.bulkCreate(payload, options);
+  }
+
+  async destroy({ criteria, options = {} }) {
+    return await this.model.destroy({ where: criteria, ...options });
   }
 
   async softDelete(criteria, options = null) {
@@ -72,10 +88,9 @@ class BaseRepository {
 
   async getId(uuid) {
     const resp = await this.model.findOne({ where: { uuid } });
-    if (resp === null) throw new badRequest('Invalid Id');
+    if (resp === null) throw new badRequest("Invalid Id");
     return resp.toJSON().id;
   }
+}
 
-};
-
-module.exports = BaseRepository; 
+module.exports = BaseRepository;

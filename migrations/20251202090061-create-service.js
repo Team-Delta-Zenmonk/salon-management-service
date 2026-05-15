@@ -1,10 +1,9 @@
-'use strict';
+"use strict";
 
 const { ServiceGender, PriceType, DiscountType } = require("../models/service/service-types");
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-
     await queryInterface.sequelize.query(`
     CREATE TYPE "enum_service_gender" AS ENUM (
     '${ServiceGender.ENUM.MALE}', 
@@ -25,12 +24,12 @@ module.exports = {
     '${DiscountType.ENUM.AMOUNT}');
     `);
 
-    await queryInterface.createTable('services', {
+    await queryInterface.createTable("services", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        type: Sequelize.INTEGER,
       },
       uuid: {
         type: Sequelize.UUID,
@@ -40,61 +39,61 @@ module.exports = {
       },
       name: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: false,
       },
       description: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
       },
       logo: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       salon_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'salons',
-          key: 'id'
-        }
+          model: "salons",
+          key: "id",
+        },
       },
       category_id: {
         type: Sequelize.INTEGER,
         references: {
-          model: 'categories',
-          key: 'id'
-        }
+          model: "categories",
+          key: "id",
+        },
       },
       parent_id: {
         type: Sequelize.INTEGER,
         references: {
-          model: 'services',
-          key: 'id'
-        }
+          model: "services",
+          key: "id",
+        },
       },
       is_active: {
         type: Sequelize.BOOLEAN,
-        defaultValue: true
+        defaultValue: true,
       },
       is_popular: {
         type: Sequelize.BOOLEAN,
-        defaultValue: false
+        defaultValue: false,
       },
       gender: {
-        type: 'enum_service_gender',
-        allowNull: false
+        type: "enum_service_gender",
+        allowNull: false,
       },
       price_type: {
-        type: 'enum_service_price_type',
-        allowNull: false
+        type: "enum_service_price_type",
+        allowNull: false,
       },
       price: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: false,
       },
       discount: {
-        type: Sequelize.INTEGER
+        type: Sequelize.INTEGER,
       },
       discount_type: {
-        type: 'enum_service_discount_type',
+        type: "enum_service_discount_type",
       },
       duration: {
         type: Sequelize.INTEGER,
@@ -102,19 +101,19 @@ module.exports = {
       },
       created_at: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       updated_at: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       deleted_at: {
-        type: Sequelize.DATE
-      }
+        type: Sequelize.DATE,
+      },
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('services');
+    await queryInterface.dropTable("services");
 
     await queryInterface.sequelize.query(`
     DROP TYPE "enum_service_gender";
@@ -127,6 +126,5 @@ module.exports = {
     await queryInterface.sequelize.query(`
     DROP TYPE "enum_service_discount_type";
     `);
-
-  }
+  },
 };

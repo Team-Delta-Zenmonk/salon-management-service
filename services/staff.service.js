@@ -3,19 +3,17 @@ const { DayOfWeek } = require("../models/salon/salon-types");
 const { staffRepository, staffServiceRepository, salonRepository } = require("../repository");
 const { Op, fn, col, where: sequelizeWhere } = require("sequelize");
 
-const numberToDay = Object.fromEntries(
-  Object.entries(DayOfWeek.ENUM).map(([day, num]) => [num, day])
-);
+const numberToDay = Object.fromEntries(Object.entries(DayOfWeek.ENUM).map(([day, num]) => [num, day]));
 
 exports.create = async (payload) => {
   const { body, salon } = payload;
 
-  if(body?.active_hours) {
+  if (body?.active_hours) {
     const result = {};
-    for(const [day, value] of Object.entries(body.active_hours)) {
+    for (const [day, value] of Object.entries(body.active_hours)) {
       result[DayOfWeek.ENUM[day]] = value;
     }
-    
+
     body.active_hours = result;
   }
 
@@ -34,12 +32,12 @@ exports.update = async (payload) => {
   });
   if (!staff) throw new error.NotFound("Staff not found");
 
-  if(body?.active_hours) {
+  if (body?.active_hours) {
     const result = {};
-    for(const [day, value] of Object.entries(body.active_hours)) {
+    for (const [day, value] of Object.entries(body.active_hours)) {
       result[DayOfWeek.ENUM[day]] = value;
     }
-    
+
     body.active_hours = result;
   }
 
@@ -68,10 +66,7 @@ exports.list = async (payload) => {
       { last_name: { [Op.iLike]: `%${search}%` } },
       { email: { [Op.iLike]: `%${search}%` } },
 
-      sequelizeWhere(
-        fn("concat", col("first_name")," ", col("last_name")),
-        { [Op.iLike]: `%${search}%` }
-      ),
+      sequelizeWhere(fn("concat", col("first_name"), " ", col("last_name")), { [Op.iLike]: `%${search}%` }),
     ];
   }
 
@@ -81,10 +76,10 @@ exports.list = async (payload) => {
     offset: (page - 1) * limit,
   });
 
-  const updatedStaffs = staffs.rows.map((staff)=> {
-    if(staff?.active_hours) {
+  const updatedStaffs = staffs.rows.map((staff) => {
+    if (staff?.active_hours) {
       const result = {};
-      for(const [num, value] of Object.entries(staff.active_hours)) {
+      for (const [num, value] of Object.entries(staff.active_hours)) {
         result[numberToDay[num]] = value;
       }
       staff.active_hours = result;
@@ -136,19 +131,17 @@ exports.listServices = async (payload) => {
 
 exports.remove = async (payload) => {
   const { salon, params } = payload;
-  
+
   const staff = await staffRepository.findOne({
     salon_id: salon.id,
     uuid: params.uuid,
   });
   if (!staff) throw new error.NotFound("Staff not found");
 
-  // check if cascade works for staff-service, and only delete if there are no bookings in future for this staff
-  
   await staffRepository.softDelete({
     salon_id: salon.id,
     uuid: params.uuid,
   });
 
-  return { message: 'Staff deleted successfully' };;
+  return { message: "Staff deleted successfully" };
 };

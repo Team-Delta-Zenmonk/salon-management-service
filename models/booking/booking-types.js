@@ -24,6 +24,7 @@ class BookingStatus extends ENUM {
     CONFIRMED: "confirmed",
     COMPLETED: "completed",
     CANCELLED: "cancelled",
+    EXPIRED: "expired",
   };
 }
 
@@ -35,4 +36,5 @@ class BookingSource extends ENUM {
     ADMIN: "ADMIN",
   };
 }
+
 exports.BookingSource = BookingSource;

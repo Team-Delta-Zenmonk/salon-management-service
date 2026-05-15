@@ -26,15 +26,14 @@ module.exports = (sequelize, DataTypes) => {
         constraints: false,
         as: "holidays",
         scope: {
-          holiday_type: HolidayType.ENUM.STAFF
-        }
+          holiday_type: HolidayType.ENUM.STAFF,
+        },
       });
 
       this.hasMany(models.BookingService, {
         foreignKey: "staff_id",
         as: "booking_services",
       });
-
     }
   }
 
@@ -131,7 +130,7 @@ module.exports = (sequelize, DataTypes) => {
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
-    }
+    },
   );
 
   return Staff;

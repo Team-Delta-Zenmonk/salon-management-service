@@ -13,7 +13,7 @@ module.exports = {
         type: Sequelize.UUID,
         defaultValue: Sequelize.UUIDV4,
         allowNull: false,
-        unique: true
+        unique: true,
       },
       salon_id: {
         type: Sequelize.INTEGER,
@@ -23,7 +23,7 @@ module.exports = {
           key: "id",
         },
         onUpdate: "CASCADE",
-        onDelete: "RESTRICT"
+        onDelete: "RESTRICT",
       },
       first_name: {
         type: Sequelize.STRING,
@@ -70,14 +70,14 @@ module.exports = {
         allowNull: false,
       },
       gender: {
-        type: 'enum_service_gender',
-        allowNull: false
+        type: "enum_service_gender",
+        allowNull: false,
       },
       active_hours: {
-        type: Sequelize.JSON
+        type: Sequelize.JSON,
       },
       photos: {
-        type: Sequelize.JSON
+        type: Sequelize.JSON,
       },
       created_at: {
         type: Sequelize.DATE,

@@ -1,14 +1,14 @@
-const crypto = require('crypto');
+const crypto = require("crypto");
 
 exports.generateOtp = (length = 6) => {
-    let otp = "";
+  let otp = "";
 
-    for (let i = 0; i < length; i++) {
-        otp += crypto.randomInt(0, 10).toString();
-    }
+  for (let i = 0; i < length; i++) {
+    otp += crypto.randomInt(0, 10).toString();
+  }
 
-    return otp;
-}
+  return otp;
+};
 
 exports.now = () => new Date();
 

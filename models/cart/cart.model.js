@@ -55,7 +55,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 0,
       },
       total_duration: {
-        type: DataTypes.INTEGER, // in minutes
+        type: DataTypes.INTEGER,
         allowNull: false,
         defaultValue: 0,
       },
@@ -81,7 +81,7 @@ module.exports = (sequelize, DataTypes) => {
       createdAt: "created_at",
       updatedAt: "updated_at",
       deletedAt: "deleted_at",
-    }
+    },
   );
 
   return Cart;

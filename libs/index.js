@@ -1,8 +1,8 @@
 module.exports = {
-    constants : require('./constants'),
-    utils : require('./utils'),
-    error : require('./error'),
-    hash : require('./hash'),
-    otp : require('./otp'),
-    generateToken : require('./generate-token'),
+  constants: require("./constants"),
+  utils: require("./utils"),
+  error: require("./error"),
+  hash: require("./hash"),
+  otp: require("./otp"),
+  generateToken: require("./generate-token"),
 };

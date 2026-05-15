@@ -13,4 +13,5 @@ module.exports = {
   bookingService: require("./booking.service"),
   customerService: require("./customer.service"),
   paymentService: require("./payment.service"),
+  reconciliationService: require("./reconciliation.service"),
 };

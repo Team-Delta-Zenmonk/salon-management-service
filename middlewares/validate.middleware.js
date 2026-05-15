@@ -1,5 +1,5 @@
-const { ZodError } = require('zod');
-const { BAD_REQUEST } = require('../libs/constants');
+const { ZodError } = require("zod");
+const { BAD_REQUEST } = require("../libs/constants");
 
 exports.validate = (schema) => (req, res, next) => {
   try {

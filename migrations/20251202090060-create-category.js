@@ -1,14 +1,13 @@
-'use strict';
+"use strict";
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-
-    await queryInterface.createTable('categories', {
+    await queryInterface.createTable("categories", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        type: Sequelize.INTEGER,
       },
       uuid: {
         type: Sequelize.UUID,
@@ -21,33 +20,33 @@ module.exports = {
         allowNull: false,
       },
       description: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
       },
       logo: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       salon_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'salons',
-          key: 'id'
-        }
+          model: "salons",
+          key: "id",
+        },
       },
       created_at: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       updated_at: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       deleted_at: {
-        type: Sequelize.DATE
-      }
+        type: Sequelize.DATE,
+      },
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('categories');
-  }
+    await queryInterface.dropTable("categories");
+  },
 };

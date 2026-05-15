@@ -1,61 +1,77 @@
 "use strict";
 
 module.exports = {
-    async up(queryInterface, Sequelize) {
-        // created_by enum type
-        await queryInterface.sequelize.query(`
-            CREATE TYPE "enum_booking_created_by" AS ENUM ('ADMIN', 'CUSTOMER');
-        `);
+  async up(queryInterface, Sequelize) {
+    const tableDesc = await queryInterface.describeTable("bookings");
 
-        // allow null customer_id (for guest bookings)
-        await queryInterface.changeColumn("bookings", "customer_id", {
-            type: Sequelize.INTEGER,
-            allowNull: true,
-            references: {
-                model: "customers",
-                key: "id",
-            },
-            onUpdate: "CASCADE",
-            onDelete: "CASCADE",
-        });
+    const [enumResult] = await queryInterface.sequelize.query(`
+       SELECT 1 FROM pg_type WHERE typname = 'enum_booking_created_by';
+    `);
 
-        // admin_booking JSON field
-        await queryInterface.addColumn("bookings", "admin_booking", {
-            type: Sequelize.JSONB,
-            allowNull: true,
-        });
+    if (enumResult.length === 0) {
+      await queryInterface.sequelize.query(`
+        CREATE TYPE "enum_booking_created_by" AS ENUM ('ADMIN', 'CUSTOMER');
+      `);
+    }
 
-        // created_by column
-        await queryInterface.addColumn("bookings", "created_by", {
-            type: "enum_booking_created_by",
-            allowNull: false,
-            defaultValue: "CUSTOMER",
-        });
-    },
+    if (tableDesc.customer_id && !tableDesc.customer_id.allowNull) {
+      await queryInterface.changeColumn("bookings", "customer_id", {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: {
+          model: "customers",
+          key: "id",
+        },
+        onUpdate: "CASCADE",
+        onDelete: "CASCADE",
+      });
+    }
 
-    async down(queryInterface, Sequelize) {
-        // revert created_by column
-        await queryInterface.removeColumn("bookings", "created_by");
+    if (!tableDesc.admin_booking) {
+      await queryInterface.addColumn("bookings", "admin_booking", {
+        type: Sequelize.JSONB,
+        allowNull: true,
+      });
+    }
 
-        // revert admin_booking field
-        await queryInterface.removeColumn("bookings", "admin_booking");
+    if (!tableDesc.created_by) {
+      await queryInterface.addColumn("bookings", "created_by", {
+        type: "enum_booking_created_by",
+        allowNull: false,
+        defaultValue: "CUSTOMER",
+      });
+    }
+  },
 
-        // make customer_id required again
-        await queryInterface.changeColumn("bookings", "customer_id", {
-            type: Sequelize.INTEGER,
-            allowNull: false,
-            references: {
-                model: "customers",
-                key: "id",
-            },
-            onUpdate: "CASCADE",
-            onDelete: "CASCADE",
-        });
+  async down(queryInterface, Sequelize) {
+    const tableDesc = await queryInterface.describeTable("bookings");
 
-        await queryInterface.sequelize.query(`
-            DROP TYPE "enum_booking_created_by";
-        `);
-    },
+    if (tableDesc.created_by) {
+      await queryInterface.removeColumn("bookings", "created_by");
+    }
+
+    if (tableDesc.admin_booking) {
+      await queryInterface.removeColumn("bookings", "admin_booking");
+    }
+
+    await queryInterface.changeColumn("bookings", "customer_id", {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      references: {
+        model: "customers",
+        key: "id",
+      },
+      onUpdate: "CASCADE",
+      onDelete: "CASCADE",
+    });
+
+    const [enumResult] = await queryInterface.sequelize.query(`
+        SELECT 1 FROM pg_type WHERE typname = 'enum_booking_created_by';
+    `);
+    if (enumResult.length > 0) {
+      await queryInterface.sequelize.query(`
+         DROP TYPE "enum_booking_created_by";
+      `);
+    }
+  },
 };
-
-

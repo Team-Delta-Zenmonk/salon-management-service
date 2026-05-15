@@ -1,10 +1,9 @@
-'use strict';
+"use strict";
 
 const { SalonType } = require("../models/salon/salon-types");
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-
     await queryInterface.sequelize.query(`
     CREATE TYPE "enum_salon_type" AS ENUM (
     '${SalonType.ENUM.FEMALE}',
@@ -13,12 +12,12 @@ module.exports = {
     );
     `);
 
-    await queryInterface.createTable('salons', {
+    await queryInterface.createTable("salons", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
-        type: Sequelize.INTEGER
+        type: Sequelize.INTEGER,
       },
       uuid: {
         type: Sequelize.UUID,
@@ -27,7 +26,7 @@ module.exports = {
         allowNull: false,
       },
       name: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       email: {
         type: Sequelize.STRING,
@@ -35,70 +34,70 @@ module.exports = {
         unique: true,
       },
       owner_name: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       password: {
         type: Sequelize.STRING,
         allowNull: false,
       },
       phone: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       latitude: {
-        type: Sequelize.DOUBLE
+        type: Sequelize.DOUBLE,
       },
       longitude: {
-        type: Sequelize.DOUBLE
+        type: Sequelize.DOUBLE,
       },
       address: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       map_link: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       about: {
-        type: Sequelize.TEXT
+        type: Sequelize.TEXT,
       },
       logo: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       type: {
-        type: 'enum_salon_type',
+        type: "enum_salon_type",
       },
       is_onboarded: {
         type: Sequelize.BOOLEAN,
         defaultValue: false,
       },
       reset_password_token: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
       },
       reset_token_expiry: {
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       business_hours: {
-        type: Sequelize.JSON
+        type: Sequelize.JSON,
       },
       photos: {
-        type: Sequelize.JSON
+        type: Sequelize.JSON,
       },
       created_at: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       updated_at: {
         allowNull: false,
-        type: Sequelize.DATE
+        type: Sequelize.DATE,
       },
       deleted_at: {
-        type: Sequelize.DATE
-      }
+        type: Sequelize.DATE,
+      },
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable('salons');
+    await queryInterface.dropTable("salons");
 
     await queryInterface.sequelize.query(`
     DROP TYPE "enum_salon_type";
     `);
-  }
+  },
 };

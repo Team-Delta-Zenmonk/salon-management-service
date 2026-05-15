@@ -70,6 +70,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.JSONB,
         allowNull: true,
       },
+      cart_snapshot: {
+        type: DataTypes.JSONB,
+        allowNull: true,
+      },
       created_by: {
         type: DataTypes.ENUM(BookingSource.getValues()),
         allowNull: false,

@@ -4,11 +4,6 @@ const { PaymentStatus } = require("../models/payment/payment-types");
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-
-    await queryInterface.sequelize.query(`
-      ALTER TYPE "enum_booking_status" ADD VALUE IF NOT EXISTS 'confirmed';
-    `);
-
     await queryInterface.sequelize.query(`
       CREATE TYPE "enum_payments_status" AS ENUM (
         '${PaymentStatus.ENUM.PENDING}',
@@ -63,6 +58,25 @@ module.exports = {
         allowNull: false,
         defaultValue: PaymentStatus.ENUM.PENDING,
       },
+      attempt_no: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+      },
+
+      idempotency_key: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true,
+      },
+      failure_reason: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
+      captured_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,
@@ -74,6 +88,10 @@ module.exports = {
       deleted_at: {
         type: Sequelize.DATE,
       },
+    });
+
+    await queryInterface.addIndex("payments", ["booking_id"], {
+      name: "idx_payments_booking",
     });
   },
 
