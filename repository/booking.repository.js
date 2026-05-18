@@ -39,6 +39,9 @@ class BookingRepository extends BaseRepository {
         booking_date: {
           [Op.between]: [start, end],
         },
+        status: {
+          [Op.notIn]: [BookingStatus.ENUM.EXPIRED, BookingStatus.ENUM.PENDING],
+        },
       },
       include: [
         {
