@@ -261,6 +261,13 @@ exports.listSalons = async (payload) => {
     };
 
     order = [[sequelize.literal("distance"), "ASC"]];
+
+    const distanceCondition = sequelize.where(distanceLiteral, { [Op.lte]: 50 });
+    if (where[Op.and]) {
+      where[Op.and].push(distanceCondition);
+    } else {
+      where[Op.and] = [distanceCondition];
+    }
   }
 
   const { count, rows } = await salonRepository.findAndCountAll({

@@ -54,7 +54,15 @@ class BaseRepository {
   }
 
   async findAndCountAll({ criteria, include = [], order, attributes = {}, offset = 0, limit = 10 }) {
-    return await this.model.findAndCountAll({ where: criteria, include, attributes, offset, order, limit });
+    return await this.model.findAndCountAll({
+      where: criteria,
+      include,
+      attributes,
+      offset,
+      order,
+      limit,
+      distinct: true,
+    });
   }
 
   async createBulk(payload, options) {
