@@ -104,6 +104,7 @@ exports.updateInventoryItem = async (payload) => {
       uuid: body.category_id,
       salon_id: salon.id,
     });
+    body.category_id = category.id;
     if (!category) throw new error.NotFound("Category not found");
   }
 
