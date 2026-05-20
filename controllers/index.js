@@ -15,4 +15,7 @@ module.exports = {
   customerController: require("./customer.controller"),
   paymentController: require("./payment.controller"),
   stripeController: require("./stripe.controller"),
+  itemsCategoryController: require("./items-category.controller"),
+  inventoryItemController: require("./inventory-item.controller"),
+  inventoryTransactionController: require("./inventory-transaction.controller"),
 };

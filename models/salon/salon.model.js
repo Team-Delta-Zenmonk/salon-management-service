@@ -37,6 +37,18 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "salon_id",
         as: "bookings",
       });
+      this.hasMany(models.ItemsCategory, {
+        foreignKey: "salon_id",
+        as: "itemsCategory",
+      });
+      this.hasMany(models.InventoryItem, {
+        foreignKey: "salon_id",
+        as: "inventoryItems",
+      });
+      this.hasMany(models.InventoryTransaction, {
+        foreignKey: "salon_id",
+        as: "inventoryTransactions",
+      });
     }
   }
   Salon.init(

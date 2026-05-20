@@ -14,5 +14,8 @@ module.exports = {
   bookingRepository: require("./booking.repository"),
   bookingServiceRepository: require("./booking-service.repository"),
   paymentRepository: require("./payment.repository"),
+  itemsCategoryRepository: require("./items-category.repository"),
+  inventoryItemRepository: require("./inventory-item.repository"),
+  inventoryTransactionRepository: require("./inventory-transaction.repository"),
   webhookEventRepository: require("./webhook-event.repository"),
 };
