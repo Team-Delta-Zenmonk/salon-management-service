@@ -1,6 +1,6 @@
 require("dotenv").config();
 global.argv = process.argv.slice(2);
-global.port = global.argv[0] || process.env.APP_PORT;
+global.port = global.argv[0] || process.env.APP_PORT || 8080;
 const stripeRouter = require("./routes/stripe.router");
 
 require("./jobs");
