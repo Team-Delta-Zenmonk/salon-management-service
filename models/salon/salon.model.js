@@ -133,6 +133,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.JSON,
         allowNull: true,
       },
+      stripe_account_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+      },
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,

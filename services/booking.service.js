@@ -585,6 +585,11 @@ exports.cancelBooking = async (payload) => {
       throw new error.BadRequest("Booking already expired");
     }
 
+    const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
+    if (booking.booking_start_time.getTime() - new Date().getTime() < TWO_HOURS_IN_MS) {
+      throw new error.BadRequest("Booking cannot be cancelled within 2 hours of its start time");
+    }
+
     await bookingRepository.update({
       payload: {
         status: BookingStatus.ENUM.CANCELLED,

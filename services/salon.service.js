@@ -218,7 +218,9 @@ exports.listSalons = async (payload) => {
   let { page, limit, search, category, latitude, longitude } = payload.query;
 
   const offset = page && limit ? (page - 1) * limit : 0;
-  const where = {};
+  const where = {
+    stripe_account_id: { [Op.not]: null },
+  };
   const include = [];
 
   if (search) {

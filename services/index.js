@@ -17,4 +17,5 @@ module.exports = {
   inventoryItemService: require("./inventory-item.service"),
   inventoryTransactionService: require("./inventory-transaction.service"),
   reconciliationService: require("./reconciliation.service"),
+  stripeConnectService: require("./stripe-connect.service"),
 };

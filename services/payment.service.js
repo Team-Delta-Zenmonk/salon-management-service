@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const stripe = require("../config/stripe");
 const { error } = require("../libs");
-const { paymentRepository, bookingRepository, cartRepository } = require("../repository");
+const { paymentRepository, bookingRepository, cartRepository, salonRepository } = require("../repository");
 const { PaymentStatus } = require("../models/payment/payment-types");
 const { BookingStatus } = require("../models/booking/booking-types");
 
@@ -33,6 +33,17 @@ exports.createPaymentIntent = async (payload) => {
 
     if (booking.expires_at && booking.expires_at < new Date()) {
       throw new error.BadRequest("Booking expired");
+    }
+
+    const salon = await salonRepository.findOne(
+      { id: booking.salon_id },
+      [],
+      {},
+      { transaction }
+    );
+
+    if (!salon || !salon.stripe_account_id) {
+      throw new error.BadRequest("Salon is not ready to accept payments");
     }
 
     const existingPayment = await paymentRepository.findOne(
@@ -82,6 +93,10 @@ exports.createPaymentIntent = async (payload) => {
         automatic_payment_methods: {
           enabled: true,
         },
+        transfer_data: {
+          destination: salon.stripe_account_id,
+        },
+        application_fee_amount: Math.round(amount * 0.10),
         metadata: {
           booking_id: booking.id.toString(),
           booking_uuid: booking.uuid,

@@ -13,6 +13,7 @@ router.use("/salons/upload-images", require("./upload.router"));
 router.use("/salons/inventory-items", authMiddleware.authSalonMiddleware, require("./inventory-items.router"));
 router.use("/salons/items-category", authMiddleware.authSalonMiddleware, require("./items-category.router"));
 router.use("/salons/inventory-transactions", authMiddleware.authSalonMiddleware, require("./inventory-transactions.router"));
+router.use("/salons/stripe", require("./stripe-connect.router"));
 router.use("/salons", require("./salon.router"));
 router.use("/cart", authMiddleware.authCustomerMiddleware, require("./cart.router"));
 router.use("/customers", require("./customer.router"));

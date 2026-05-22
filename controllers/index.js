@@ -18,4 +18,5 @@ module.exports = {
   itemsCategoryController: require("./items-category.controller"),
   inventoryItemController: require("./inventory-item.controller"),
   inventoryTransactionController: require("./inventory-transaction.controller"),
+  stripeConnectController: require("./stripe-connect.controller"),
 };
