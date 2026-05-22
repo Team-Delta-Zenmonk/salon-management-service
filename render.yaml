@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: salon-backend
+    env: docker
+    branch: phase-1
+    rootDir: salon-backend
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # We will no longer pull from a Render DB. 
+      # You will paste your Neon DATABASE_URL manually in the Render Dashboard.
+      # You will also need to add your other .env variables manually.
