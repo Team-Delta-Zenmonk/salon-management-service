@@ -2,7 +2,7 @@ services:
   - type: web
     name: salon-backend
     env: docker
-    branch: phase-1
+    branch: feature/phase-1
     rootDir: salon-backend
     plan: free
     envVars:
