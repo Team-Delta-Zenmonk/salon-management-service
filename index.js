@@ -19,9 +19,6 @@ const cookieParser = require("cookie-parser");
 const app = express();
 
 app.use(cookieParser());
-app.use("/stripe", stripeRouter);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",").map((url) => url.trim()) : [];
 
@@ -35,11 +32,16 @@ app.use(
         callback(new Error("Not allowed by CORS"));
       }
     },
-    methods: ["GET", "POST", "DELETE", "PUT", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "stripe-signature"],
     credentials: true,
   }),
 );
+
+app.use("/stripe", stripeRouter);
+
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 app.use("/", require("./routes"));
 
