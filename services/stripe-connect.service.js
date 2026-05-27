@@ -4,6 +4,7 @@ const { salonRepository } = require("../repository");
 
 exports.createOnboardingLink = async (salonId) => {
   const salon = await salonRepository.findOne({ id: salonId });
+  const managementAppUrl = process.env.MANAGEMENT_APP_URL;
   if (!salon) {
     throw new error.NotFound("Salon not found");
   }
@@ -31,16 +32,17 @@ exports.createOnboardingLink = async (salonId) => {
       criteria: { id: salonId },
     });
   }
+  
+ const accountLink = await stripe.accountLinks.create({
+   account: accountId,
+   refresh_url: `${managementAppUrl}/dashboard`,
+   return_url: `${managementAppUrl}/dashboard?stripe_onboarded=true`,
+   type: "account_onboarding",
+ });
 
-  const accountLink = await stripe.accountLinks.create({
-    account: accountId,
-    refresh_url: `${process.env.CLIENT_URL.split(",")[0]}/dashboard`,
-    return_url: `${process.env.CLIENT_URL.split(",")[0]}/dashboard?stripe_onboarded=true`,
-    type: "account_onboarding",
-  });
-
-  return { url: accountLink.url };
+ return { url: accountLink.url };
 };
+
 
 exports.createDashboardLoginLink = async (salonId) => {
   const salon = await salonRepository.findOne({ id: salonId });
