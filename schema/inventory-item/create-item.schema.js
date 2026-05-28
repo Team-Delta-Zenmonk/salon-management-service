@@ -10,7 +10,7 @@ exports.createInventoryItemSchema = z.object({
     logo: z.string().nullable().optional(),
     variant_name: z.string().nullable().optional(),
     unit: z.string().nullable().optional(),
-    unit_price: z.number().positive({ message: "Unit price must be positive" }).optional(),
+    unit_price: z.number().nonnegative({ message: "Unit price cannot be negative" }).optional(),
     min_stock_level: z.number().min(0).optional(),
   }),
 });
