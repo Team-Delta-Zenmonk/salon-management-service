@@ -37,6 +37,19 @@ class StaffServiceRepository extends BaseRepository {
 
     return map;
   }
+
+  async findByServiceAndStaff(pairs) {
+    if (!pairs || pairs.length === 0) return [];
+    
+    const criteria = {
+      [Op.or]: pairs.map(pair => ({
+        service_id: pair.service_id,
+        staff_id: pair.staff_id
+      }))
+    };
+    
+    return await this.findAll({ criteria });
+  }
 }
 
 module.exports = new StaffServiceRepository({ model: StaffService });
