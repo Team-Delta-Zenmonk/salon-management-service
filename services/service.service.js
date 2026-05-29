@@ -55,7 +55,7 @@ exports.listServices = async (payload) => {
         criteria.category_id = category.id;
     }
 
-    const { count, rows } = await serviceRepository.findAndCountAll({ criteria, include: ["category"], limit, offset });
+    const { count, rows } = await serviceRepository.findAndCountAll({ criteria, include: ["category"], limit, offset ,order: [["created_at", "DESC"]]});
 
     return {
         total: count,

@@ -66,19 +66,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: false,
       },
-      deleted_at: {
-        type: DataTypes.DATE,
-      },
     },
     {
       sequelize,
       modelName: "Category",
       tableName: "categories",
-      paranoid: true,
       timestamps: true,
       createdAt: "created_at",
       updatedAt: "updated_at",
-      deletedAt: "deleted_at",
       indexes: [
         {
           unique: true,

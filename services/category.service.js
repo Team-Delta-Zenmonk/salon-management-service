@@ -28,6 +28,7 @@ exports.listCategories = async (payload) => {
     criteria: where,
     limit: limit,
     offset: (page - 1) * limit,
+    order: [["created_at", "DESC"]]
   });
 
   return {
@@ -60,7 +61,7 @@ exports.deleteCategory = async (payload) => {
   const category = await categoryRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
   if (!category) throw new error.NotFound("Category not found");
 
-  await categoryRepository.softDelete({ uuid: params.uuid });
+  await categoryRepository.destroy({ criteria: { uuid: params.uuid } });
 
   return { message: "Category deleted successfully" };
 };

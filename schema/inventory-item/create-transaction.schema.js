@@ -38,7 +38,7 @@ exports.createTransactionSchema = z.object({
       item_uuid: z.string().uuid({ message: "Valid Item UUID is required" }),
     })
     .refine(validateQuantities, {
-      message: "Quantities are physically impossible. Received <= Ordered AND (Damaged + Returned) <= Received.",
+      message: "Quantities are physically impossible.",
       path: ["received_quantity"],
     }),
 });

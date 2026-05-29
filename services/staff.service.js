@@ -74,6 +74,7 @@ exports.list = async (payload) => {
     criteria,
     limit,
     offset: (page - 1) * limit,
+    order: [["created_at", "DESC"]]
   });
 
   const updatedStaffs = staffs.rows.map((staff) => {
