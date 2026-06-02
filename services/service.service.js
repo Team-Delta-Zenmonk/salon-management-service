@@ -1,5 +1,6 @@
 const { error } = require("../libs");
 const { Op } = require('sequelize');
+const { sequelize } = require("../config/db/db-connection");
 const { salonRepository, categoryRepository, serviceRepository, staffServiceRepository } = require("../repository");
 
 exports.createService = async (payload) => {
@@ -38,13 +39,31 @@ exports.listServices = async (payload) => {
     const offset = query?.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
     const search = query.search;
 
-    let criteria = { salon_id: salon.id };
+    let criteria = {
+      salon_id: salon.id,
+      [Op.and]: [
+        {
+          [Op.or]: [
+            { parent_id: null },
+            {
+              parent_id: {
+                [Op.in]: sequelize.literal(
+                  '(SELECT id FROM services WHERE deleted_at IS NULL)'
+                ),
+              },
+            },
+          ],
+        },
+      ],
+    };
 
     if (search) {
-      criteria[Op.or] = [
-        { name: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } },
-      ];
+      criteria[Op.and].push({
+        [Op.or]: [
+          { name: { [Op.iLike]: `%${search}%` } },
+          { description: { [Op.iLike]: `%${search}%` } },
+        ],
+      });
     }
 
     if (category_uuid) {
@@ -144,7 +163,12 @@ exports.deleteService = async (payload) => {
         throw new error.NotFound("Service not found");
     }
 
-    await serviceRepository.softDelete({ uuid: params.uuid });
+    await serviceRepository.softDelete({
+        [Op.or]: [
+            { uuid: params.uuid },
+            { parent_id: service.id },
+        ],
+    });
 
     return { message: 'Service deleted successfully' };
 }
