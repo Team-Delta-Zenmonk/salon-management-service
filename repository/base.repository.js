@@ -23,8 +23,8 @@ class BaseRepository {
     return await this.model.update(payload, { where: criteria, ...options });
   }
 
-  findById(id) {
-    return this.items.find((item) => item.id === id);
+  async findById(id) {
+    return await this.model.findByPk(id);
   }
 
   async findOne(criteria, include = [], attributes = {}, options = {}) {

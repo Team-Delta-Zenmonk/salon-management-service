@@ -22,7 +22,7 @@ exports.loginSalon = async (payload) => {
     throw new error.BadRequest("Invalid password");
   }
 
-  const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET);
+  const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET, { expiresIn: "7d" });
   return { token, salon };
 };
 
@@ -42,7 +42,7 @@ exports.loginCustomer = async (payload) => {
     });
   }
 
-  const jwtToken = jwt.sign({ email: customer.email, uuid: customer.uuid, role: "customer" }, process.env.JWT_SECRET);
+  const jwtToken = jwt.sign({ email: customer.email, uuid: customer.uuid, role: "customer" }, process.env.JWT_SECRET, { expiresIn: "7d" });
   return { token: jwtToken, customer };
 };
 
