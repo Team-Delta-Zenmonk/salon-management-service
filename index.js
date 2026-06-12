@@ -23,6 +23,12 @@ app.use(cookieParser());
 const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",").map((url) => url.trim()) : [];
 console.log("CLIENT_URL:", process.env.CLIENT_URL);
 console.log("Allowed Origins:", allowedOrigins);
+app.get("/debug-env", (req, res) => {
+  res.json({
+    CLIENT_URL: process.env.CLIENT_URL,
+    NODE_ENV: process.env.NODE_ENV,
+  });
+});
 
 app.use(
   cors({
