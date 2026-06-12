@@ -1,4 +1,4 @@
-const { Op } = require("sequelize");
+const { Op, literal } = require("sequelize");
 const { Booking } = require("../models");
 const BaseRepository = require("./base.repository");
 const { BookingStatus } = require("../models/booking/booking-types");
@@ -30,19 +30,63 @@ class BookingRepository extends BaseRepository {
     });
   }
 
-  async findAllBookings({ page, limit, start, end, salon_id }) {
+  async findAllBookings({ page, limit, start, end, salon_id, payment_policy, staff_uuid, service_uuid, sort_by, sort_order, no_limit }) {
     const offset = (page - 1) * limit;
 
-    return await this.model.findAndCountAll({
-      where: {
-        salon_id,
-        booking_date: {
-          [Op.between]: [start, end],
-        },
-        status: {
-          [Op.notIn]: [BookingStatus.ENUM.EXPIRED, BookingStatus.ENUM.PENDING],
-        },
+    const where = {
+      salon_id,
+      booking_date: {
+        [Op.between]: [start, end],
       },
+      status: {
+        [Op.notIn]: [BookingStatus.ENUM.EXPIRED, BookingStatus.ENUM.PENDING],
+      },
+    };
+
+    // Add payment_policy filter
+    if (payment_policy) {
+      where.payment_policy = payment_policy;
+    }
+
+    // Add staff filter via subquery to avoid affecting included data
+    if (staff_uuid) {
+      where.id = {
+        ...(where.id || {}),
+        [Op.in]: literal(
+          `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "staffs" s ON bs."staff_id" = s."id" WHERE s."uuid" = '${staff_uuid}')`
+        ),
+      };
+    }
+
+    // Add service filter via subquery
+    if (service_uuid) {
+      // If staff_uuid already set where.id, we need to combine
+      if (where.id && where.id[Op.in]) {
+        // Use Op.and to combine both subqueries
+        where[Op.and] = [
+          ...(where[Op.and] || []),
+          {
+            id: {
+              [Op.in]: literal(
+                `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "services" sv ON bs."service_id" = sv."id" WHERE sv."uuid" = '${service_uuid}')`
+              ),
+            },
+          },
+        ];
+      } else {
+        where.id = {
+          ...(where.id || {}),
+          [Op.in]: literal(
+            `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "services" sv ON bs."service_id" = sv."id" WHERE sv."uuid" = '${service_uuid}')`
+          ),
+        };
+      }
+    }
+
+    const order = [[sort_by || "booking_date", sort_order || "DESC"]];
+
+    const queryOptions = {
+      where,
       include: [
         {
           association: "customer",
@@ -56,11 +100,18 @@ class BookingRepository extends BaseRepository {
           ],
         },
       ],
-      order: [["booking_date", "DESC"]],
-      limit,
-      offset,
+      order,
       distinct: true,
-    });
+    };
+
+    // For calendar view: no pagination (fetch all in date range)
+    // For table view: apply limit/offset
+    if (!no_limit) {
+      queryOptions.limit = limit;
+      queryOptions.offset = offset;
+    }
+
+    return await this.model.findAndCountAll(queryOptions);
   }
 
   async findAllCustomerBookings({ page, limit, customer_id, status }) {

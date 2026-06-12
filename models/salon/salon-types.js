@@ -23,3 +23,13 @@ class DayOfWeek extends ENUM {
 }
 
 exports.DayOfWeek = DayOfWeek;
+
+class PaymentPolicy extends ENUM {
+  static ENUM = {
+    PAY_AT_VENUE: "pay_at_venue",
+    PARTIAL_DEPOSIT: "partial_deposit",
+    FULL_UPFRONT: "full_upfront",
+  };
+}
+
+exports.PaymentPolicy = PaymentPolicy;

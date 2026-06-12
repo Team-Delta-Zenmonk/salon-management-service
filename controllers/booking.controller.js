@@ -50,8 +50,8 @@ exports.deleteAdminBooking = async (req, res, next) => {
 
 exports.listBookings = async (req, res, next) => {
   try {
-    const bookings = await bookingService.listBookings({ query: req.query, salon: req.salon });
-    return res.status(SUCCESS).json({ data: bookings });
+    const result = await bookingService.listBookings({ query: req.query, salon: req.salon });
+    return res.status(SUCCESS).json({ data: result.bookings, pagination: result.pagination });
   } catch (error) {
     console.log("error in listBookings controller", error);
     next(error);

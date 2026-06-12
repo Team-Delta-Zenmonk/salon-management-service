@@ -1,5 +1,5 @@
 const { z } = require("zod");
-const { SalonType } = require("../../models/salon/salon-types");
+const { SalonType, PaymentPolicy } = require("../../models/salon/salon-types");
 
 const businessDaySchema = z
   .object({
@@ -35,6 +35,8 @@ exports.updateSalonSchema = z.object({
     map_link: z.string().optional(),
     logo: z.string().optional(),
     is_onboarded: z.boolean().optional(),
+    payment_policy: z.enum(PaymentPolicy.getValues(), { message: "Invalid payment policy" }).optional(),
+    deposit_percentage: z.number().min(1).max(100).nullable().optional(),
     photos: z.array(photoSchema).optional(),
     business_hours: z
       .object({

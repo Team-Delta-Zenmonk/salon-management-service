@@ -2,6 +2,7 @@
 
 const { Model } = require("sequelize");
 const { BookingType, BookingExecutionMode, BookingStatus, BookingSource } = require("./booking-types");
+const { PaymentPolicy } = require("../salon/salon-types");
 
 module.exports = (sequelize, DataTypes) => {
   class Booking extends Model {
@@ -73,6 +74,19 @@ module.exports = (sequelize, DataTypes) => {
       cart_snapshot: {
         type: DataTypes.JSONB,
         allowNull: true,
+      },
+      payment_policy: {
+        type: DataTypes.ENUM(PaymentPolicy.getValues()),
+        allowNull: true,
+      },
+      deposit_amount: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      amount_paid_online: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
       },
       created_by: {
         type: DataTypes.ENUM(BookingSource.getValues()),

@@ -4,6 +4,7 @@ const { error } = require("../libs");
 const { paymentRepository, bookingRepository, cartRepository, salonRepository } = require("../repository");
 const { PaymentStatus } = require("../models/payment/payment-types");
 const { BookingStatus } = require("../models/booking/booking-types");
+const { PaymentPolicy } = require("../models/salon/salon-types");
 
 exports.createPaymentIntent = async (payload) => {
   const { booking_id } = payload.body;
@@ -84,8 +85,12 @@ exports.createPaymentIntent = async (payload) => {
       throw new error.BadRequest("Too many payment attempts. Please rebook.");
     }
 
+    if (booking.payment_policy === PaymentPolicy.ENUM.PAY_AT_VENUE) {
+      throw new error.BadRequest("Online payment is not required for this booking policy");
+    }
+
     const idempotencyKey = crypto.randomUUID();
-    const amount = booking.total_price * 100;
+    const amount = booking.deposit_amount * 100;
     const paymentIntent = await stripe.paymentIntents.create(
       {
         amount,
@@ -172,19 +177,23 @@ exports.handlePaymentSucceeded = async (paymentIntent) => {
       },
     });
 
+    const bookingUpdates = {
+      amount_paid_online: booking.amount_paid_online + (payment.amount / 100),
+    };
+
     if (booking.status === BookingStatus.ENUM.PENDING) {
-      await bookingRepository.update({
-        payload: {
-          status: BookingStatus.ENUM.CONFIRMED,
-        },
-        criteria: {
-          id: booking.id,
-        },
-        options: {
-          transaction,
-        },
-      });
+      bookingUpdates.status = BookingStatus.ENUM.CONFIRMED;
     }
+
+    await bookingRepository.update({
+      payload: bookingUpdates,
+      criteria: {
+        id: booking.id,
+      },
+      options: {
+        transaction,
+      },
+    });
 
     const cart = await cartRepository.getActiveCartByCustomerId(booking.customer_id);
 

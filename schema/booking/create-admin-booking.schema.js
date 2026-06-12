@@ -1,4 +1,6 @@
 const { default: z } = require("zod");
+const { PaymentPolicy } = require("../../models/salon/salon-types");
+
 
 exports.createAdminBookingSchema = z.object({
   body: z.object({
@@ -16,5 +18,6 @@ exports.createAdminBookingSchema = z.object({
         sequence: z.number().optional(),
       }),
     ),
+    payment_preference: z.enum(Object.values(PaymentPolicy.ENUM)),
   }),
 });

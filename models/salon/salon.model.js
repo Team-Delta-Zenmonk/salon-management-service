@@ -1,6 +1,6 @@
 "use strict";
 const { Model } = require("sequelize");
-const { SalonType } = require("./salon-types");
+const { SalonType, PaymentPolicy } = require("./salon-types");
 const { HolidayType } = require("../holiday/holiday-types");
 
 module.exports = (sequelize, DataTypes) => {
@@ -137,6 +137,15 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: true,
         unique: true,
+      },
+      payment_policy: {
+        type: DataTypes.ENUM(PaymentPolicy.getValues()),
+        allowNull: false,
+        defaultValue: PaymentPolicy.ENUM.FULL_UPFRONT,
+      },
+      deposit_percentage: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
       },
       created_at: {
         type: DataTypes.DATE,

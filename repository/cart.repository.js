@@ -27,7 +27,7 @@ class CartRepository extends BaseRepository {
       },
       {
         association: "salon",
-        attributes: ["id", "uuid", "name", "logo", "address", "type", "business_hours"],
+        attributes: ["id", "uuid", "name", "logo", "address", "type", "business_hours", "payment_policy", "deposit_percentage"],
       },
     ];
   }

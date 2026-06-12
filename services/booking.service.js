@@ -8,6 +8,7 @@ const {
 } = require("../repository");
 const { acquireTransactionAdvisoryLock } = require("../utils/advisory-lock.util");
 const { BookingStatus, BookingType, BookingExecutionMode, BookingSource } = require("../models/booking/booking-types");
+const { PaymentPolicy } = require("../models/salon/salon-types");
 
 function buildBookingSnapshot({ cart, slot }) {
   return {
@@ -35,7 +36,7 @@ function buildBookingSnapshot({ cart, slot }) {
 }
 
 exports.createBooking = async (payload) => {
-  const { cart_id, date, slot } = payload.body;
+  const { cart_id, date, slot, payment_preference } = payload.body;
   const createdBy = BookingSource.ENUM.CUSTOMER;
 
   return await bookingRepository.handleManagedTransaction(async (transaction) => {
@@ -160,6 +161,22 @@ exports.createBooking = async (payload) => {
       }
     }
 
+    const preference = payment_preference || cart.salon.payment_policy;
+
+    if (cart.salon.payment_policy === PaymentPolicy.ENUM.FULL_UPFRONT && preference !== PaymentPolicy.ENUM.FULL_UPFRONT) {
+      throw new error.BadRequest("Salon requires full payment upfront");
+    }
+    if (cart.salon.payment_policy === PaymentPolicy.ENUM.PARTIAL_DEPOSIT && preference === PaymentPolicy.ENUM.PAY_AT_VENUE) {
+      throw new error.BadRequest("Salon requires at least a partial deposit");
+    }
+
+    let depositAmount = 0;
+    if (preference === PaymentPolicy.ENUM.FULL_UPFRONT) {
+      depositAmount = cart.total_price;
+    } else if (preference === PaymentPolicy.ENUM.PARTIAL_DEPOSIT) {
+      depositAmount = Math.round(cart.total_price * ((cart.salon.deposit_percentage || 0) / 100));
+    }
+
     const booking = await bookingRepository.create(
       {
         customer_id: cart.customer_id,
@@ -168,13 +185,15 @@ exports.createBooking = async (payload) => {
         total_duration: cart.total_duration,
         booking_type: BookingType.ENUM.SINGLE,
         booking_execution_mode: BookingExecutionMode.ENUM.SEQUENTIAL,
-        status: BookingStatus.ENUM.PENDING,
+        status: preference === PaymentPolicy.ENUM.PAY_AT_VENUE ? BookingStatus.ENUM.CONFIRMED : BookingStatus.ENUM.PENDING,
         booking_start_time: new Date(slot.start),
         booking_end_time: new Date(slot.end),
         booking_date: new Date(date),
         created_by: createdBy,
-        expires_at: new Date(Date.now() + 11 * 60 * 1000),
+        expires_at: preference === PaymentPolicy.ENUM.PAY_AT_VENUE ? null : new Date(Date.now() + 11 * 60 * 1000),
         cart_snapshot: snapshot,
+        payment_policy: preference,
+        deposit_amount: depositAmount,
       },
       { transaction },
     );
@@ -205,45 +224,65 @@ exports.createBooking = async (payload) => {
 exports.listBookings = async (payload) => {
   const { query, salon } = payload;
   const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 50;
-  const { filter } = query;
+  const limit = Number(query.limit) || 12;
+  const { filter, view, payment_policy, staff_uuid, service_uuid, start_date, end_date } = query;
 
-  const start = new Date();
-  const end = new Date();
+  let start, end;
 
-  if (filter === "day") {
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
+  if (start_date && end_date) {
+    start = new Date(start_date);
+    end = new Date(end_date);
+  } else {
+    start = new Date();
+    end = new Date();
+
+    if (filter === "day") {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (filter === "week") {
+      const day = start.getDay();
+      const diff = start.getDate() - day + (day === 0 ? -6 : 1);
+      start.setDate(diff);
+      start.setHours(0, 0, 0, 0);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+    }
+
+    if (filter === "month") {
+      start.setDate(1);
+      start.setHours(0, 0, 0, 0);
+      end.setMonth(start.getMonth() + 1, 0);
+      end.setHours(23, 59, 59, 999);
+    }
   }
 
-  if (filter === "week") {
-    const day = start.getDay();
-    const diff = start.getDate() - day + (day === 0 ? -6 : 1);
-    start.setDate(diff);
-    start.setHours(0, 0, 0, 0);
-    end.setDate(start.getDate() + 6);
-    end.setHours(23, 59, 59, 999);
-  }
+  const isCalendar = view === "calendar";
 
-  if (filter === "month") {
-    start.setDate(1);
-
-    start.setHours(0, 0, 0, 0);
-
-    end.setMonth(start.getMonth() + 1, 0);
-
-    end.setHours(23, 59, 59, 999);
-  }
-
-  const { rows: bookings } = await bookingRepository.findAllBookings({
+  const { rows: bookings, count } = await bookingRepository.findAllBookings({
     page,
     limit,
     start,
     end,
     salon_id: salon.id,
+    payment_policy,
+    staff_uuid,
+    service_uuid,
+    sort_by: isCalendar ? "booking_start_time" : "created_at",
+    sort_order: isCalendar ? "ASC" : "DESC",
+    no_limit: isCalendar,
   });
 
-  return bookings;
+  return {
+    bookings,
+    pagination: {
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+    },
+  };
 };
 
 exports.listCustomerBookings = async (payload) => {
@@ -251,8 +290,8 @@ exports.listCustomerBookings = async (payload) => {
   const { page, limit, status } = query;
 
   const { rows: bookings, count } = await bookingRepository.findAllCustomerBookings({
-    page: Number(page) ?? 1,
-    limit: Number(limit) ?? 10,
+    page: page ?? 1,
+    limit:limit ?? 12,
     customer_id: customer.id,
     status,
   });
@@ -268,7 +307,7 @@ exports.listCustomerBookings = async (payload) => {
 };
 
 exports.createAdminBooking = async (payload) => {
-  const { admin_booking, customer_id, booking_start_time, booking_date, services } = payload.body;
+  const { admin_booking, customer_id, booking_start_time, booking_date, services,payment_preference } = payload.body;
 
   const { salon } = payload;
 
@@ -361,6 +400,8 @@ exports.createAdminBooking = async (payload) => {
         booking_date: new Date(booking_date),
         created_by: BookingSource.ENUM.ADMIN,
         admin_booking: admin_booking || {},
+        payment_policy: payment_preference,
+        deposit_amount: payment_preference === PaymentPolicy.ENUM.FULL_UPFRONT ? Math.round(total_price):0,
       },
       { transaction },
     );
