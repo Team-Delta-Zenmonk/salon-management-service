@@ -21,6 +21,8 @@ const app = express();
 app.use(cookieParser());
 
 const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",").map((url) => url.trim()) : [];
+console.log("CLIENT_URL:", process.env.CLIENT_URL);
+console.log("Allowed Origins:", allowedOrigins);
 
 app.use(
   cors({
