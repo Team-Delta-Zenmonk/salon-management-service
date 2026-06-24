@@ -107,3 +107,15 @@ exports.getBookingByUuid = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.collectPayment = async (req, res, next) => {
+  try {
+    const booking = await bookingService.collectPayment({
+      params: req.params,
+    });
+    return res.status(SUCCESS).json({ message: "Payment collected successfully", data: booking });
+  } catch (error) {
+    console.log("error in collectPayment controller", error);
+    next(error);
+  }
+};

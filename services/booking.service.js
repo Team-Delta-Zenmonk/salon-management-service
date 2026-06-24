@@ -658,3 +658,21 @@ exports.getBookingByUuid = async ({ uuid, customer }) => {
 
   return booking;
 };
+
+exports.collectPayment = async ({ params }) => {
+  const { uuid } = params;
+  const booking = await bookingRepository.findOne({ uuid });
+  if (!booking) {
+    throw new error.BadRequest("Booking not found");
+  }
+  await bookingRepository.update({
+    payload: {
+      deposit_amount: booking.total_price,
+    },
+    criteria: {
+      id: booking.id,
+    },
+
+  });
+  return await bookingRepository.findBookingWithDetails({ id: booking.id });;
+};
