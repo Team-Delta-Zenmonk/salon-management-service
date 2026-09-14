@@ -116,6 +116,12 @@ exports.resendOtp = async (payload) => {
       throw new error.BadRequest("Resend limit reached. Try again later.");
 
     if (new Date(record.otp_expires_at) > nowTime) {
+      const otpTtlLeftInMinutes = new Date(record.otp_expires_at).getMinutes() - nowTime.getMinutes();
+      await mailService.sendMailToUser(
+        email,
+        "Your verification code",
+        `Your OTP is ${record.otp}. It expires in ${otpTtlLeftInMinutes} minutes.`,
+      );
       return { message: "Your OTP is still valid. Check your email." };
     }
 

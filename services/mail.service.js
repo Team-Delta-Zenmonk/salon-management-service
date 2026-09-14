@@ -15,7 +15,7 @@ exports.sendMailToUser = async (to, subject, text) => {
     await transporter.verify();
     await transporter.sendMail(mailOptions);
   } catch (error) {
-    console.log(error);
+    console.log("Error in sending mail", error);
     throw error;
   }
 };
