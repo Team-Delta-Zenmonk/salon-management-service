@@ -1,4 +1,5 @@
 const { default: z } = require("zod");
+const { PaymentPolicy } = require("../../models/salon/salon-types");
 
 exports.updateAdminBookingSchema = z.object({
   body: z.object({
@@ -12,6 +13,9 @@ exports.updateAdminBookingSchema = z.object({
     booking_start_time: z.coerce.date().optional(),
     booking_date: z.coerce.date().optional(),
     status: z.enum(["pending", "confirmed", "completed", "cancelled", "expired"]).optional(),
+    payment_policy: z.enum(Object.values(PaymentPolicy.ENUM)).optional(),
+    payment_preference: z.enum(Object.values(PaymentPolicy.ENUM)).optional(),
+    is_walk_in: z.boolean().optional(),
     services: z
       .array(
         z.object({

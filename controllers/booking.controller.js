@@ -95,6 +95,20 @@ exports.cancelBooking = async (req, res, next) => {
   }
 };
 
+exports.rescheduleBooking = async (req, res, next) => {
+  try {
+    const booking = await bookingService.rescheduleBooking({
+      params: req.params,
+      body: req.body,
+      customer: req.user,
+    });
+    return res.status(SUCCESS).json({ message: "Booking rescheduled successfully", data: booking });
+  } catch (error) {
+    console.log("error in rescheduleBooking controller", error);
+    next(error);
+  }
+};
+
 exports.getBookingByUuid = async (req, res, next) => {
   try {
     const booking = await bookingService.getBookingByUuid({

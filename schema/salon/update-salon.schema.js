@@ -35,7 +35,7 @@ exports.updateSalonSchema = z.object({
     map_link: z.string().optional(),
     logo: z.string().optional(),
     is_onboarded: z.boolean().optional(),
-    payment_policy: z.enum(PaymentPolicy.getValues(), { message: "Invalid payment policy" }).optional(),
+    allowed_payment_policies: z.array(z.enum(PaymentPolicy.getValues()), { message: "Invalid allowed payment policies" }).min(1, "At least one payment policy must be enabled").optional(),
     deposit_percentage: z.number().min(1).max(100).nullable().optional(),
     photos: z.array(photoSchema).optional(),
     business_hours: z

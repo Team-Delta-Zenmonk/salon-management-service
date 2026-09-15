@@ -10,6 +10,7 @@ const { deleteAdminBookingSchema } = require("../schema/booking/delete-admin-boo
 const { listBookingsSchema } = require("../schema/booking/list-booking.schema");
 const { listCustomerBookingsSchema } = require("../schema/booking/list-customer-bookings.schema");
 const { cancelBookingSchema } = require("../schema/booking/cancel-booking-schema");
+const { rescheduleBookingSchema } = require("../schema/booking/reschedule-booking.schema");
 
 router.post("/", authCustomerMiddleware, validate(createBookingSchema), bookingController.createBooking);
 router.post("/admin", authMiddleware.authSalonMiddleware, validate(createAdminBookingSchema), bookingController.createAdminBooking,);
@@ -20,6 +21,7 @@ router.get("/history", authCustomerMiddleware, validate(listCustomerBookingsSche
 router.get("/active", authCustomerMiddleware, bookingController.getActiveBooking);
 router.get("/:uuid", authCustomerMiddleware, bookingController.getBookingByUuid);
 router.post("/:uuid/cancel", authCustomerMiddleware, validate(cancelBookingSchema), bookingController.cancelBooking);
+router.post("/:uuid/reschedule", authCustomerMiddleware, validate(rescheduleBookingSchema), bookingController.rescheduleBooking);
 router.patch("/:uuid/collect-payment", authMiddleware.authSalonMiddleware, bookingController.collectPayment);
 
 

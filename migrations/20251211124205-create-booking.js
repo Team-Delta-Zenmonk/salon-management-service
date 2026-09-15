@@ -118,6 +118,20 @@ module.exports = {
         type: Sequelize.DATE,
         allowNull: true,
       },
+      is_walk_in: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      reschedule_count: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+      },
+      rescheduled_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,

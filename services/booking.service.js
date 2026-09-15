@@ -161,13 +161,16 @@ exports.createBooking = async (payload) => {
       }
     }
 
-    const preference = payment_preference || cart.salon.payment_policy;
+    const allowedPolicies = Array.isArray(cart.salon.allowed_payment_policies) && cart.salon.allowed_payment_policies.length > 0
+      ? cart.salon.allowed_payment_policies
+      : [PaymentPolicy.ENUM.PAY_AT_VENUE];
 
-    if (cart.salon.payment_policy === PaymentPolicy.ENUM.FULL_UPFRONT && preference !== PaymentPolicy.ENUM.FULL_UPFRONT) {
-      throw new error.BadRequest("Salon requires full payment upfront");
-    }
-    if (cart.salon.payment_policy === PaymentPolicy.ENUM.PARTIAL_DEPOSIT && preference === PaymentPolicy.ENUM.PAY_AT_VENUE) {
-      throw new error.BadRequest("Salon requires at least a partial deposit");
+    const preference = payment_preference || allowedPolicies[0];
+
+    if (!allowedPolicies.includes(preference)) {
+      throw new error.BadRequest(
+        `Selected payment option '${preference}' is not enabled by this salon. Enabled options: ${allowedPolicies.join(", ")}`
+      );
     }
 
     let depositAmount = 0;
@@ -225,7 +228,7 @@ exports.listBookings = async (payload) => {
   const { query, salon } = payload;
   const page = Number(query.page) || 1;
   const limit = Number(query.limit) || 12;
-  const { filter, view, payment_policy, staff_uuid, service_uuid, start_date, end_date } = query;
+  const { filter, view, payment_policy, staff_uuid, service_uuid, is_walk_in, start_date, end_date } = query;
 
   let start, end;
 
@@ -269,6 +272,7 @@ exports.listBookings = async (payload) => {
     payment_policy,
     staff_uuid,
     service_uuid,
+    is_walk_in,
     sort_by: isCalendar ? "booking_start_time" : "created_at",
     sort_order: isCalendar ? "ASC" : "DESC",
     no_limit: isCalendar,
@@ -307,13 +311,15 @@ exports.listCustomerBookings = async (payload) => {
 };
 
 exports.createAdminBooking = async (payload) => {
-  const { admin_booking, customer_id, booking_start_time, booking_date, services,payment_preference } = payload.body;
+  const { admin_booking, customer_id, booking_start_time, booking_date, services, payment_preference, payment_policy, is_walk_in } = payload.body;
 
   const { salon } = payload;
 
   if (!salon) {
     throw new error.BadRequest("Salon information is required");
   }
+
+  const chosenPolicy = payment_policy || payment_preference || PaymentPolicy.ENUM.PAY_AT_VENUE;
 
   return await bookingRepository.handleManagedTransaction(async (transaction) => {
     let total_price = 0;
@@ -400,8 +406,14 @@ exports.createAdminBooking = async (payload) => {
         booking_date: new Date(booking_date),
         created_by: BookingSource.ENUM.ADMIN,
         admin_booking: admin_booking || {},
-        payment_policy: payment_preference,
-        deposit_amount: payment_preference === PaymentPolicy.ENUM.FULL_UPFRONT ? Math.round(total_price):0,
+        payment_policy: chosenPolicy,
+        deposit_amount:
+          chosenPolicy === PaymentPolicy.ENUM.FULL_UPFRONT
+            ? Math.round(total_price)
+            : chosenPolicy === PaymentPolicy.ENUM.PARTIAL_DEPOSIT
+            ? Math.round(total_price * ((salon.deposit_percentage || 0) / 100))
+            : 0,
+        is_walk_in: is_walk_in || false,
       },
       { transaction },
     );
@@ -419,7 +431,7 @@ exports.createAdminBooking = async (payload) => {
 
 exports.updateAdminBooking = async (payload) => {
   const { uuid } = payload.params;
-  const { admin_booking, customer_id, booking_start_time, booking_date, services, status } = payload.body;
+  const { admin_booking, customer_id, booking_start_time, booking_date, services, status, payment_preference, payment_policy, is_walk_in } = payload.body;
   const { salon } = payload;
 
   return await bookingRepository.handleManagedTransaction(async (transaction) => {
@@ -513,6 +525,14 @@ exports.updateAdminBooking = async (payload) => {
       final_booking_end_time = current_start_time;
     }
 
+    const updatedPolicy = payment_policy || payment_preference || booking.payment_policy || PaymentPolicy.ENUM.PAY_AT_VENUE;
+    const newDepositAmount =
+      updatedPolicy === PaymentPolicy.ENUM.FULL_UPFRONT
+        ? Math.round(total_price)
+        : updatedPolicy === PaymentPolicy.ENUM.PARTIAL_DEPOSIT
+        ? Math.round(total_price * ((salon.deposit_percentage || 0) / 100))
+        : 0;
+
     await bookingRepository.update({
       payload: {
         customer_id: customer_id !== undefined ? customer_id : booking.customer_id,
@@ -523,6 +543,9 @@ exports.updateAdminBooking = async (payload) => {
         booking_end_time: final_booking_end_time,
         booking_date: new Date(new_booking_date),
         admin_booking: admin_booking || booking.admin_booking,
+        payment_policy: updatedPolicy,
+        deposit_amount: newDepositAmount,
+        is_walk_in: is_walk_in !== undefined ? is_walk_in : booking.is_walk_in,
       },
       criteria: { id: booking.id },
       options: { transaction },
@@ -530,6 +553,138 @@ exports.updateAdminBooking = async (payload) => {
 
     if (bookingServicesPayload.length > 0) {
       await bookingServiceRepository.createBulk(bookingServicesPayload, { transaction });
+    }
+
+    return await bookingRepository.findBookingWithDetails({ id: booking.id }, { transaction });
+  });
+};
+
+exports.rescheduleBooking = async (payload) => {
+  const { uuid } = payload.params;
+  const { slot, date } = payload.body;
+  const { customer } = payload;
+
+  if (!customer) {
+    throw new error.Unauthorized("Customer authentication required");
+  }
+
+  const newStartTime = new Date(slot.start);
+
+  if (newStartTime.getTime() <= Date.now()) {
+    throw new error.BadRequest("Reschedule start time must be in the future");
+  }
+
+  return await bookingRepository.handleManagedTransaction(async (transaction) => {
+    const booking = await bookingRepository.findOne(
+      { uuid, customer_id: customer.id },
+      [
+        {
+          association: "booking_services",
+        },
+      ],
+      {},
+      { transaction, lock: transaction.LOCK.UPDATE },
+    );
+
+    if (!booking) {
+      throw new error.BadRequest("Booking not found or not authorized");
+    }
+
+    if ([BookingStatus.ENUM.CANCELLED, BookingStatus.ENUM.EXPIRED, BookingStatus.ENUM.COMPLETED].includes(booking.status)) {
+      throw new error.BadRequest(`Cannot reschedule booking with status '${booking.status}'`);
+    }
+
+    if (booking.reschedule_count >= 2) {
+      throw new error.BadRequest("Booking can only be rescheduled a maximum of 2 times");
+    }
+
+    const bookingServices = booking.booking_services || [];
+    if (bookingServices.length === 0) {
+      throw new error.BadRequest("Booking has no services associated with it");
+    }
+
+    let current_start_time = new Date(newStartTime);
+    const updatedServicesPayload = [];
+
+    const sortedServices = bookingServices.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+    for (const service of sortedServices) {
+      const staffService = await staffServiceRepository.findOne({
+        service_id: service.service_id,
+        staff_id: service.staff_id,
+      });
+
+      if (!staffService) {
+        throw new error.BadRequest(`Staff is not assigned to service ID ${service.service_id}`);
+      }
+
+      const duration = staffService.duration;
+      const service_end_time = new Date(current_start_time.getTime() + duration * 60 * 1000);
+
+      await acquireTransactionAdvisoryLock({
+        transaction,
+        staffId: service.staff_id,
+        startTime: current_start_time,
+        endTime: service_end_time,
+      });
+
+      const conflicts = await bookingServiceRepository.findAll({
+        criteria: {
+          staff_id: service.staff_id,
+          start_time: {
+            [Op.lt]: service_end_time,
+          },
+          end_time: {
+            [Op.gt]: current_start_time,
+          },
+        },
+        include: [
+          {
+            association: "booking",
+            where: {
+              id: { [Op.ne]: booking.id },
+              status: { [Op.notIn]: [BookingStatus.ENUM.CANCELLED, BookingStatus.ENUM.EXPIRED] },
+            },
+            required: true,
+          },
+        ],
+        transaction,
+      });
+
+      if (conflicts.length > 0) {
+        throw new error.BadRequest("Staff is not available for this slot");
+      }
+
+      updatedServicesPayload.push({
+        id: service.id,
+        start_time: new Date(current_start_time),
+        end_time: service_end_time,
+      });
+
+      current_start_time = service_end_time;
+    }
+
+    await bookingRepository.update({
+      payload: {
+        booking_start_time: newStartTime,
+        booking_end_time: current_start_time,
+        booking_date: new Date(date),
+        reschedule_count: booking.reschedule_count + 1,
+        rescheduled_at: new Date(),
+      },
+      criteria: { id: booking.id },
+      options: { transaction },
+    });
+
+    for (const servicePayload of updatedServicesPayload) {
+      await bookingServiceRepository.update({
+        payload: {
+          start_time: servicePayload.start_time,
+          end_time: servicePayload.end_time,
+        },
+        criteria: { id: servicePayload.id },
+        options: { transaction },
+      });
     }
 
     return await bookingRepository.findBookingWithDetails({ id: booking.id }, { transaction });

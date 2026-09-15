@@ -30,7 +30,7 @@ class BookingRepository extends BaseRepository {
     });
   }
 
-  async findAllBookings({ page, limit, start, end, salon_id, payment_policy, staff_uuid, service_uuid, sort_by, sort_order, no_limit }) {
+  async findAllBookings({ page, limit, start, end, salon_id, payment_policy, staff_uuid, service_uuid, is_walk_in, sort_by, sort_order, no_limit }) {
     const offset = (page - 1) * limit;
 
     const where = {
@@ -43,12 +43,14 @@ class BookingRepository extends BaseRepository {
       },
     };
 
-    // Add payment_policy filter
+    if (is_walk_in !== undefined && is_walk_in !== null) {
+      where.is_walk_in = is_walk_in;
+    }
+
     if (payment_policy) {
       where.payment_policy = payment_policy;
     }
 
-    // Add staff filter via subquery to avoid affecting included data
     if (staff_uuid) {
       where.id = {
         ...(where.id || {}),

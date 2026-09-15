@@ -10,6 +10,7 @@ exports.listBookingsSchema = z.object({
     payment_policy: z.enum(["pay_at_venue", "partial_deposit", "full_upfront"]).optional(),
     staff_uuid: z.string().uuid().optional(),
     service_uuid: z.string().uuid().optional(),
+    is_walk_in: z.preprocess((val) => (val === "true" ? true : val === "false" ? false : val), z.boolean().optional()),
     start_date: z.coerce.date().optional(),
     end_date: z.coerce.date().optional(),
   }),
