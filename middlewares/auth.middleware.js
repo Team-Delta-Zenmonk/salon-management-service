@@ -4,7 +4,7 @@ const { salonRepository } = require("../repository");
 
 exports.authSalonMiddleware = async (req, res, next) => {
   try {
-    const token = req.headers.authorization || req?.cookies?.jwt;
+    const token = req.headers.authorization || req?.cookies?.salon_jwt;
 
     if (!token) {
       return res.status(UNAUTHORIZED).json({ error: "Unauthorized - Token not provided" });
@@ -36,7 +36,7 @@ exports.authSalonMiddleware = async (req, res, next) => {
 
 exports.authCustomerMiddleware = async (req, res, next) => {
   try {
-    const token = req.headers.authorization || req?.cookies?.jwt;
+    const token = req.headers.authorization || req?.cookies?.customer_jwt;
 
     if (!token) {
       return res.status(UNAUTHORIZED).json({ error: "Unauthorized - Token not provided" });
