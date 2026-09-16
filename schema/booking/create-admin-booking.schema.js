@@ -18,6 +18,22 @@ exports.createAdminBookingSchema = z.object({
     }, {
       message: "Booking date cannot be in the past",
     }),
+    booking_date: z
+      .any()
+      .refine((val) => val !== null && val !== undefined && val !== "", {
+        message: "Booking date is required",
+      })
+      .transform((val) => new Date(val))
+      .refine((val) => !isNaN(val.getTime()), {
+        message: "Invalid booking date format",
+      })
+      .refine((val) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return val.getTime() >= today.getTime();
+      }, {
+        message: "Booking date cannot be in the past",
+      }),
     services: z.array(
       z.object({
         service_id: z.number(),
