@@ -1,6 +1,5 @@
 "use strict";
 const { Model } = require("sequelize");
-const { model } = require("../../repository/salon.repository");
 
 module.exports = (sequelize, DataTypes) => {
   class Category extends Model {

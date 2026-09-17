@@ -30,7 +30,20 @@ class BookingRepository extends BaseRepository {
     });
   }
 
-  async findAllBookings({ page, limit, start, end, salon_id, payment_policy, staff_uuid, service_uuid, is_walk_in, sort_by, sort_order, no_limit }) {
+  async findAllBookings({
+    page,
+    limit,
+    start,
+    end,
+    salon_id,
+    payment_policy,
+    staff_uuid,
+    service_uuid,
+    is_walk_in,
+    sort_by,
+    sort_order,
+    no_limit,
+  }) {
     const offset = (page - 1) * limit;
 
     const where = {
@@ -55,22 +68,19 @@ class BookingRepository extends BaseRepository {
       where.id = {
         ...(where.id || {}),
         [Op.in]: literal(
-          `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "staffs" s ON bs."staff_id" = s."id" WHERE s."uuid" = '${staff_uuid}')`
+          `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "staffs" s ON bs."staff_id" = s."id" WHERE s."uuid" = '${staff_uuid}')`,
         ),
       };
     }
 
-    // Add service filter via subquery
     if (service_uuid) {
-      // If staff_uuid already set where.id, we need to combine
       if (where.id && where.id[Op.in]) {
-        // Use Op.and to combine both subqueries
         where[Op.and] = [
           ...(where[Op.and] || []),
           {
             id: {
               [Op.in]: literal(
-                `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "services" sv ON bs."service_id" = sv."id" WHERE sv."uuid" = '${service_uuid}')`
+                `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "services" sv ON bs."service_id" = sv."id" WHERE sv."uuid" = '${service_uuid}')`,
               ),
             },
           },
@@ -79,7 +89,7 @@ class BookingRepository extends BaseRepository {
         where.id = {
           ...(where.id || {}),
           [Op.in]: literal(
-            `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "services" sv ON bs."service_id" = sv."id" WHERE sv."uuid" = '${service_uuid}')`
+            `(SELECT DISTINCT bs."booking_id" FROM "booking_services" bs INNER JOIN "services" sv ON bs."service_id" = sv."id" WHERE sv."uuid" = '${service_uuid}')`,
           ),
         };
       }
@@ -98,7 +108,10 @@ class BookingRepository extends BaseRepository {
           association: "booking_services",
           include: [
             { association: "service", attributes: ["name", "uuid"] },
-            { association: "staff", attributes: ["first_name", "last_name", "uuid"] },
+            {
+              association: "staff",
+              attributes: ["first_name", "last_name", "uuid"],
+            },
           ],
         },
       ],
@@ -106,8 +119,6 @@ class BookingRepository extends BaseRepository {
       distinct: true,
     };
 
-    // For calendar view: no pagination (fetch all in date range)
-    // For table view: apply limit/offset
     if (!no_limit) {
       queryOptions.limit = limit;
       queryOptions.offset = offset;
@@ -158,7 +169,10 @@ class BookingRepository extends BaseRepository {
     });
   }
 
-  async getActivePendingBooking({ customer_id, salon_uuid }, transaction = null) {
+  async getActivePendingBooking(
+    { customer_id, salon_uuid },
+    transaction = null,
+  ) {
     const criteria = {
       customer_id,
       status: BookingStatus.ENUM.PENDING,
@@ -204,7 +218,10 @@ class BookingRepository extends BaseRepository {
         association: "booking_services",
         include: [
           { association: "service", attributes: ["name", "uuid"] },
-          { association: "staff", attributes: ["first_name", "last_name", "uuid"] },
+          {
+            association: "staff",
+            attributes: ["first_name", "last_name", "uuid"],
+          },
         ],
       },
       {

@@ -18,4 +18,6 @@ module.exports = {
   inventoryItemRepository: require("./inventory-item.repository"),
   inventoryTransactionRepository: require("./inventory-transaction.repository"),
   webhookEventRepository: require("./webhook-event.repository"),
+  adminUserRepository: require("./admin-user.repository"),
+  subscriptionInvoiceRepository: require("./subscription-invoice.repository"),
 };

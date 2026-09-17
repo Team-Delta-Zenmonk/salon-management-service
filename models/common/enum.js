@@ -1,5 +1,4 @@
 class ENUM {
-  // default enum value that should be updated while extending
   static ENUM = {};
 
   static getValues() {

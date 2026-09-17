@@ -1,4 +1,4 @@
-const { error } = require("../libs"); // your error helper
+const { error } = require("../libs");
 const { salonRepository, salonOnboardingRepository } = require("../repository");
 const mailService = require("./mail.service");
 const { hashPassword } = require("../libs/hash");

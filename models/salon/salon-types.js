@@ -33,3 +33,34 @@ class PaymentPolicy extends ENUM {
 }
 
 exports.PaymentPolicy = PaymentPolicy;
+
+class RegisteredBy extends ENUM {
+  static ENUM = {
+    SELF: "self",
+    ADMIN: "admin",
+  };
+}
+
+exports.RegisteredBy = RegisteredBy;
+
+class SubscriptionPlan extends ENUM {
+  static ENUM = {
+    TRIAL: "trial",
+    MONTHLY: "monthly",
+    YEARLY: "yearly",
+  };
+}
+
+exports.SubscriptionPlan = SubscriptionPlan;
+
+class SubscriptionStatus extends ENUM {
+  static ENUM = {
+    TRIAL: "trial",
+    ACTIVE: "active",
+    EXPIRED: "expired",
+    SUSPENDED: "suspended",
+    PENDING_PAYMENT: "pending_payment",
+  };
+}
+
+exports.SubscriptionStatus = SubscriptionStatus;

@@ -1,6 +1,6 @@
 const Sequelize = require("sequelize");
-const { NO_CONTENT, CONFLICT, BAD_REQUEST, NOT_FOUND, INTERNAL_SERVER_ERROR } = require("./constants");
-const { BadRequest, NotFound, NoContent, Conflict } = require("./error");
+const { NO_CONTENT, CONFLICT, BAD_REQUEST, NOT_FOUND, INTERNAL_SERVER_ERROR, FORBIDDEN, UNAUTHORIZED } = require("./constants");
+const { BadRequest, NotFound, NoContent, Conflict, Forbidden, Unauthorized } = require("./error");
 
 exports.regex = {
   email_validator: "[a-z0-9]+@[a-z]+\.[a-z]{2,3}",
@@ -22,6 +22,10 @@ exports.errorHandler = (error) => {
       return NO_CONTENT;
     case error instanceof Conflict:
       return CONFLICT;
+    case error instanceof Forbidden:
+      return FORBIDDEN;
+    case error instanceof Unauthorized:
+      return UNAUTHORIZED;
     default:
       return INTERNAL_SERVER_ERROR;
   }

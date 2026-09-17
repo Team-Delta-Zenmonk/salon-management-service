@@ -35,6 +35,30 @@ class SalonRepository extends BaseRepository {
       ],
     });
   }
+
+  async findBySlug(slug) {
+    return await this.model.findOne({
+      where: { slug, is_active: true },
+      attributes: {
+        exclude: ["password", "reset_password_token", "reset_token_expiry", "deleted_at"],
+      },
+      include: [
+        {
+          association: "staff",
+          attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos"],
+        },
+        {
+          association: "categories",
+        },
+        {
+          association: "services",
+        },
+        {
+          association: "holidays",
+        },
+      ],
+    });
+  }
 }
 
 module.exports = new SalonRepository({ model: Salon });

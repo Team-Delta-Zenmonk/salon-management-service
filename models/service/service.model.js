@@ -5,7 +5,6 @@ const { ServiceGender, PriceType, DiscountType } = require("./service-types");
 module.exports = (sequelize, DataTypes) => {
   class Service extends Model {
     static associate(models) {
-      // define association here
       this.belongsTo(models.Salon, {
         foreignKey: "salon_id",
         as: "salon",

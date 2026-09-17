@@ -1,6 +1,11 @@
 "use strict";
 const { Model } = require("sequelize");
-const { SalonType } = require("./salon-types");
+const {
+  SalonType,
+  RegisteredBy,
+  SubscriptionPlan,
+  SubscriptionStatus,
+} = require("./salon-types");
 const { HolidayType } = require("../holiday/holiday-types");
 
 module.exports = (sequelize, DataTypes) => {
@@ -48,6 +53,10 @@ module.exports = (sequelize, DataTypes) => {
       this.hasMany(models.InventoryTransaction, {
         foreignKey: "salon_id",
         as: "inventoryTransactions",
+      });
+      this.hasMany(models.SubscriptionInvoice, {
+        foreignKey: "salon_id",
+        as: "subscriptionInvoices",
       });
     }
   }
@@ -145,6 +154,39 @@ module.exports = (sequelize, DataTypes) => {
       },
       deposit_percentage: {
         type: DataTypes.INTEGER,
+        allowNull: true,
+      },
+      slug: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        unique: true,
+      },
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+        allowNull: false,
+      },
+      registered_by: {
+        type: DataTypes.ENUM(RegisteredBy.getValues()),
+        defaultValue: RegisteredBy.ENUM.SELF,
+        allowNull: false,
+      },
+      trial_ends_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      subscription_plan: {
+        type: DataTypes.ENUM(SubscriptionPlan.getValues()),
+        defaultValue: SubscriptionPlan.ENUM.TRIAL,
+        allowNull: false,
+      },
+      subscription_status: {
+        type: DataTypes.ENUM(SubscriptionStatus.getValues()),
+        defaultValue: SubscriptionStatus.ENUM.TRIAL,
+        allowNull: false,
+      },
+      subscription_expires_at: {
+        type: DataTypes.DATE,
         allowNull: true,
       },
       created_at: {

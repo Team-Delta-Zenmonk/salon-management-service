@@ -41,3 +41,58 @@ exports.getSalon = async (req, res, next) => {
     return next(error);
   }
 };
+
+exports.checkSlugAvailability = async (req, res, next) => {
+  try {
+    const result = await salonService.checkSlugAvailability({
+      params: req.params,
+      salon: req.salon,
+    });
+    return res.status(SUCCESS).json(result);
+  } catch (error) {
+    console.log("Error in controller checkSlugAvailability", error);
+    return next(error);
+  }
+};
+
+exports.upgradeSubscription = async (req, res, next) => {
+  try {
+    const result = await salonService.upgradeSubscription({
+      body: req.body,
+      salon: req.salon,
+    });
+    return res.status(SUCCESS).json(result);
+  } catch (error) {
+    console.log("Error in controller upgradeSubscription", error);
+    return next(error);
+  }
+};
+
+exports.getSubscriptionInvoices = async (req, res, next) => {
+  try {
+    const result = await salonService.getSubscriptionInvoices({
+      salon: req.salon,
+    });
+    return res.status(SUCCESS).json(result);
+  } catch (error) {
+    console.log("Error in controller getSubscriptionInvoices", error);
+    return next(error);
+  }
+};
+
+exports.createSubscriptionPaymentIntent = async (req, res, next) => {
+  try {
+    const result = await salonService.createSubscriptionPaymentIntent({
+      body: req.body,
+      salon: req.salon,
+    });
+    return res.status(SUCCESS).json(result);
+  } catch (error) {
+    console.log("Error in controller createSubscriptionPaymentIntent", error);
+    return next(error);
+  }
+};
+
+
+
+

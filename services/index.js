@@ -18,4 +18,6 @@ module.exports = {
   inventoryTransactionService: require("./inventory-transaction.service"),
   reconciliationService: require("./reconciliation.service"),
   stripeConnectService: require("./stripe-connect.service"),
+  adminService: require("./admin.service"),
+  storefrontService: require("./storefront.service"),
 };

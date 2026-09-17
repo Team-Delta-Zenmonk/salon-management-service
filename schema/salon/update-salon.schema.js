@@ -1,5 +1,5 @@
 const { z } = require("zod");
-const { SalonType, PaymentPolicy } = require("../../models/salon/salon-types");
+const { SalonType, PaymentPolicy, SubscriptionPlan } = require("../../models/salon/salon-types");
 
 const businessDaySchema = z
   .object({
@@ -34,6 +34,15 @@ exports.updateSalonSchema = z.object({
     type: z.enum(SalonType.getValues(), { message: "Invalid salon type" }).optional(),
     map_link: z.string().optional(),
     logo: z.string().optional(),
+    slug: z
+      .string()
+      .min(3, "Slug must be at least 3 characters")
+      .max(50, "Slug cannot exceed 50 characters")
+      .regex(
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+        "Slug must contain only lowercase letters, numbers, and hyphens"
+      )
+      .optional(),
     is_onboarded: z.boolean().optional(),
     allowed_payment_policies: z.array(z.enum(PaymentPolicy.getValues()), { message: "Invalid allowed payment policies" }).min(1, "At least one payment policy must be enabled").optional(),
     deposit_percentage: z.number().min(1).max(100).nullable().optional(),
@@ -49,5 +58,6 @@ exports.updateSalonSchema = z.object({
         sunday: businessDaySchema,
       })
       .optional(),
+    subscription_plan: z.enum(SubscriptionPlan.getValues()).optional(),
   }),
 });

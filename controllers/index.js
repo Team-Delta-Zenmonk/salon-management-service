@@ -19,4 +19,6 @@ module.exports = {
   inventoryItemController: require("./inventory-item.controller"),
   inventoryTransactionController: require("./inventory-transaction.controller"),
   stripeConnectController: require("./stripe-connect.controller"),
+  adminController: require("./admin.controller"),
+  storefrontController: require("./storefront.controller"),
 };
