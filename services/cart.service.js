@@ -9,6 +9,7 @@ const {
   serviceRepository,
   staffRepository,
 } = require("../repository");
+const { assertStaffActive } = require("../utils/staff-status.util");
 
 const calculateFinalPrice = ({ basePrice, discount, discountType }) => {
   if (!discount || !discountType) {
@@ -71,6 +72,7 @@ exports.createCart = async (payload) => {
       let staff = null;
       if (itemData.staff_id) {
         staff = await staffRepository.findOne({ uuid: itemData.staff_id });
+        if (staff) assertStaffActive(staff, error);
       }
 
       const basePrice = itemData.base_price ?? service.price;
@@ -167,6 +169,8 @@ exports.updateItem = async (payload) => {
   if (staff_id) {
     const staff = await staffRepository.findOne({ uuid: staff_id });
     if (!staff) throw new error.NotFound("Staff not found");
+
+    assertStaffActive(staff, error);
 
     const staffService = await staffServiceRepository.findOne({
       staff_id: staff.id,

@@ -7,6 +7,7 @@ const {
   staffServiceRepository,
 } = require("../repository");
 const { acquireTransactionAdvisoryLock } = require("../utils/advisory-lock.util");
+const { assertStaffActive } = require("../utils/staff-status.util");
 const { BookingStatus, BookingType, BookingExecutionMode, BookingSource } = require("../models/booking/booking-types");
 const { PaymentPolicy } = require("../models/salon/salon-types");
 
@@ -333,10 +334,19 @@ exports.createAdminBooking = async (payload) => {
       const staffService = await staffServiceRepository.findOne({
         service_id: service.service_id,
         staff_id: service.staff_id,
-      });
+      }, [
+        {
+          association: "staff",
+          attributes: ["id", "end_date"],
+        },
+      ]);
 
       if (!staffService) {
         throw new error.BadRequest(`Staff is not assigned to service ID ${service.service_id}`);
+      }
+
+      if (staffService.staff) {
+        assertStaffActive(staffService.staff, error);
       }
 
       const duration = staffService.duration;
@@ -466,10 +476,19 @@ exports.updateAdminBooking = async (payload) => {
         const staffService = await staffServiceRepository.findOne({
           service_id: service.service_id,
           staff_id: service.staff_id,
-        });
+        }, [
+          {
+            association: "staff",
+            attributes: ["id", "end_date"],
+          },
+        ]);
 
         if (!staffService) {
           throw new error.BadRequest(`Staff is not assigned to service ID ${service.service_id}`);
+        }
+
+        if (staffService.staff) {
+          assertStaffActive(staffService.staff, error);
         }
 
         const duration = staffService.duration;

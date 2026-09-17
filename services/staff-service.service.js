@@ -1,5 +1,6 @@
 const { error } = require("../libs");
-const { salonRepository, staffServiceRepository, staffRepository, serviceRepository } = require("../repository");
+const { staffServiceRepository, staffRepository, serviceRepository } = require("../repository");
+const { assertStaffActive } = require("../utils/staff-status.util");
 
 exports.bulkCreate = async (payload) => {
   return await staffServiceRepository.handleManagedTransaction(async (transaction) => {
@@ -16,9 +17,13 @@ exports.bulkCreate = async (payload) => {
 
     const staff = await staffRepository.findAll({
       criteria: { uuid: staffUUIDs },
-      attributes: ["id", "uuid"],
+      attributes: ["id", "uuid", "end_date"],
       transaction,
     });
+
+    for (const s of staff) {
+      assertStaffActive(s, error);
+    }
 
     const serviceMap = new Map(services.map((s) => [s.uuid, s.id]));
     const staffMap = new Map(staff.map((s) => [s.uuid, s.id]));
