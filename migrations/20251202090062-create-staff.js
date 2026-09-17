@@ -79,6 +79,9 @@ module.exports = {
       photos: {
         type: Sequelize.JSON,
       },
+      staff_docs: {
+        type: Sequelize.JSON,
+      },
       created_at: {
         type: Sequelize.DATE,
         allowNull: false,

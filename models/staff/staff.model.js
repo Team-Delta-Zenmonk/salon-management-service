@@ -108,6 +108,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.JSON,
         allowNull: true,
       },
+      staff_docs: {
+        type: DataTypes.JSON,
+        allowNull: true,
+      },
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,

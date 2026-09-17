@@ -8,6 +8,20 @@ const activeDaySchema = z
   .nullable()
   .optional();
 
+const docSchema = z.object({
+  url: z.url(),
+  public_id: z.string(),
+  format: z.string().optional(),
+  resource_type: z.string().optional(),
+  bytes: z.number().optional(),
+  type: z.string().optional(),
+  secure_url: z.url(),
+  asset_folder: z.string().optional(),
+  filename: z.string(),
+});
+
+const maxStaffDocs = Number(process.env.MAX_STAFF_DOCS_LIMIT) || 10;
+
 exports.createStaffSchema = z.object({
   body: z.object({
     first_name: z.string().min(1, "First name is required"),
@@ -28,6 +42,8 @@ exports.createStaffSchema = z.object({
       phone: z.string().min(8),
       relation: z.string().optional(),
     }),
+    photos: docSchema.nullable().optional(),
+    staff_docs: z.array(docSchema).max(maxStaffDocs, `Maximum ${maxStaffDocs} staff documents allowed`).nullable().optional(),
     active_hours: z
       .object({
         monday: activeDaySchema,

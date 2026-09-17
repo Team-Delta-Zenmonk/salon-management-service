@@ -15,6 +15,7 @@ const cors = require("cors");
 const { errorMiddleware } = require("./middlewares");
 const { checkConnection } = require("./config/").dbConnection;
 const cookieParser = require("cookie-parser");
+const { initPresets } = require("./config");
 
 const app = express();
 
@@ -61,7 +62,8 @@ process.on("unhandledRejection", (reason, promise) => {
 
 if (process.env.NODE_ENV !== "test") {
   checkConnection()
-    .then(() => {
+    .then(async () => {
+      await initPresets();
       app.listen(global.port, () => {
         const NODE_ENV = process.env.NODE_ENV;
         console.log(`${NODE_ENV} Server is listening on port ${global.port}`);
