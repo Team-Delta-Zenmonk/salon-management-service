@@ -5,6 +5,7 @@ const {
   bookingRepository,
   bookingServiceRepository,
   staffServiceRepository,
+  serviceRepository,
   salonRepository,
 } = require("../repository");
 const {
@@ -167,6 +168,7 @@ exports.createBooking = async (payload) => {
       }
 
       for (const plan of executionPlan) {
+        if (!plan.staff_id) continue;
         await acquireTransactionAdvisoryLock({
           transaction,
           staffId: plan.staff_id,
@@ -176,6 +178,7 @@ exports.createBooking = async (payload) => {
       }
 
       for (const plan of executionPlan) {
+        if (!plan.staff_id) continue;
         const conflicts = await bookingServiceRepository.findAll({
           criteria: {
             staff_id: plan.staff_id,
@@ -426,73 +429,88 @@ exports.createAdminBooking = async (payload) => {
       }));
 
       for (const service of sortedServices) {
-        const staffService = await staffServiceRepository.findOne({
-          service_id: service.service_id,
-          staff_id: service.staff_id,
-        }, [
-        {
-          association: "staff",
-          attributes: ["id", "end_date"],
-        },
-      ]);
+        let duration = 0;
+        let price = 0;
 
-        if (!staffService) {
-          throw new error.BadRequest(
-            `Staff is not assigned to service ID ${service.service_id}`,
-          );
+        if (service.staff_id) {
+          const staffService = await staffServiceRepository.findOne({
+            service_id: service.service_id,
+            staff_id: service.staff_id,
+          }, [
+            {
+              association: "staff",
+              attributes: ["id", "end_date"],
+            },
+          ]);
+
+          if (!staffService) {
+            throw new error.BadRequest(
+              `Staff is not assigned to service ID ${service.service_id}`,
+            );
+          }
+
+          if (staffService.staff) {
+            assertStaffActive(staffService.staff, error);
+          }
+
+          duration = staffService.duration;
+          price = staffService.price;
+        } else {
+          const serviceObj = await serviceRepository.findOne({ id: service.service_id });
+          if (!serviceObj) {
+            throw new error.BadRequest(`Service ID ${service.service_id} not found`);
+          }
+          duration = serviceObj.duration;
+          price = serviceObj.price;
         }
 
-      if (staffService.staff) {
-        assertStaffActive(staffService.staff, error);
-      }
-
-        const duration = staffService.duration;
-        const price = staffService.price;
         const service_end_time = new Date(
           current_start_time.getTime() + duration * 60 * 1000,
         );
 
-        await acquireTransactionAdvisoryLock({
-          transaction,
-          staffId: service.staff_id,
-          startTime: current_start_time,
-          endTime: service_end_time,
-        });
+        if (service.staff_id) {
+          await acquireTransactionAdvisoryLock({
+            transaction,
+            staffId: service.staff_id,
+            startTime: current_start_time,
+            endTime: service_end_time,
+          });
 
-        const conflicts = await bookingServiceRepository.findAll({
-          criteria: {
-            staff_id: service.staff_id,
-            start_time: {
-              [Op.lt]: service_end_time,
-            },
-            end_time: {
-              [Op.gt]: current_start_time,
-            },
-          },
-          include: [
-            {
-              association: "booking",
-              where: {
-                status: {
-                  [Op.notIn]: [
-                    BookingStatus.ENUM.CANCELLED,
-                    BookingStatus.ENUM.EXPIRED,
-                  ],
-                },
+          const conflicts = await bookingServiceRepository.findAll({
+            criteria: {
+              staff_id: service.staff_id,
+              start_time: {
+                [Op.lt]: service_end_time,
               },
-              required: true,
+              end_time: {
+                [Op.gt]: current_start_time,
+              },
             },
-          ],
-          transaction,
-        });
+            include: [
+              {
+                association: "booking",
+                where: {
+                  status: {
+                    [Op.notIn]: [
+                      BookingStatus.ENUM.CANCELLED,
+                      BookingStatus.ENUM.EXPIRED,
+                    ],
+                  },
+                },
+                required: true,
+              },
+            ],
+            transaction,
+          });
 
-        if (conflicts.length > 0) {
-          throw new error.BadRequest("Staff is not available for this slot");
+          if (conflicts.length > 0) {
+            throw new error.BadRequest("Staff is not available for this slot");
+          }
         }
 
         bookingServicesPayload.push({
           service_id: service.service_id,
-          staff_id: service.staff_id,
+          staff_id: service.staff_id || null,
           sequence: service.sequence,
           offset_minutes: total_duration,
           start_time: new Date(current_start_time),
@@ -610,71 +628,86 @@ exports.updateAdminBooking = async (payload) => {
         total_duration = 0;
 
         for (const service of services) {
-          const staffService = await staffServiceRepository.findOne({
-            service_id: service.service_id,
-            staff_id: service.staff_id,
-          }, [
-          {
-            association: "staff",
-            attributes: ["id", "end_date"],
-          },
-        ]);
+          let duration = 0;
+          let price = 0;
 
-          if (!staffService) {
-            throw new error.BadRequest(
-              `Staff is not assigned to service ID ${service.service_id}`,
-            );
+          if (service.staff_id) {
+            const staffService = await staffServiceRepository.findOne({
+              service_id: service.service_id,
+              staff_id: service.staff_id,
+            }, [
+              {
+                association: "staff",
+                attributes: ["id", "end_date"],
+              },
+            ]);
+
+            if (!staffService) {
+              throw new error.BadRequest(
+                `Staff is not assigned to service ID ${service.service_id}`,
+              );
+            }
+
+            if (staffService.staff) {
+              assertStaffActive(staffService.staff, error);
+            }
+
+            duration = staffService.duration;
+            price = staffService.price;
+          } else {
+            const serviceObj = await serviceRepository.findOne({ id: service.service_id });
+            if (!serviceObj) {
+              throw new error.BadRequest(`Service ID ${service.service_id} not found`);
+            }
+            duration = serviceObj.duration;
+            price = serviceObj.price;
           }
 
-        if (staffService.staff) {
-          assertStaffActive(staffService.staff, error);
-        }
-
-          const duration = staffService.duration;
-          const price = staffService.price;
           const service_end_time = new Date(
             current_start_time.getTime() + duration * 60 * 1000,
           );
 
-          await acquireTransactionAdvisoryLock({
-            transaction,
-            staffId: service.staff_id,
-            startTime: current_start_time,
-            endTime: service_end_time,
-          });
+          if (service.staff_id) {
+            await acquireTransactionAdvisoryLock({
+              transaction,
+              staffId: service.staff_id,
+              startTime: current_start_time,
+              endTime: service_end_time,
+            });
 
-          const conflicts = await bookingServiceRepository.findAll({
-            criteria: {
-              staff_id: service.staff_id,
-              start_time: { [Op.lt]: service_end_time },
-              end_time: { [Op.gt]: current_start_time },
-            },
-            include: [
-              {
-                association: "booking",
-                where: {
-                  id: { [Op.ne]: booking.id },
-                  status: {
-                    [Op.notIn]: [
-                      BookingStatus.ENUM.CANCELLED,
-                      BookingStatus.ENUM.EXPIRED,
-                    ],
-                  },
-                },
-                required: true,
+            const conflicts = await bookingServiceRepository.findAll({
+              criteria: {
+                staff_id: service.staff_id,
+                start_time: { [Op.lt]: service_end_time },
+                end_time: { [Op.gt]: current_start_time },
               },
-            ],
-            transaction,
-          });
+              include: [
+                {
+                  association: "booking",
+                  where: {
+                    id: { [Op.ne]: booking.id },
+                    status: {
+                      [Op.notIn]: [
+                        BookingStatus.ENUM.CANCELLED,
+                        BookingStatus.ENUM.EXPIRED,
+                      ],
+                    },
+                  },
+                  required: true,
+                },
+              ],
+              transaction,
+            });
 
-          if (conflicts.length > 0) {
-            throw new error.BadRequest("Staff is not available for this slot");
+            if (conflicts.length > 0) {
+              throw new error.BadRequest("Staff is not available for this slot");
+            }
           }
 
           bookingServicesPayload.push({
             booking_id: booking.id,
             service_id: service.service_id,
-            staff_id: service.staff_id,
+            staff_id: service.staff_id || null,
             sequence: service.sequence || bookingServicesPayload.length + 1,
             offset_minutes: total_duration,
             start_time: new Date(current_start_time),

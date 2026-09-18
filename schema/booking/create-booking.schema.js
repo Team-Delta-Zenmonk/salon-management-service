@@ -12,7 +12,7 @@ exports.createBookingSchema = z.object({
       services: z.array(
         z.object({
           service_id: z.number(),
-          staff_id: z.number(),
+          staff_id: z.number().optional().nullable(),
         }),
       ),
     }),

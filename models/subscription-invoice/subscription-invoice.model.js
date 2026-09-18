@@ -81,6 +81,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
         unique: true,
       },
+      stripe_client_secret: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       billing_period_start: {
         type: DataTypes.DATE,
         allowNull: false,

@@ -54,6 +54,10 @@ module.exports = {
       await queryInterface.removeColumn("bookings", "admin_booking");
     }
 
+    await queryInterface.sequelize.query(`
+      DELETE FROM "bookings" WHERE "customer_id" IS NULL;
+    `);
+
     await queryInterface.changeColumn("bookings", "customer_id", {
       type: Sequelize.INTEGER,
       allowNull: false,

@@ -20,7 +20,7 @@ exports.updateAdminBookingSchema = z.object({
       .array(
         z.object({
           service_id: z.number(),
-          staff_id: z.number(),
+          staff_id: z.number().optional().nullable(),
           sequence: z.number().optional(),
         }),
       )
