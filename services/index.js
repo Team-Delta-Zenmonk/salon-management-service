@@ -20,4 +20,5 @@ module.exports = {
   stripeConnectService: require("./stripe-connect.service"),
   adminService: require("./admin.service"),
   storefrontService: require("./storefront.service"),
+  invoiceService: require("./invoice.service"),
 };

@@ -34,6 +34,17 @@ services:
     networks:
       - salon_management_network
   
+  redis:
+    image: redis:7-alpine
+    container_name: salon-management-redis
+    restart: always
+    ports:
+      - ${REDIS_FORWARD_PORT:-6379}:6379
+    volumes:
+      - redis_data:/data
+    networks:
+      - salon_management_network
+
   #pgAdmin
   pgadmin:
     image: dpage/pgadmin4
@@ -57,6 +68,7 @@ networks:
 volumes:
   pg_data: {}
   pgadmin_data: {}
+  redis_data: {}
 
 
 

@@ -18,6 +18,7 @@ const {
   BookingSource,
 } = require("../models/booking/booking-types");
 const { PaymentPolicy } = require("../models/salon/salon-types");
+const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 
 function buildBookingSnapshot({ cart, slot }) {
   return {
@@ -48,7 +49,7 @@ exports.createBooking = async (payload) => {
   const { cart_id, date, slot, payment_preference } = payload.body;
   const createdBy = BookingSource.ENUM.CUSTOMER;
 
-  return await bookingRepository.handleManagedTransaction(
+  const result = await bookingRepository.handleManagedTransaction(
     async (transaction) => {
       const cart = await cartRepository.getCartByUuid(cart_id);
 
@@ -287,6 +288,12 @@ exports.createBooking = async (payload) => {
       };
     },
   );
+
+  enqueueInvoiceJob(result.booking.id).catch((err) =>
+    console.error(`[CreateBooking] Failed to enqueue invoice job for Booking #${result.booking?.id}:`, err.message)
+  );
+
+  return result;
 };
 
 exports.listBookings = async (payload) => {
@@ -406,7 +413,7 @@ exports.createAdminBooking = async (payload) => {
   const chosenPolicy =
     payment_policy || payment_preference || PaymentPolicy.ENUM.PAY_AT_VENUE;
 
-  return await bookingRepository.handleManagedTransaction(
+  const createdBooking = await bookingRepository.handleManagedTransaction(
     async (transaction) => {
       let total_price = 0;
       let total_duration = 0;
@@ -499,6 +506,12 @@ exports.createAdminBooking = async (payload) => {
         current_start_time = service_end_time;
       }
 
+    const adminBookingData = {
+      ...(admin_booking || {}),
+      customer_name: payload.body.customer_name || admin_booking?.customer_name,
+      customer_phone: payload.body.customer_phone || admin_booking?.customer_phone,
+    };
+
       const booking = await bookingRepository.create(
         {
           customer_id: customer_id || null,
@@ -512,7 +525,7 @@ exports.createAdminBooking = async (payload) => {
           booking_end_time: current_start_time,
           booking_date: new Date(booking_date),
           created_by: BookingSource.ENUM.ADMIN,
-          admin_booking: admin_booking || {},
+          admin_booking: adminBookingData,
           payment_policy: chosenPolicy,
           deposit_amount:
             chosenPolicy === PaymentPolicy.ENUM.FULL_UPFRONT
@@ -542,6 +555,12 @@ exports.createAdminBooking = async (payload) => {
       );
     },
   );
+
+  enqueueInvoiceJob(createdBooking.id).catch((err) =>
+    console.error(`[CreateAdminBooking] Failed to enqueue invoice job for Booking #${createdBooking?.id}:`, err.message)
+  );
+
+  return createdBooking;
 };
 
 exports.updateAdminBooking = async (payload) => {

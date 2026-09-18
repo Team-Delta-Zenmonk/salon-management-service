@@ -117,3 +117,20 @@ exports.generatePresignedUrls = async (payload) => {
     data: results,
   };
 };
+
+exports.uploadPdfBuffer = async ({ pdfBuffer, filename, folder = "invoices" }) => {
+  const base64Data = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+  const folderPath = process.env.CLOUDINARY_FOLDER
+    ? `${process.env.CLOUDINARY_FOLDER}/${folder}`
+    : folder;
+
+  const result = await cloudinary.uploader.upload(base64Data, {
+    folder: folderPath,
+    public_id: filename.replace(/\.pdf$/i, ""),
+    resource_type: "auto",
+    upload_preset: process.env.CLOUDINARY_DOC_PRESET || "doc_preset",
+  });
+
+  return result.secure_url;
+};
+

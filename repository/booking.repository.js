@@ -217,16 +217,19 @@ class BookingRepository extends BaseRepository {
       {
         association: "booking_services",
         include: [
-          { association: "service", attributes: ["name", "uuid"] },
+          { association: "service", attributes: ["id", "name", "uuid"] },
           {
             association: "staff",
-            attributes: ["first_name", "last_name", "uuid"],
+            attributes: ["id", "first_name", "last_name", "uuid"],
           },
         ],
       },
       {
         association: "customer",
-        attributes: ["name", "email"],
+        attributes: ["id", "name", "email"],
+      },
+      {
+        association: "salon",
       },
     ];
 

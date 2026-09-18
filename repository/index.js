@@ -10,7 +10,6 @@ module.exports = {
   cartRepository: require("./cart.repository"),
   cartItemRepository: require("./cart-item.repository"),
   customerRepository: require("./customer.repository"),
-  holidayRepository: require("./holiday.repository"),
   bookingRepository: require("./booking.repository"),
   bookingServiceRepository: require("./booking-service.repository"),
   paymentRepository: require("./payment.repository"),
@@ -20,4 +19,5 @@ module.exports = {
   webhookEventRepository: require("./webhook-event.repository"),
   adminUserRepository: require("./admin-user.repository"),
   subscriptionInvoiceRepository: require("./subscription-invoice.repository"),
+  invoiceRepository: require("./invoice.repository"),
 };
