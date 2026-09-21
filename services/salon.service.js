@@ -21,6 +21,7 @@ const {
   staffServiceRepository,
   bookingServiceRepository,
   subscriptionInvoiceRepository,
+  subscriptionPlanRepository,
 } = require("../repository");
 const { Op } = require("sequelize");
 const { Category, sequelize } = require("../models");
@@ -494,8 +495,14 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
     );
   }
 
-  const amountInPaise = plan === "yearly" ? 2499000 : 249900;
-  const amountInRupees = amountInPaise / 100;
+  const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
+  if (!dbPlan){
+    throw new error.BadRequest(
+      `Invalid plan selected`,
+    );
+  }
+  const amountInPaise = Math.round(Number(dbPlan.amount) * 100);
+  const amountInRupees = Number(dbPlan.amount);
 
   // 1. Reuse active PENDING invoice for this salon & plan if created within 24h
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -862,9 +869,8 @@ exports.upgradeSubscription = async (payload) => {
     criteria: { uuid },
   });
 
-  const updatedSalon = await salonRepository.findByUuid(uuid);
-
-  const amount = plan === SubscriptionPlan.ENUM.YEARLY ? 24990 : 2499;
+  const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
+  const amount = dbPlan ? Number(dbPlan.amount) : (plan === SubscriptionPlan.ENUM.YEARLY ? 24990 : 2499);
   const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
   const effectiveTxId =
     transaction_id ||

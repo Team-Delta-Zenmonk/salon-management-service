@@ -1,4 +1,4 @@
-const { adminUserRepository, salonRepository } = require("../repository");
+const { adminUserRepository, salonRepository, subscriptionPlanRepository } = require("../repository");
 const { hashPassword, comparePassword } = require("../libs/hash");
 const { BadRequest, NotFound, Conflict } = require("../libs/error");
 const jwt = require("jsonwebtoken");
@@ -23,13 +23,20 @@ exports.loginAdmin = async (payload) => {
   }
 
   const token = jwt.sign(
-    { email: admin.email, uuid: admin.uuid, role: admin.role },
+    { email: admin.email, uuid: admin.uuid, role: admin.role, type: "admin" },
     process.env.JWT_SECRET,
-    { expiresIn: "24h" },
+    { expiresIn: "15m" },
+  );
+
+  const refreshToken = jwt.sign(
+    { email: admin.email, uuid: admin.uuid, role: admin.role, type: "admin" },
+    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
+    { expiresIn: "7d" },
   );
 
   return {
     token,
+    refreshToken,
     admin: {
       uuid: admin.uuid,
       name: admin.name,
@@ -37,6 +44,36 @@ exports.loginAdmin = async (payload) => {
       role: admin.role,
     },
   };
+};
+
+exports.refreshAdminToken = async (refreshToken) => {
+  if (!refreshToken) {
+    throw new BadRequest("Refresh token required");
+  }
+  try {
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
+    );
+    if (decoded.type !== "admin") {
+      throw new error.Forbidden("Invalid token type");
+    }
+    const admin = await adminUserRepository.findOne({
+      uuid: decoded.uuid,
+      is_active: true,
+    });
+    if (!admin) {
+      throw new BadRequest("Admin user not found or inactive");
+    }
+    const token = jwt.sign(
+      { email: admin.email, uuid: admin.uuid, role: admin.role, type: "admin" },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" },
+    );
+    return { token };
+  } catch (err) {
+    throw new BadRequest("Invalid or expired refresh token");
+  }
 };
 
 exports.listSalons = async (payload) => {
@@ -244,6 +281,82 @@ exports.updateSalonPlan = async (payload) => {
       subscription_status: salon.subscription_status,
       trial_ends_at: salon.trial_ends_at,
       subscription_expires_at: salon.subscription_expires_at,
+    },
+  };
+};
+
+exports.getSubscriptionPlans = async () => {
+  const plans = await subscriptionPlanRepository.model.findAll({
+    where: { is_active: true },
+    order: [["id", "ASC"]],
+  });
+
+  return plans.map((plan) => {
+    const numAmount = Number(plan.amount);
+    const formatted_price =
+      numAmount === 0
+        ? "Free"
+        : `₹${numAmount.toLocaleString("en-IN")}`;
+
+    return {
+      id: plan.code,
+      db_id: plan.id,
+      code: plan.code,
+      name: plan.name,
+      amount: numAmount,
+      formatted_price,
+      currency: plan.currency || "INR",
+      billing_cycle: plan.billing_cycle,
+      badge: plan.badge,
+      description: plan.description,
+      is_active: plan.is_active,
+    };
+  });
+};
+
+exports.updateSubscriptionPlan = async (payload) => {
+  const { code } = payload.params;
+  const { amount, name, description, badge, billing_cycle } = payload.body;
+
+  const plan = await subscriptionPlanRepository.findOne({ code });
+  if (!plan) {
+    throw new NotFound(`Subscription plan '${code}' not found`);
+  }
+
+  const updates = {};
+  if (amount !== undefined) {
+    if (isNaN(Number(amount)) || Number(amount) < 0) {
+      throw new BadRequest("Amount must be a non-negative number");
+    }
+    updates.amount = Number(amount);
+  }
+  if (name !== undefined) updates.name = name;
+  if (description !== undefined) updates.description = description;
+  if (badge !== undefined) updates.badge = badge;
+  if (billing_cycle !== undefined) updates.billing_cycle = billing_cycle;
+
+  await plan.update(updates);
+
+  const numAmount = Number(plan.amount);
+  const formatted_price =
+    numAmount === 0
+      ? "Free"
+      : `₹${numAmount.toLocaleString("en-IN")}`;
+
+  return {
+    message: "Subscription plan updated successfully",
+    plan: {
+      id: plan.code,
+      db_id: plan.id,
+      code: plan.code,
+      name: plan.name,
+      amount: numAmount,
+      formatted_price,
+      currency: plan.currency || "INR",
+      billing_cycle: plan.billing_cycle,
+      badge: plan.badge,
+      description: plan.description,
+      is_active: plan.is_active,
     },
   };
 };

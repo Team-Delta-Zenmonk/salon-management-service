@@ -20,4 +20,5 @@ module.exports = {
   adminUserRepository: require("./admin-user.repository"),
   subscriptionInvoiceRepository: require("./subscription-invoice.repository"),
   invoiceRepository: require("./invoice.repository"),
+  subscriptionPlanRepository: require("./subscription-plan.repository"),
 };

@@ -22,8 +22,45 @@ exports.loginSalon = async (payload) => {
     throw new error.BadRequest("Invalid password");
   }
 
-  const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET);
-  return { token, salon };
+  const accessToken = jwt.sign(
+    { email: salon.email, uuid: salon.uuid, type: "salon" },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+  const refreshToken = jwt.sign(
+    { email: salon.email, uuid: salon.uuid, type: "salon" },
+    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
+    { expiresIn: "7d" }
+  );
+
+  return { token: accessToken, refreshToken, salon };
+};
+
+exports.refreshSalonToken = async (refreshToken) => {
+  if (!refreshToken) {
+    throw new error.Unauthorized("Refresh token required");
+  }
+  try {
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh"
+    );
+    if (decoded.type !== "salon") {
+      throw new error.Forbidden("Invalid token type");
+    }
+    const salon = await salonRepository.findOne({ uuid: decoded.uuid });
+    if (!salon) {
+      throw new error.BadRequest("Salon not found");
+    }
+    const accessToken = jwt.sign(
+      { email: salon.email, uuid: salon.uuid, type: "salon" },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+    return { token: accessToken };
+  } catch (err) {
+    throw new error.Forbidden("Invalid or expired refresh token");
+  }
 };
 
 exports.loginCustomer = async (payload) => {
@@ -42,8 +79,45 @@ exports.loginCustomer = async (payload) => {
     });
   }
 
-  const jwtToken = jwt.sign({ email: customer.email, uuid: customer.uuid, role: "customer" }, process.env.JWT_SECRET);
-  return { token: jwtToken, customer };
+  const jwtToken = jwt.sign(
+    { email: customer.email, uuid: customer.uuid, role: "customer", type: "customer" },
+    process.env.JWT_SECRET,
+    { expiresIn: "15m" }
+  );
+  const refreshToken = jwt.sign(
+    { email: customer.email, uuid: customer.uuid, role: "customer", type: "customer" },
+    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
+    { expiresIn: "7d" }
+  );
+
+  return { token: jwtToken, refreshToken, customer };
+};
+
+exports.refreshCustomerToken = async (refreshToken) => {
+  if (!refreshToken) {
+    throw new error.Unauthorized("Refresh token required");
+  }
+  try {
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh"
+    );
+    if (decoded.type !== "customer") {
+      throw new error.Forbidden("Invalid token type");
+    }
+    const customer = await customerRepository.findOne({ uuid: decoded.uuid });
+    if (!customer) {
+      throw new error.BadRequest("Customer not found");
+    }
+    const jwtToken = jwt.sign(
+      { email: customer.email, uuid: customer.uuid, role: "customer", type: "customer" },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+    return { token: jwtToken };
+  } catch (err) {
+    throw new error.Forbidden("Invalid or expired refresh token");
+  }
 };
 
 exports.forgotPassword = async (payload) => {
