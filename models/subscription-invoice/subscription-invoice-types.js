@@ -28,3 +28,12 @@ class SubscriptionPaymentMethod extends ENUM {
 }
 
 exports.SubscriptionPaymentMethod = SubscriptionPaymentMethod;
+
+class SubscriptionDiscountType extends ENUM {
+  static ENUM = {
+    MANUAL: "manual",
+    PERCENTAGE: "percentage",
+  };
+}
+
+exports.SubscriptionDiscountType = SubscriptionDiscountType;

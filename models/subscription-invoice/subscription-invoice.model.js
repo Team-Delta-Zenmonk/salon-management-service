@@ -4,7 +4,6 @@ const { Model } = require("sequelize");
 const {
   SubscriptionInvoiceStatus,
   SubscriptionBillingCycle,
-  SubscriptionPaymentMethod,
 } = require("./subscription-invoice-types");
 
 module.exports = (sequelize, DataTypes) => {
@@ -63,10 +62,14 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: SubscriptionInvoiceStatus.ENUM.PAID,
       },
+      discount_details: {
+        type: DataTypes.JSON,
+        allowNull: true,
+      },
       payment_method: {
         type: DataTypes.STRING,
-        allowNull: false,
-        defaultValue: SubscriptionPaymentMethod.ENUM.CARD,
+        allowNull: true,
+        defaultValue: null,
       },
       payment_details: {
         type: DataTypes.JSON,
@@ -74,7 +77,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       transaction_id: {
         type: DataTypes.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       stripe_payment_intent_id: {
         type: DataTypes.STRING,

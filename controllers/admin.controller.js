@@ -50,12 +50,12 @@ exports.listSalons = async (req, res, next) => {
   }
 };
 
-exports.createSalon = async (req, res, next) => {
+exports.onboardSalon = async (req, res, next) => {
   try {
-    const response = await adminService.createSalon({ body: req.body });
+    const response = await adminService.onboardSalon({ body: req.body });
     return res.status(CREATED).json(response);
   } catch (error) {
-    console.log("Error in controller createSalon", error);
+    console.log("Error in controller onboardSalon", error);
     return next(error);
   }
 };

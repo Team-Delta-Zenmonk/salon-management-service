@@ -53,10 +53,14 @@ module.exports = {
         allowNull: false,
         defaultValue: "paid",
       },
+      discount_details: {
+        type: Sequelize.JSON,
+        allowNull: true,
+      },
       payment_method: {
         type: Sequelize.STRING,
-        allowNull: false,
-        defaultValue: "card",
+        allowNull: true,
+        defaultValue: null,
       },
       payment_details: {
         type: Sequelize.JSON,
@@ -64,7 +68,7 @@ module.exports = {
       },
       transaction_id: {
         type: Sequelize.STRING,
-        allowNull: false,
+        allowNull: true,
       },
       stripe_payment_intent_id: {
         type: Sequelize.STRING,

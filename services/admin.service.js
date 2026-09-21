@@ -1,8 +1,21 @@
-const { adminUserRepository, salonRepository, subscriptionPlanRepository } = require("../repository");
+const {
+  adminUserRepository,
+  salonRepository,
+  subscriptionPlanRepository,
+  subscriptionInvoiceRepository,
+} = require("../repository");
 const { hashPassword, comparePassword } = require("../libs/hash");
 const { BadRequest, NotFound, Conflict } = require("../libs/error");
 const jwt = require("jsonwebtoken");
 const { Op } = require("sequelize");
+const {
+  SubscriptionInvoiceStatus,
+  SubscriptionDiscountType,
+} = require("../models/subscription-invoice/subscription-invoice-types");
+const {
+  SubscriptionPlan,
+  SubscriptionStatus,
+} = require("../models/salon/salon-types");
 
 exports.loginAdmin = async (payload) => {
   const { email, password } = payload.body;
@@ -126,7 +139,7 @@ exports.listSalons = async (payload) => {
   };
 };
 
-exports.createSalon = async (payload) => {
+exports.onboardSalon = async (payload) => {
   const {
     name,
     email,
@@ -135,62 +148,94 @@ exports.createSalon = async (payload) => {
     slug,
     trial_days = 15,
     subscription_plan = "trial",
+    subscription_status = "trial",
+    plan,
+    amount,
+    discount_details,
   } = payload.body;
 
   if (!name || !email || !password) {
     throw new BadRequest("Salon name, email, and password are required");
   }
 
-  const existingEmail = await salonRepository.findOne({ email });
-  if (existingEmail) {
-    throw new Conflict("A salon with this email already exists");
-  }
+  return await salonRepository.handleManagedTransaction(async (transaction) => {
+    const options = { transaction };
 
-  const finalSlug = slug
-    ? slug
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, "-")
-        .replace(/^-+|-+$/g, "")
-    : name
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, "-")
-        .replace(/^-+|-+$/g, "");
+    const existingEmail = await salonRepository.findOne({ email }, [], {}, options);
+    if (existingEmail) {
+      throw new Conflict("A salon with this email already exists");
+    }
 
-  const existingSlug = await salonRepository.findOne({ slug: finalSlug });
-  if (existingSlug) {
-    throw new Conflict(`The web address '${finalSlug}' is already taken`);
-  }
+    const finalSlug = slug
+      ? slug
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, "-")
+          .replace(/^-+|-+$/g, "")
+      : name
+          .toLowerCase()
+          .replace(/[^a-z0-9-]/g, "-")
+          .replace(/^-+|-+$/g, "");
 
-  const hashedPassword = await hashPassword(password);
-  const trialEndsAt = new Date(
-    Date.now() + Number(trial_days) * 24 * 60 * 60 * 1000,
-  );
+    const existingSlug = await salonRepository.findOne({ slug: finalSlug }, [], {}, options);
+    if (existingSlug) {
+      throw new Conflict(`The web address '${finalSlug}' is already taken`);
+    }
 
-  const newSalon = await salonRepository.create({
-    name,
-    email,
-    phone: phone || null,
-    password: hashedPassword,
-    slug: finalSlug,
-    is_active: true,
-    registered_by: "admin",
-    subscription_plan,
-    subscription_status: "trial",
-    trial_ends_at: trialEndsAt,
+    const hashedPassword = await hashPassword(password);
+    const trialEndsAt = new Date(
+      Date.now() + Number(trial_days) * 24 * 60 * 60 * 1000,
+    );
+
+    const effectivePlan = plan || subscription_plan;
+    const hasSubscription = Boolean(plan || amount !== undefined);
+    const effectiveStatus = hasSubscription ? SubscriptionStatus.ENUM.ACTIVE : subscription_status;
+
+    const newSalon = await salonRepository.create(
+      {
+        name,
+        email,
+        phone: phone || null,
+        password: hashedPassword,
+        slug: finalSlug,
+        is_active: true,
+        registered_by: "admin",
+        subscription_plan: effectivePlan,
+        subscription_status: effectiveStatus,
+        trial_ends_at: hasSubscription ? null : trialEndsAt,
+      },
+      options,
+    );
+
+    let invoice = null;
+    if (hasSubscription && amount !== undefined) {
+      invoice = await exports.createSubscriptionInvoice(
+        {
+          body: {
+            salon_id: newSalon.id,
+            plan: effectivePlan,
+            amount,
+            discount_details,
+          },
+        },
+        options,
+      );
+    }
+
+    return {
+      salon: {
+        id: newSalon.id,
+        uuid: newSalon.uuid,
+        name: newSalon.name,
+        slug: newSalon.slug,
+        email: newSalon.email,
+        is_active: newSalon.is_active,
+        subscription_status: effectiveStatus,
+        subscription_plan: effectivePlan,
+        trial_ends_at: hasSubscription ? null : newSalon.trial_ends_at,
+      },
+      ...(invoice ? { invoice } : {}),
+    };
   });
-
-  return {
-    salon: {
-      id: newSalon.id,
-      uuid: newSalon.uuid,
-      name: newSalon.name,
-      slug: newSalon.slug,
-      email: newSalon.email,
-      is_active: newSalon.is_active,
-      subscription_status: newSalon.subscription_status,
-      trial_ends_at: newSalon.trial_ends_at,
-    },
-  };
 };
 
 exports.updateSalonStatus = async (payload) => {
@@ -359,4 +404,66 @@ exports.updateSubscriptionPlan = async (payload) => {
       is_active: plan.is_active,
     },
   };
+};
+
+exports.createSubscriptionInvoice = async (payload, options = {}) => {
+  const { salon_id, plan, amount, discount_details } = payload.body;
+
+  const durationDays = plan === "yearly" ? 365 : 30;
+  const now = new Date();
+  const expiresAt = new Date(
+    now.getTime() + durationDays * 24 * 60 * 60 * 1000,
+  );
+
+  let finalAmount = Number(amount);
+  let discountData = null;
+
+  if (discount_details) {
+    const discountVal = Number(discount_details.value);
+    if (discount_details.type === SubscriptionDiscountType.ENUM.MANUAL) {
+      finalAmount = Math.max(0, finalAmount - discountVal);
+      discountData = {
+        type: SubscriptionDiscountType.ENUM.MANUAL,
+        value: discountVal,
+        original_amount: Number(amount),
+        discount_amount: discountVal,
+        final_amount: finalAmount,
+      };
+    } else if (discount_details.type === SubscriptionDiscountType.ENUM.PERCENTAGE) {
+      const discountAmount = (finalAmount * discountVal) / 100;
+      finalAmount = Math.max(0, finalAmount - discountAmount);
+      discountData = {
+        type: SubscriptionDiscountType.ENUM.PERCENTAGE,
+        value: discountVal,
+        original_amount: Number(amount),
+        discount_amount: discountAmount,
+        final_amount: finalAmount,
+      };
+    }
+  }
+
+  const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${salon_id}`;
+
+  const invoice = await subscriptionInvoiceRepository.create(
+    {
+      salon_id,
+      invoice_number: invoiceNumber,
+      plan,
+      billing_cycle: plan,
+      amount: finalAmount,
+      currency: "INR",
+      status: SubscriptionInvoiceStatus.ENUM.PAID,
+      discount_details: discountData,
+      payment_method: null,
+      payment_details: null,
+      transaction_id: null,
+      stripe_payment_intent_id: null,
+      stripe_client_secret: null,
+      billing_period_start: now,
+      billing_period_end: expiresAt,
+    },
+    options,
+  );
+
+  return invoice;
 };
