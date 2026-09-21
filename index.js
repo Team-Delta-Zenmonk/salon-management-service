@@ -21,20 +21,47 @@ const app = express();
 
 app.use(cookieParser());
 
-const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",").map((url) => url.trim()) : [];
+const rawClientUrls = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",") : [];
+const allowedOrigins = rawClientUrls
+  .map((url) => url.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  const cleanOrigin = origin.trim().replace(/\/+$/, "");
+
+  if (allowedOrigins.includes(cleanOrigin)) return true;
+
+  if (
+    cleanOrigin.endsWith(".vercel.app") ||
+    cleanOrigin.endsWith(".trycloudflare.com") ||
+    cleanOrigin.includes("localhost") ||
+    cleanOrigin.includes("127.0.0.1")
+  ) {
+    return true;
+  }
+
+  return false;
+};
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
+      if (isOriginAllowed(origin)) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        console.log("Not allowed by CORS: ", origin);
+        callback(null, false);
       }
     },
     methods: ["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "stripe-signature"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "stripe-signature",
+      "X-Requested-With",
+      "Accept",
+    ],
     credentials: true,
   }),
 );
