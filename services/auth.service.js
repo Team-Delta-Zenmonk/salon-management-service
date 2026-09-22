@@ -4,6 +4,7 @@ const { salonRepository, customerRepository } = require("../repository");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const mailService = require("./mail.service");
+const { buildForgotPasswordEmailHtml, buildResetPasswordEmailHtml } = require("../templates");
 const { hashPassword, comparePassword } = require("../libs/hash");
 const admin = require("../config/firebase");
 
@@ -137,12 +138,20 @@ exports.forgotPassword = async (payload) => {
     criteria: { email },
   });
 
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+  const resetUrl = `${process.env.FRONTEND_URL || "https://salon.com"}/reset-password/${token}`;
+
+  const html = buildForgotPasswordEmailHtml({
+    userName: salon.name || "Valued Partner",
+    resetLink: resetUrl,
+    expiryMinutes: 15,
+    salonName: salon.name || "SALON",
+  });
 
   await mailService.sendMailToUser(
     email,
-    "Reset your password",
+    "Reset Your Password",
     `Click here to reset your password: ${resetUrl}. This link will expire in 15 minutes.`,
+    html
   );
 
   return "Password reset link sent to your email";
@@ -173,6 +182,29 @@ exports.resetPassword = async (payload) => {
     payload: { password: hashedPassword, reset_password_token: null, reset_token_expiry: null },
     criteria: { id: salon.id },
   });
+
+  const changedAt = new Date().toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+
+  const html = buildResetPasswordEmailHtml({
+    userName: salon.name || "Valued Partner",
+    changedAt,
+    loginUrl: `${process.env.FRONTEND_URL || "https://salon.com"}/login`,
+    salonName: salon.name || "SALON",
+  });
+
+  try {
+    await mailService.sendMailToUser(
+      salon.email,
+      "Password Reset Successful",
+      `Your password for ${salon.name || "your account"} was successfully reset on ${changedAt}.`,
+      html
+    );
+  } catch (mailErr) {
+    console.warn("Could not send password reset confirmation email:", mailErr.message);
+  }
 
   return "Password reset successfully";
 };

@@ -1,9 +1,7 @@
 const { invoiceRepository, bookingRepository } = require("../repository");
 const { error } = require("../libs");
 const pdfGeneratorService = require("./pdf-generator.service");
-const mailService = require("./mail.service");
 const uploadService = require("./upload.service");
-const { buildInvoiceEmailHtml } = require("../templates/invoice-email.template");
 
 const derivePaymentStatus = (paid, total) => {
   if (paid >= total && total > 0) return "PAID";
@@ -61,6 +59,7 @@ exports.generateAndSendInvoiceForBooking = async ({ bookingId }) => {
       console.log(`[InvoiceService] Uploaded PDF to Cloudinary for Booking #${booking.id}: ${invoiceUrl}`);
     } catch (uploadErr) {
       console.warn(`[InvoiceService] Could not upload PDF to Cloudinary:`, uploadErr.message);
+      invoiceUrl = invoice?.invoice_url || null;
     }
   }
 
@@ -78,44 +77,18 @@ exports.generateAndSendInvoiceForBooking = async ({ bookingId }) => {
       issued_at: new Date(),
       invoice_url: invoiceUrl,
     });
-  } else if (invoiceUrl && !invoice.invoice_url) {
-    await invoice.update({ invoice_url: invoiceUrl });
-  }
-
-  const isAdminBooking = booking.created_by === "ADMIN" || Boolean(booking.admin_booking);
-  if (isAdminBooking) {
-    console.log(`[InvoiceService] Booking #${booking.id} created by ADMIN — invoice generated & uploaded (URL: ${invoice.invoice_url}), email skipped.`);
-    return invoice;
-  }
-
-  if (!customerEmail) {
-    console.log(`[InvoiceService] Booking #${booking.id} has no customer email — invoice generated & uploaded (URL: ${invoice.invoice_url}), email skipped.`);
-    return invoice;
-  }
-
-  const salonName = booking.salon?.name || "salon.com";
-
-  const emailHtml = buildInvoiceEmailHtml({
-    customerName,
-    salonName,
-    invoiceNumber: invoice.invoice_number,
-    bookingDate: new Date(booking.booking_date).toLocaleDateString("en-IN"),
-    totalAmount: `₹${totalAmount.toFixed(2)}`,
-    paymentStatus,
-  });
-
-  try {
-    await mailService.sendInvoiceMail({
-      to: customerEmail,
-      subject: `Booking Confirmed & Invoice #${invoice.invoice_number} — ${salonName}`,
-      html: emailHtml,
-      pdfBuffer,
-      filename: `Invoice_${invoice.invoice_number}.pdf`,
+  } else if (invoiceUrl) {
+    await invoice.update({
+      invoice_url: invoiceUrl,
+      grand_total: totalAmount,
+      amount_paid: paidAmount,
+      balance_due: balanceDue,
+      payment_status: paymentStatus,
+      payment_method: paymentMethod,
     });
-    console.log(`[InvoiceService] Sent invoice email to ${customerEmail} for Booking #${booking.id}`);
-  } catch (mailErr) {
-    console.warn(`[InvoiceService] Failed to send email to ${customerEmail}:`, mailErr.message);
   }
+
+  console.log(`[InvoiceService] Booking #${booking.id} created by ADMIN — invoice generated & uploaded (URL: ${invoice.invoice_url}).`);
 
   return invoice;
 };

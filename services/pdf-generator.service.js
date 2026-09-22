@@ -125,14 +125,22 @@ const drawHeader = (doc, { salon, invoice }, logoBuffer) => {
   let textLeft = PAGE.marginX;
 
   if (logoBuffer) {
+    let logoDrawn = false;
     try {
       doc.save();
-      doc.circle(PAGE.marginX + 20, y + 20, 20).clip();
-      doc.image(logoBuffer, PAGE.marginX, y, { width: 40, height: 40, fit: [40, 40] });
-      doc.restore();
-      textLeft += 50;
+      try {
+        doc.circle(PAGE.marginX + 20, y + 20, 20).clip();
+        doc.image(logoBuffer, PAGE.marginX, y, { width: 40, height: 40, fit: [40, 40] });
+        logoDrawn = true;
+      } finally {
+        doc.restore();
+      }
     } catch (err) {
-      textLeft = PAGE.marginX;
+      console.warn("[PDFGenerator] Failed to render salon logo in PDF:", err.message);
+      logoDrawn = false;
+    }
+    if (logoDrawn) {
+      textLeft += 50;
     }
   }
 

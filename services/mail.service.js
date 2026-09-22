@@ -3,12 +3,13 @@ const { mailConfig } = require("../config");
 
 const transporter = nodemailer.createTransport(mailConfig);
 
-exports.sendMailToUser = async (to, subject, text) => {
+exports.sendMailToUser = async (to, subject, text, html) => {
   const mailOptions = {
     from: process.env.MAIL_USER,
     to,
     subject,
     text,
+    ...(html ? { html } : {}),
   };
 
   try {

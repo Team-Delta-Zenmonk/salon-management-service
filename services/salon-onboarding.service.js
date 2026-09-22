@@ -4,6 +4,7 @@ const mailService = require("./mail.service");
 const { hashPassword } = require("../libs/hash");
 const { generateOtp, now, addMinutes } = require("../libs/otp");
 const jwt = require("jsonwebtoken");
+const { buildOtpVerificationEmailHtml, buildSalonLiveEmailHtml } = require("../templates");
 
 const OTP_TTL_MINUTES = parseInt(process.env.OTP_TTL_MINUTES || "5");
 const OTP_LENGTH = parseInt(process.env.OTP_LENGTH || "6");
@@ -54,10 +55,19 @@ exports.initOnboarding = async (payload) => {
       });
     }
 
+    const otpHtml = buildOtpVerificationEmailHtml({
+      userName: name || "Salon Owner",
+      otpCode: otp,
+      expiryMinutes: OTP_TTL_MINUTES,
+      actionType: "NEW_OTP",
+      salonName: "Salon.com",
+    });
+
     await mailService.sendMailToUser(
       email,
-      "Your verification code",
+      "Verify your salon account",
       `Your OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`,
+      otpHtml
     );
 
     return { message: "OTP sent to your email", email };
@@ -87,7 +97,18 @@ exports.verifyOnboarding = async (payload) => {
 
     await salonOnboardingRepository.softDelete({ email }, { transaction });
 
-    await mailService.sendMailToUser(email, "Welcome to Salon", "Your account is ready. You can login now.");
+    const liveHtml = buildSalonLiveEmailHtml({
+      ownerName: record.name || "Salon Owner",
+      salonName: record.name || "Your Salon",
+      dashboardUrl: `${process.env.FRONTEND_URL || "https://salon.com"}/owner/dashboard`,
+    });
+
+    await mailService.sendMailToUser(
+      email,
+      "Welcome to Salon — Your Account is Ready!",
+      "Your account is ready. You can login now.",
+      liveHtml
+    );
 
     const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET);
     return { token, salon };
@@ -116,11 +137,20 @@ exports.resendOtp = async (payload) => {
       throw new error.BadRequest("Resend limit reached. Try again later.");
 
     if (new Date(record.otp_expires_at) > nowTime) {
-      const otpTtlLeftInMinutes = new Date(record.otp_expires_at).getMinutes() - nowTime.getMinutes();
+      const otpTtlLeftInMinutes = Math.ceil((new Date(record.otp_expires_at) - nowTime) / (60 * 1000));
+      const otpHtml = buildOtpVerificationEmailHtml({
+        userName: record.name || "Salon Owner",
+        otpCode: record.otp,
+        expiryMinutes: otpTtlLeftInMinutes,
+        actionType: "REQUEST_OTP",
+        salonName: "Salon.com",
+      });
+
       await mailService.sendMailToUser(
         email,
         "Your verification code",
         `Your OTP is ${record.otp}. It expires in ${otpTtlLeftInMinutes} minutes.`,
+        otpHtml
       );
       return { message: "Your OTP is still valid. Check your email." };
     }
@@ -140,10 +170,19 @@ exports.resendOtp = async (payload) => {
       options: { transaction },
     });
 
+    const otpHtml = buildOtpVerificationEmailHtml({
+      userName: record.name || "Salon Owner",
+      otpCode: otp,
+      expiryMinutes: OTP_TTL_MINUTES,
+      actionType: "REQUEST_OTP",
+      salonName: "Salon.com",
+    });
+
     await mailService.sendMailToUser(
       email,
       "Your new verification code",
       `Your new OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`,
+      otpHtml
     );
 
     return { message: "OTP resent successfully." };

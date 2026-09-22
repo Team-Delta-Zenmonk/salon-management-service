@@ -13,6 +13,7 @@ const {
 } = require("../models/subscription-invoice/subscription-invoice-types");
 const { isReservedSlug } = require("../libs/reserved-slugs");
 const mailService = require("./mail.service");
+const { buildSalonLiveEmailHtml } = require("../templates");
 const {
   salonRepository,
   cartRepository,
@@ -86,10 +87,19 @@ exports.updateSalon = async (payload) => {
         const storefrontUrl = `https://${salonSlug}.${baseDomain}`;
         setImmediate(async () => {
           try {
+            const liveHtml = buildSalonLiveEmailHtml({
+              ownerName: currentSalon.name || "Salon Partner",
+              salonName: currentSalon.name || "Your Salon",
+              salonUrl: storefrontUrl,
+              dashboardUrl: `${process.env.FRONTEND_URL || "https://salon.com"}/owner/dashboard`,
+              platformName: "ZenMonk Salon",
+            });
+
             await mailService.sendMailToUser(
               salonEmail,
               "Welcome to ZenMonk — Your Salon is Live!",
               `Congratulations!\n\nYour salon storefront is now live and ready to accept bookings at:\n${storefrontUrl}\n\nYour 14-day free trial has been activated.\nShare your link with your clients or on your social media profiles!\n\nBest,\nThe ZenMonk Team`,
+              liveHtml
             );
           } catch (mailErr) {
             console.error(
@@ -411,7 +421,6 @@ exports.listSalons = async (payload) => {
 
 exports.getSalon = async (payload) => {
   const { uuid } = payload.params;
-  console.log("uuid: ", uuid);
 
   const salon = await salonRepository.findByUuid(uuid);
 
