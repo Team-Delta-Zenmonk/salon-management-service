@@ -130,7 +130,7 @@ exports.updateSalon = async (payload) => {
       salonId: currentSalon.id,
       type: "SALON_ONBOARDED",
       title: "Storefront is Live!",
-      message: "Congratulations! Your salon onboarding is complete and your storefront is now live to accept bookings.",
+      message: "Congratulations! Your salon onboarding is complete,to access the storefront please check you mail inbox.",
       data: {
         salon_uuid: currentSalon.uuid,
         slug: payload.body.slug || currentSalon.slug,
