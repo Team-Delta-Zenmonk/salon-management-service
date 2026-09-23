@@ -3,8 +3,6 @@ global.argv = process.argv.slice(2);
 global.port = global.argv[0] || process.env.APP_PORT || 8080;
 const stripeRouter = require("./routes/stripe.router");
 
-require("./jobs");
-
 if (!global.port) {
   console.log("port is not defined. argv = ", global.argv);
   process.exit(128);
@@ -16,6 +14,7 @@ const { errorMiddleware } = require("./middlewares");
 const { checkConnection } = require("./config/").dbConnection;
 const cookieParser = require("cookie-parser");
 const { initPresets } = require("./config");
+const socketManager = require("./libs/socket.manager");
 
 const app = express();
 
@@ -91,10 +90,12 @@ if (process.env.NODE_ENV !== "test") {
   checkConnection()
     .then(async () => {
       await initPresets();
-      app.listen(global.port, () => {
+      const server = app.listen(global.port, () => {
         const NODE_ENV = process.env.NODE_ENV;
         console.log(`${NODE_ENV} Server is listening on port ${global.port}`);
       });
+      socketManager.init(server);
+      require("./jobs");
     })
     .catch((err) => {
       console.error("Unable to connect to the database:", err);

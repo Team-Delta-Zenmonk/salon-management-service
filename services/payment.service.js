@@ -5,6 +5,7 @@ const { paymentRepository, bookingRepository, cartRepository, salonRepository } 
 const { PaymentStatus } = require("../models/payment/payment-types");
 const { BookingStatus } = require("../models/booking/booking-types");
 const { PaymentPolicy } = require("../models/salon/salon-types");
+const { enqueueNotificationJob } = require("../jobs/notification.worker");
 
 exports.createPaymentIntent = async (payload) => {
   const { booking_id } = payload.body;
@@ -148,6 +149,9 @@ exports.handlePaymentSucceeded = async (paymentIntent) => {
     return;
   }
 
+  let wasPending = false;
+  let targetBooking = null;
+
   await paymentRepository.handleManagedTransaction(async (transaction) => {
     const booking = await bookingRepository.findOne(
       { id: payment.booking_id },
@@ -182,6 +186,8 @@ exports.handlePaymentSucceeded = async (paymentIntent) => {
     };
 
     if (booking.status === BookingStatus.ENUM.PENDING) {
+      wasPending = true;
+      targetBooking = booking;
       bookingUpdates.status = BookingStatus.ENUM.CONFIRMED;
     }
 
@@ -207,6 +213,24 @@ exports.handlePaymentSucceeded = async (paymentIntent) => {
       );
     }
   });
+
+  if (wasPending && targetBooking) {
+    enqueueNotificationJob({
+      salonId: targetBooking.salon_id,
+      bookingId: targetBooking.id,
+      type: "BOOKING_CONFIRMED",
+      title: "Booking Confirmed",
+      message: `Booking #${targetBooking.uuid.slice(0, 8)} payment received and booking confirmed for ${new Date(targetBooking.booking_date).toLocaleDateString()} at ${new Date(targetBooking.booking_start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+      data: {
+        booking_uuid: targetBooking.uuid,
+        customer_id: targetBooking.customer_id,
+        booking_date: targetBooking.booking_date,
+        booking_start_time: targetBooking.booking_start_time,
+        total_price: targetBooking.total_price,
+        source: "CUSTOMER",
+      },
+    }).catch((err) => console.error("[PaymentService] Notification error:", err.message));
+  }
 };
 
 exports.handlePaymentFailed = async (paymentIntent) => {

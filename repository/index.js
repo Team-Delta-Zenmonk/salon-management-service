@@ -21,4 +21,5 @@ module.exports = {
   subscriptionInvoiceRepository: require("./subscription-invoice.repository"),
   invoiceRepository: require("./invoice.repository"),
   subscriptionPlanRepository: require("./subscription-plan.repository"),
+  notificationRepository: require("./notification.repository"),
 };

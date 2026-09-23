@@ -58,6 +58,10 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "salon_id",
         as: "subscriptionInvoices",
       });
+      this.hasMany(models.Notification, {
+        foreignKey: "salon_id",
+        as: "notifications",
+      });
     }
   }
   Salon.init(

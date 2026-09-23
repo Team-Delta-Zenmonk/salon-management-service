@@ -3,8 +3,8 @@ const { redisConnection } = require("../config/redis");
 const { getQueue } = require("../config/queue");
 const invoiceService = require("../services/invoice.service");
 
-const QUEUE_NAME = "invoice";
-const JOB_NAME = "generate";
+const QUEUE_NAME = process.env.INVOICE_QUEUE_NAME || "invoice";
+const JOB_NAME = process.env.INVOICE_JOB_NAME || "generate";
 
 function initInvoiceWorker() {
   const worker = new Worker(

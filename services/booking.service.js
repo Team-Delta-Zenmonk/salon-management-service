@@ -7,6 +7,7 @@ const {
   staffServiceRepository,
   serviceRepository,
   salonRepository,
+  invoiceRepository,
 } = require("../repository");
 const {
   acquireTransactionAdvisoryLock,
@@ -20,6 +21,7 @@ const {
 } = require("../models/booking/booking-types");
 const { PaymentPolicy } = require("../models/salon/salon-types");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
+const { enqueueNotificationJob } = require("../jobs/notification.worker");
 
 function buildBookingSnapshot({ cart, slot }) {
   return {
@@ -292,9 +294,29 @@ exports.createBooking = async (payload) => {
     },
   );
 
-  enqueueInvoiceJob(result.booking.id).catch((err) =>
-    console.error(`[CreateBooking] Failed to enqueue invoice job for Booking #${result.booking?.id}:`, err.message)
-  );
+  if (result.action === "BOOKING_CREATED") {
+    enqueueInvoiceJob(result.booking.id).catch((err) =>
+      console.error(`[CreateBooking] Failed to enqueue invoice job for Booking #${result.booking?.id}:`, err.message)
+    );
+
+    enqueueNotificationJob({
+      salonId: result.booking.salon_id,
+      bookingId: result.booking.id,
+      type: "BOOKING_CREATED",
+      title: "New Booking Received",
+      message: `New booking #${result.booking.uuid.slice(0, 8)} created for ${new Date(result.booking.booking_date).toLocaleDateString()} at ${new Date(result.booking.booking_start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+      data: {
+        booking_uuid: result.booking.uuid,
+        customer_id: result.booking.customer_id,
+        booking_date: result.booking.booking_date,
+        booking_start_time: result.booking.booking_start_time,
+        total_price: result.booking.total_price,
+        source: "CUSTOMER",
+      },
+    }).catch((err) =>
+      console.error(`[CreateBooking] Failed to enqueue notification job for Booking #${result.booking?.id}:`, err.message)
+    );
+  }
 
   return result;
 };
@@ -578,6 +600,25 @@ exports.createAdminBooking = async (payload) => {
     console.error(`[CreateAdminBooking] Failed to enqueue invoice job for Booking #${createdBooking?.id}:`, err.message)
   );
 
+  const clientName = createdBooking.admin_booking?.name || createdBooking.customer?.name || "Client";
+  enqueueNotificationJob({
+    salonId: salon.id,
+    bookingId: createdBooking.id,
+    type: "BOOKING_CREATED",
+    title: "New Booking Created",
+    message: `New booking #${createdBooking.uuid.slice(0, 8)} created for ${clientName} on ${new Date(createdBooking.booking_date).toLocaleDateString()} at ${new Date(createdBooking.booking_start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+    data: {
+      booking_uuid: createdBooking.uuid,
+      customer_name: clientName,
+      booking_date: createdBooking.booking_date,
+      booking_start_time: createdBooking.booking_start_time,
+      total_price: createdBooking.total_price,
+      source: "ADMIN",
+    },
+  }).catch((err) =>
+    console.error(`[CreateAdminBooking] Failed to enqueue notification job for Booking #${createdBooking?.id}:`, err.message)
+  );
+
   return createdBooking;
 };
 
@@ -596,7 +637,11 @@ exports.updateAdminBooking = async (payload) => {
   } = payload.body;
   const { salon } = payload;
 
-  return await bookingRepository.handleManagedTransaction(
+  let previousStatus;
+  let previousDate;
+  let previousStartTime;
+
+  const updatedBooking = await bookingRepository.handleManagedTransaction(
     async (transaction) => {
       const booking = await bookingRepository.findOne(
         { uuid, salon_id: salon.id },
@@ -608,6 +653,10 @@ exports.updateAdminBooking = async (payload) => {
       if (!booking) {
         throw new error.BadRequest("Booking not found");
       }
+
+      previousStatus = booking.status;
+      previousDate = new Date(booking.booking_date).getTime();
+      previousStartTime = new Date(booking.booking_start_time).getTime();
 
       let total_price = booking.total_price;
       let total_duration = booking.total_duration;
@@ -769,6 +818,54 @@ exports.updateAdminBooking = async (payload) => {
       );
     },
   );
+
+  if (previousStatus !== BookingStatus.ENUM.CANCELLED && updatedBooking.status === BookingStatus.ENUM.CANCELLED) {
+    enqueueNotificationJob({
+      salonId: salon.id,
+      bookingId: updatedBooking.id,
+      type: "BOOKING_CANCELLED",
+      title: "Booking Cancelled",
+      message: `Booking #${updatedBooking.uuid.slice(0, 8)} has been cancelled.`,
+      data: {
+        booking_uuid: updatedBooking.uuid,
+        customer_id: updatedBooking.customer_id,
+        action_by: "ADMIN",
+      },
+    }).catch((err) => console.error("[UpdateAdminBooking] Notification error:", err.message));
+  } else if (previousStatus !== BookingStatus.ENUM.COMPLETED && updatedBooking.status === BookingStatus.ENUM.COMPLETED) {
+    enqueueNotificationJob({
+      salonId: salon.id,
+      bookingId: updatedBooking.id,
+      type: "BOOKING_COMPLETED",
+      title: "Booking Completed",
+      message: `Booking #${updatedBooking.uuid.slice(0, 8)} has been marked as completed.`,
+      data: {
+        booking_uuid: updatedBooking.uuid,
+        customer_id: updatedBooking.customer_id,
+        action_by: "ADMIN",
+      },
+    }).catch((err) => console.error("[UpdateAdminBooking] Notification error:", err.message));
+  } else if (
+    previousDate !== new Date(updatedBooking.booking_date).getTime() ||
+    previousStartTime !== new Date(updatedBooking.booking_start_time).getTime()
+  ) {
+    enqueueNotificationJob({
+      salonId: salon.id,
+      bookingId: updatedBooking.id,
+      type: "BOOKING_RESCHEDULED",
+      title: "Booking Rescheduled",
+      message: `Booking #${updatedBooking.uuid.slice(0, 8)} date and time slot updated to ${new Date(updatedBooking.booking_date).toLocaleDateString()} at ${new Date(updatedBooking.booking_start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+      data: {
+        booking_uuid: updatedBooking.uuid,
+        customer_id: updatedBooking.customer_id,
+        booking_date: updatedBooking.booking_date,
+        booking_start_time: updatedBooking.booking_start_time,
+        action_by: "ADMIN",
+      },
+    }).catch((err) => console.error("[UpdateAdminBooking] Notification error:", err.message));
+  }
+
+  return updatedBooking;
 };
 
 exports.rescheduleBooking = async (payload) => {
@@ -786,7 +883,7 @@ exports.rescheduleBooking = async (payload) => {
     throw new error.BadRequest("Reschedule start time must be in the future");
   }
 
-  return await bookingRepository.handleManagedTransaction(
+  const result = await bookingRepository.handleManagedTransaction(
     async (transaction) => {
       const booking = await bookingRepository.findOne(
         { uuid, customer_id: customer.id },
@@ -929,13 +1026,33 @@ exports.rescheduleBooking = async (payload) => {
       );
     },
   );
+
+  enqueueNotificationJob({
+    salonId: result.salon_id,
+    bookingId: result.id,
+    type: "BOOKING_RESCHEDULED",
+    title: "Booking Rescheduled",
+    message: `Booking #${result.uuid.slice(0, 8)} rescheduled by customer to ${new Date(result.booking_date).toLocaleDateString()} at ${new Date(result.booking_start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}.`,
+    data: {
+      booking_uuid: result.uuid,
+      customer_id: result.customer_id,
+      booking_date: result.booking_date,
+      booking_start_time: result.booking_start_time,
+      reschedule_count: result.reschedule_count,
+      action_by: "CUSTOMER",
+    },
+  }).catch((err) =>
+    console.error(`[RescheduleBooking] Failed to enqueue notification job for Booking #${result?.id}:`, err.message)
+  );
+
+  return result;
 };
 
 exports.deleteAdminBooking = async (payload) => {
   const { uuid } = payload.params;
   const { salon } = payload;
 
-  return await bookingRepository.handleManagedTransaction(
+  await bookingRepository.handleManagedTransaction(
     async (transaction) => {
       const booking = await bookingRepository.findOne(
         { uuid, salon_id: salon.id },
@@ -950,17 +1067,38 @@ exports.deleteAdminBooking = async (payload) => {
 
       await bookingServiceRepository.destroy({
         criteria: { booking_id: booking.id },
-        options: { transaction, force: true },
+        options: { transaction },
+      });
+
+      await invoiceRepository.destroy({
+        criteria: { booking_id: booking.id },
+        options: { transaction },
       });
 
       await bookingRepository.destroy({
         criteria: { id: booking.id },
-        options: { transaction, force: true },
+        options: { transaction },
       });
 
       return true;
     },
   );
+
+  enqueueNotificationJob({
+    salonId: salon.id,
+    bookingId: null,
+    type: "BOOKING_DELETED",
+    title: "Booking Deleted",
+    message: `Booking #${uuid.slice(0, 8)} has been deleted.`,
+    data: {
+      booking_uuid: uuid,
+      action_by: "ADMIN",
+    },
+  }).catch((err) =>
+    console.error("[DeleteAdminBooking] Notification error:", err.message)
+  );
+
+  return true;
 };
 
 exports.getActiveBooking = async (payload) => {
@@ -984,7 +1122,7 @@ exports.cancelBooking = async (payload) => {
 
   const { customer } = payload;
 
-  return await bookingRepository.handleManagedTransaction(
+  const cancelledBooking = await bookingRepository.handleManagedTransaction(
     async (transaction) => {
       const booking = await bookingRepository.findOne(
         {
@@ -1060,9 +1198,26 @@ exports.cancelBooking = async (payload) => {
         },
       });
 
-      return true;
+      return booking;
     },
   );
+
+  enqueueNotificationJob({
+    salonId: cancelledBooking.salon_id,
+    bookingId: cancelledBooking.id,
+    type: "BOOKING_CANCELLED",
+    title: "Booking Cancelled",
+    message: `Booking #${cancelledBooking.uuid.slice(0, 8)} has been cancelled by customer.`,
+    data: {
+      booking_uuid: cancelledBooking.uuid,
+      customer_id: cancelledBooking.customer_id,
+      action_by: "CUSTOMER",
+    },
+  }).catch((err) =>
+    console.error("[CancelBooking] Notification error:", err.message)
+  );
+
+  return cancelledBooking;
 };
 
 exports.getBookingByUuid = async ({ uuid, customer }) => {

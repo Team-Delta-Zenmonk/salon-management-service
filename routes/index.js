@@ -27,6 +27,7 @@ router.use("/payments", require("./payment.router"));
 router.use("/admin", require("./admin.router"));
 router.use("/storefront", require("./storefront.router"));
 router.use("/invoices", require("./invoice.router"));
+router.use("/notifications", require("./notification.router"));
 
 router.get("/", (req, res, next) => {
   res.send("Salon Management Service is running");

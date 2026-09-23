@@ -21,4 +21,5 @@ module.exports = {
   adminService: require("./admin.service"),
   storefrontService: require("./storefront.service"),
   invoiceService: require("./invoice.service"),
+  notificationService: require("./notification.service"),
 };

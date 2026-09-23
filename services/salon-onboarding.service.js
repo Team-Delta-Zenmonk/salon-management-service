@@ -5,6 +5,7 @@ const { hashPassword } = require("../libs/hash");
 const { generateOtp, now, addMinutes } = require("../libs/otp");
 const jwt = require("jsonwebtoken");
 const { buildOtpVerificationEmailHtml, buildSalonLiveEmailHtml } = require("../templates");
+const { enqueueNotificationJob } = require("../jobs/notification.worker");
 
 const OTP_TTL_MINUTES = parseInt(process.env.OTP_TTL_MINUTES || "5");
 const OTP_LENGTH = parseInt(process.env.OTP_LENGTH || "6");
@@ -75,7 +76,7 @@ exports.initOnboarding = async (payload) => {
 };
 
 exports.verifyOnboarding = async (payload) => {
-  return await salonOnboardingRepository.handleManagedTransaction(async (transaction) => {
+  const result = await salonOnboardingRepository.handleManagedTransaction(async (transaction) => {
     const { email, otp } = payload.body;
 
     const record = await salonOnboardingRepository.findOne({ email }, [], {}, { transaction });
@@ -113,6 +114,19 @@ exports.verifyOnboarding = async (payload) => {
     const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET);
     return { token, salon };
   });
+
+  enqueueNotificationJob({
+    salonId: result.salon.id,
+    type: "SALON_ONBOARDED",
+    title: "Welcome!",
+    message: "Your salon account has been successfully registered. Start setting up your services, staff, and accept bookings!",
+    data: {
+      salon_uuid: result.salon.uuid,
+      email: result.salon.email,
+    },
+  }).catch((err) => console.error("[VerifyOnboarding] Notification error:", err.message));
+
+  return result;
 };
 
 exports.resendOtp = async (payload) => {

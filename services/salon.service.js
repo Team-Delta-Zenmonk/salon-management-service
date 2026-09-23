@@ -8,12 +8,12 @@ const {
 } = require("../models/salon/salon-types");
 const {
   SubscriptionInvoiceStatus,
-  SubscriptionBillingCycle,
   SubscriptionPaymentMethod,
 } = require("../models/subscription-invoice/subscription-invoice-types");
 const { isReservedSlug } = require("../libs/reserved-slugs");
 const mailService = require("./mail.service");
 const { buildSalonLiveEmailHtml } = require("../templates");
+const { enqueueNotificationJob } = require("../jobs/notification.worker");
 const {
   salonRepository,
   cartRepository,
@@ -63,9 +63,13 @@ exports.updateSalon = async (payload) => {
     payload.body.slug = normalizedSlug;
   }
 
+  let isNewlyOnboarded = false;
+  let currentSalon = null;
+
   if (payload?.body?.is_onboarded === true) {
-    const currentSalon = await salonRepository.findOne({ uuid }, [], {}, {});
+    currentSalon = await salonRepository.findOne({ uuid }, [], {}, {});
     if (currentSalon && !currentSalon.is_onboarded) {
+      isNewlyOnboarded = true;
       if (
         !currentSalon.trial_ends_at &&
         currentSalon.subscription_status !== "active"
@@ -119,6 +123,19 @@ exports.updateSalon = async (payload) => {
 
   if (result[0] === 0) {
     throw new error.BadRequest("Salon not updated");
+  }
+
+  if (isNewlyOnboarded) {
+    enqueueNotificationJob({
+      salonId: currentSalon.id,
+      type: "SALON_ONBOARDED",
+      title: "Storefront is Live!",
+      message: "Congratulations! Your salon onboarding is complete and your storefront is now live to accept bookings.",
+      data: {
+        salon_uuid: currentSalon.uuid,
+        slug: payload.body.slug || currentSalon.slug,
+      },
+    }).catch((err) => console.error("[UpdateSalon] Notification error:", err.message));
   }
 
   return "Salon updated successfully";

@@ -6,7 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile
       target: dependency-base
-    command: npm run dev
     ports:
       - ${APP_FORWARD_PORT:-8080}:${APP_PORT:-8080}
       - ${EMAIL_FORWARD_PORT:-2525}:${EMAIL_PORT:-2525}
