@@ -61,7 +61,7 @@ exports.initOnboarding = async (payload) => {
       otpCode: otp,
       expiryMinutes: OTP_TTL_MINUTES,
       actionType: "NEW_OTP",
-      salonName: "Salon.com",
+      email,
     });
 
     await mailService.sendMailToUser(
@@ -102,6 +102,7 @@ exports.verifyOnboarding = async (payload) => {
       ownerName: record.name || "Salon Owner",
       salonName: record.name || "Your Salon",
       dashboardUrl: `${process.env.FRONTEND_URL || "https://salon.com"}/owner/dashboard`,
+      email,
     });
 
     await mailService.sendMailToUser(
@@ -156,8 +157,8 @@ exports.resendOtp = async (payload) => {
         userName: record.name || "Salon Owner",
         otpCode: record.otp,
         expiryMinutes: otpTtlLeftInMinutes,
-        actionType: "REQUEST_OTP",
-        salonName: "Salon.com",
+        actionType: "RESEND_OTP",
+        email,
       });
 
       await mailService.sendMailToUser(
@@ -188,8 +189,8 @@ exports.resendOtp = async (payload) => {
       userName: record.name || "Salon Owner",
       otpCode: otp,
       expiryMinutes: OTP_TTL_MINUTES,
-      actionType: "REQUEST_OTP",
-      salonName: "Salon.com",
+      actionType: "RESEND_OTP",
+      email,
     });
 
     await mailService.sendMailToUser(

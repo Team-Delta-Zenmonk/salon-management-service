@@ -6,15 +6,16 @@ import {
   Body,
   Container,
   Section,
-  Row,
-  Column,
   Text,
   Img,
   Hr,
   Button,
   Link,
 } from "@react-email/components";
-import { renderToStaticMarkup } from "react-dom/server";
+import { colors } from "./email.tokens";
+import styles from "./email.styles";
+import { Header } from "./header";
+import { Footer } from "./footer";
 
 function formatCurrency(amount) {
   if (typeof amount === "string" && amount.startsWith("₹")) return amount;
@@ -28,12 +29,15 @@ function formatCurrency(amount) {
   })}`;
 }
 
+
+
+
 export function EmailTemplate(props) {
   const {
     type = "GENERIC",
-    salonName = "SALON",
-    logoUrl = null,
-    userName = "Valued Customer",
+    salonName,
+    logoUrl,
+    userName,
     title,
     previewText,
     message,
@@ -44,7 +48,11 @@ export function EmailTemplate(props) {
     actionType,
     changedAt,
     dashboardUrl,
-    // Invoice specific data
+    ownerName,
+    email,
+    userEmail,
+    footerTitle,
+    footerBody,
     invoice = {},
     booking = {},
     salon = {},
@@ -55,950 +63,649 @@ export function EmailTemplate(props) {
     bookingDate,
     totalAmount,
     paymentStatus,
+    paymentMethod,
   } = props;
 
-  const brandName = salon.name || props.salonName || salonName || "SALON";
+  const brandName = process.env.BRAND_NAME || "Vellora";
+  const platformName = brandName;
   const brandLogo = salon.logo || logoUrl || null;
-  const brandWebsite = salon.website || "www.salon.com";
-  const brandAddress = salon.address || "";
-  const brandPhone = salon.phone || salon.phone_number || "N/A";
-  const brandEmail = salon.email || "N/A";
-  const brandAbout = salon.about || salon.type || salon.tagline || "";
+  const recipientEmail = email || userEmail || customer.email || "vellora@gmail.com";
+  const displayName =
+    ownerName ||
+    (typeof userName === "string" && userName.trim() ? userName : null) ||
+    customer.name ||
+    customerName ||
+    "there";
+
   const resetLinkUrl = ctaUrl || props.resetLink || props.resetUrl || props.loginUrl || "";
+  const salonDashboardUrl =
+    dashboardUrl ||
+    ctaUrl ||
+    `${process.env.FRONTEND_URL || "https://vellora.com"}/owner/dashboard`;
 
-  let renderedPreview = previewText || `${brandName} Notification`;
-  let renderedTitle = title;
   const isInvoice = type === "INVOICE";
+  const isOtp = type === "OTP_VERIFICATION";
+  const isForgotPassword = type === "FORGOT_PASSWORD";
+  const isSalonLive = type === "SALON_LIVE";
+  const isResetPassword = type === "RESET_PASSWORD";
 
-  if (type === "FORGOT_PASSWORD") {
-    renderedTitle = title || "Password Reset Request";
-    renderedPreview = previewText || `Reset your password for ${brandName}`;
-  } else if (type === "OTP_VERIFICATION") {
-    const isNew = actionType === "NEW_OTP";
-    renderedTitle =
-      title || (isNew ? "Email Verification Code" : "Your OTP Security Code");
-    renderedPreview = previewText || `Your verification code is ${otpCode}`;
-  } else if (type === "SALON_LIVE") {
-    renderedTitle = title || "🎉 Your Salon is Live!";
-    renderedPreview =
-      previewText || `Congratulations! ${brandName} is live online`;
-  } else if (type === "RESET_PASSWORD") {
-    renderedTitle = title || "✓ Password Reset Successful";
-    renderedPreview = previewText || `Your password for ${brandName} has been reset`;
-  } else if (type === "INVOICE") {
-    renderedTitle = "INVOICE";
-    renderedPreview =
-      previewText ||
-      `Invoice #${invoice.invoice_number || invoiceNumber || "DRAFT"} from ${brandName}`;
+  let renderedPreview = previewText;
+  if (!renderedPreview) {
+    if (isOtp) {
+      renderedPreview = `Your verification code is ${otpCode || ""}`;
+    } else if (isForgotPassword) {
+      renderedPreview = otpCode
+        ? `Your password reset code is ${otpCode}`
+        : `Reset your password for ${brandName}`;
+    } else if (isSalonLive) {
+      renderedPreview = `Your salon is officially on ${brandName}!`;
+    } else if (isResetPassword) {
+      renderedPreview = `Your password for ${brandName} has been reset`;
+    } else if (isInvoice) {
+      renderedPreview = `Payment has been confirmed - Invoice #${invoice.invoice_number || invoiceNumber || "DRAFT"}`;
+    } else {
+      renderedPreview = `${brandName} Notification`;
+    }
   }
 
-  const invNumber = invoice.invoice_number || invoiceNumber || "DRAFT";
-  const invStatus = (
-    invoice.payment_status ||
-    paymentStatus ||
-    "UNPAID"
-  ).toUpperCase();
-  const invIssuedAt = invoice.issued_at
-    ? typeof invoice.issued_at === "string"
-      ? invoice.issued_at
-      : new Date(invoice.issued_at).toLocaleDateString("en-IN")
-    : "N/A";
-  const invMethod = invoice.payment_method || "Pay at Venue";
-  const invSubtotal = invoice.subtotal ?? 0;
-  const invDiscount = invoice.discount ?? 0;
-  const invGrandTotal = invoice.grand_total ?? totalAmount ?? 0;
-  const invBalanceDue = invoice.balance_due ?? 0;
+  let bannerHeading = title;
+  if (!bannerHeading) {
+    if (isOtp) {
+      bannerHeading = actionType === "RESEND_OTP" ? "Resend verification code" : "Verify it’s you";
+    } else if (isForgotPassword) {
+      bannerHeading = otpCode ? "Verify it’s you" : "Reset your password";
+    } else if (isSalonLive) {
+      bannerHeading = `Your salon is officially on ${brandName}!`;
+    } else if (isResetPassword) {
+      bannerHeading = "Password Updated";
+    } else if (isInvoice) {
+      bannerHeading = "Payment has been confirmed.";
+    } else {
+      bannerHeading = "Notification";
+    }
+  }
 
-  const clientName =
-    customer.name || customerName || userName || "Valued Customer";
-  const clientPhone = customer.phone_number || "N/A";
-  const clientEmail = customer.email || "N/A";
+  let resolvedFooterTitle = footerTitle;
+  let resolvedFooterBody = footerBody;
 
-  const bookDate = booking.booking_date || bookingDate || "N/A";
-  const bookTime = booking.booking_start_time || "N/A";
+  if (!resolvedFooterTitle && !resolvedFooterBody) {
+    if (isInvoice) {
+      const supportEmail = process.env.SUPPORT_EMAIL || `support@${brandName.toLowerCase()}.com`;
+      const supportPhone = process.env.SUPPORT_PHONE || salon.phone || salon.phone_number || "(+91) 555-0189";
+      resolvedFooterTitle = (
+        <>
+          Questions about your receipt? Reach out to{" "}
+          <Link href={`mailto:${supportEmail}`} style={{ color: "inherit", textDecoration: "none" }}>
+            {supportEmail}
+          </Link>{" "}
+          or call {supportPhone}.
+        </>
+      );
+      resolvedFooterBody = (
+        <>
+          This automated security email was sent to{" "}
+          <Link href={`mailto:${recipientEmail}`} style={{ color: "inherit", textDecoration: "none" }}>
+            {recipientEmail}
+          </Link>
+          . Please do not reply.
+        </>
+      );
+    } else if (isSalonLive) {
+      resolvedFooterTitle = (
+        <>
+          Need a hand? Email{" "}
+          <Link href={`mailto:support@${brandName.toLowerCase()}.com`} style={{ color: colors.PRIMARY_ORANGE, textDecoration: "none" }}>
+            support@{brandName.toLowerCase()}.com
+          </Link>{" "}
+          — our team is happy to help.
+        </>
+      );
+      resolvedFooterBody = `This confirmation was sent to ${recipientEmail} because you registered a salon on ${brandName}.`;
+    } else {
+      resolvedFooterTitle = `The ${brandName} Team`;
+      resolvedFooterBody = (
+        <>
+          This automated security email was sent to{" "}
+          <Link href={`mailto:${recipientEmail}`} style={{ color: colors.LINK_BLUE, textDecoration: "none" }}>
+            {recipientEmail}
+          </Link>
+          . Please don’t reply.
+        </>
+      );
+    }
+  }
 
-  const isPaid = invStatus === "PAID";
-  const badgeStyle = {
-    display: "inline-block",
-    padding: "4px 12px",
-    borderRadius: "20px",
-    fontSize: "11px",
-    fontWeight: "700",
-    letterSpacing: "1px",
-    textTransform: "uppercase",
-    backgroundColor: isPaid ? "#D1FAE5" : "#FEE2E2",
-    color: isPaid ? "#065F46" : "#991B1B",
-    border: `1px solid ${isPaid ? "#A7F3D0" : "#FCA5A5"}`,
-  };
+  const formattedOtp =
+    typeof otpCode === "string" && otpCode.length === 6
+      ? `${otpCode.slice(0, 3)} ${otpCode.slice(3)}`
+      : String(otpCode || "");
 
   return (
     <Html lang="en" dir="ltr">
-      <Head />
+      <Head>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+          * {
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          }
+        `}</style>
+      </Head>
       <Preview>{renderedPreview}</Preview>
-      <Body
-        style={{
-          backgroundColor: "#FAFAFA",
-          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-          color: "#2C2C2C",
-          margin: 0,
-          padding: "20px 0",
-          fontSize: "14px",
-          lineHeight: "1.5",
-        }}
-      >
-        <Container
-          style={{
-            maxWidth: "600px",
-            margin: "0 auto",
-            backgroundColor: "#FFFFFF",
-            borderRadius: "8px",
-            border: "1px solid #E5E5E5",
-            padding: "24px 32px",
-          }}
-        >
-          {/* Header Section */}
-          <Section
-            style={{
-              borderBottom: "2px solid #D4AF37",
-              paddingBottom: "16px",
-              marginBottom: "24px",
-            }}
-          >
-            <Row>
-              <Column
-                style={{
-                  width: isInvoice ? "60%" : "100%",
-                  verticalAlign: "top",
-                  textAlign: isInvoice ? "left" : "center",
-                }}
-              >
-                {brandLogo && (
-                  <Img
-                    src={brandLogo}
-                    alt="Logo"
-                    width="48"
-                    height="48"
-                    style={{
-                      borderRadius: "50%",
-                      objectFit: "cover",
-                      marginBottom: "8px",
-                      border: "1px solid #E5E5E5",
-                      margin: isInvoice ? "0 0 8px 0" : "0 auto 8px auto",
-                    }}
-                  />
-                )}
-                <Text
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "700",
-                    letterSpacing: "2px",
-                    color: "#1A1A1A",
-                    textTransform: "uppercase",
-                    margin: "0 0 4px 0",
-                  }}
-                >
-                  {brandName}
+      <Body style={styles.body}>
+        <Container style={styles.container}>
+          <Header
+            title={bannerHeading}
+            logoUrl={brandLogo}
+          />
+
+          <Section style={styles.contentSection}>
+            {(isOtp || (isForgotPassword && otpCode)) && (
+              <>
+                <Text style={styles.greetingText}>
+                  Hi {displayName},
                 </Text>
-                {brandAbout && (
-                  <Text
-                    style={{
-                      fontSize: "11px",
-                      color: "#8C7A6B",
-                      letterSpacing: "1px",
-                      textTransform: "uppercase",
-                      margin: "0 0 4px 0",
-                    }}
-                  >
-                    {brandAbout}
-                  </Text>
-                )}
-                {isInvoice && (
-                  <Text
-                    style={{
-                      fontSize: "11px",
-                      color: "#666666",
-                      margin: 0,
-                      lineHeight: "1.4",
-                    }}
-                  >
-                    {brandAddress && (
-                      <>
-                        {brandAddress}
-                        <br />
-                      </>
-                    )}
-                    Phone: {brandPhone} | Email: {brandEmail}
-                  </Text>
-                )}
-              </Column>
-              {isInvoice && (
-                <Column
-                  style={{
-                    width: "40%",
-                    verticalAlign: "top",
-                    textAlign: "right",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: "24px",
-                      fontWeight: "300",
-                      letterSpacing: "3px",
-                      color: "#8C7A6B",
-                      margin: "0 0 4px 0",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    INVOICE
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: "13px",
-                      fontWeight: "600",
-                      color: "#333333",
-                      margin: "0 0 8px 0",
-                    }}
-                  >
-                    #{invNumber}
-                  </Text>
-                  <span style={badgeStyle}>{invStatus}</span>
-                </Column>
-              )}
-            </Row>
-          </Section>
 
-          {/* DYNAMIC CONTENT TYPE: INVOICE */}
-          {isInvoice && (
-            <>
-              <Section
-                style={{
-                  backgroundColor: "#FAFAFA",
-                  borderRadius: "8px",
-                  border: "1px solid #E5E5E5",
-                  padding: "16px",
-                  marginBottom: "24px",
-                }}
-              >
-                <Row>
-                  <Column
-                    style={{
-                      width: "50%",
-                      verticalAlign: "top",
-                      paddingRight: "12px",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: "700",
-                        color: "#8C7A6B",
-                        textTransform: "uppercase",
-                        letterSpacing: "1.5px",
-                        margin: "0 0 6px 0",
-                      }}
-                    >
-                      Billed To
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: "15px",
-                        fontWeight: "700",
-                        color: "#1A1A1A",
-                        margin: "0 0 4px 0",
-                      }}
-                    >
-                      {clientName}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: "12px",
-                        color: "#666666",
-                        margin: 0,
-                        lineHeight: "1.4",
-                      }}
-                    >
-                      Phone: {clientPhone}
-                      <br />
-                      Email: {clientEmail}
-                    </Text>
-                  </Column>
-                  <Column
-                    style={{
-                      width: "50%",
-                      verticalAlign: "top",
-                      paddingLeft: "12px",
-                      borderLeft: "1px solid #E5E5E5",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: "700",
-                        color: "#8C7A6B",
-                        textTransform: "uppercase",
-                        letterSpacing: "1.5px",
-                        margin: "0 0 6px 0",
-                      }}
-                    >
-                      Appointment Details
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: "12px",
-                        color: "#666666",
-                        margin: "0 0 3px 0",
-                      }}
-                    >
-                      <strong style={{ color: "#333" }}>Invoice Date: </strong>
-                      {invIssuedAt}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: "12px",
-                        color: "#666666",
-                        margin: "0 0 3px 0",
-                      }}
-                    >
-                      <strong style={{ color: "#333" }}>Booking Date: </strong>
-                      {bookDate}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: "12px",
-                        color: "#666666",
-                        margin: "0 0 3px 0",
-                      }}
-                    >
-                      <strong style={{ color: "#333" }}>Time Slot: </strong>
-                      {bookTime}
-                    </Text>
-                    <Text
-                      style={{ fontSize: "12px", color: "#666666", margin: 0 }}
-                    >
-                      <strong style={{ color: "#333" }}>
-                        Payment Method:{" "}
-                      </strong>
-                      {invMethod}
-                    </Text>
-                  </Column>
-                </Row>
-              </Section>
+                <Text style={styles.bodyParagraph}>
+                  {message ||
+                    (isForgotPassword
+                      ? `Use the verification code below to reset your password for your ${platformName} account.`
+                      : `Use the verification code below to finish signing in to your ${platformName} account.`)}
+                </Text>
 
-              <Section
-                style={{
-                  marginBottom: "24px",
-                  border: "1px solid #E5E5E5",
-                  borderRadius: "8px",
-                  overflow: "hidden",
-                }}
-              >
-                <table
-                  width="100%"
-                  cellPadding="0"
-                  cellSpacing="0"
-                  style={{ borderCollapse: "collapse", fontSize: "13px" }}
-                >
-                  <thead>
-                    <tr style={{ backgroundColor: "#2C2C2C", color: "#FFFFFF" }}>
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "center",
-                          width: "8%",
-                          fontSize: "11px",
-                          fontWeight: "600",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        #
-                      </th>
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "left",
-                          width: "42%",
-                          fontSize: "11px",
-                          fontWeight: "600",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Services Booked
-                      </th>
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "left",
-                          width: "25%",
-                          fontSize: "11px",
-                          fontWeight: "600",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Staff Assigned
-                      </th>
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "center",
-                          width: "10%",
-                          fontSize: "11px",
-                          fontWeight: "600",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Duration
-                      </th>
-                      <th
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "right",
-                          width: "15%",
-                          fontSize: "11px",
-                          fontWeight: "600",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        Amount
-                      </th>
+                {/* Light Peach OTP Box */}
+                <Section style={styles.otpCard}>
+                  <Text style={styles.otpDigits}>
+                    {formattedOtp}
+                  </Text>
+                  <Text style={styles.otpExpiry}>
+                    This code expires in {expiryMinutes} minutes.
+                  </Text>
+                </Section>
+
+                {/* Safety / Ignore Notice */}
+                <Text style={styles.secondaryParagraph}>
+                  If you didn’t request this code, you can safely ignore this email. Your account remains secure.
+                </Text>
+              </>
+            )}
+
+            {/* 2. FORGOT PASSWORD (LINK BASED) */}
+            {isForgotPassword && !otpCode && (
+              <>
+                <Text style={styles.greetingText}>
+                  Hi {displayName},
+                </Text>
+
+                <Text style={styles.bodyParagraph}>
+                  We received a request to reset your password for your {platformName} account. Click the button below to proceed.
+                </Text>
+
+                {resetLinkUrl && (
+                  <Section style={styles.buttonSectionLeft}>
+                    <Button href={resetLinkUrl} style={styles.primaryButton}>
+                      {ctaText || "Reset Password"}
+                    </Button>
+                  </Section>
+                )}
+
+                <Text style={styles.secondaryParagraph}>
+                  This link will expire in {expiryMinutes} minutes. If you did not request a password reset, you can safely ignore this email.
+                </Text>
+              </>
+            )}
+
+            {/* 3. SALON LIVE / REGISTRATION COMPLETE */}
+            {isSalonLive && (
+              <>
+                {/* Green Pill Badge */}
+                <Section style={styles.successBadgeCard}>
+                  <table cellPadding="0" cellSpacing="0" border="0">
+                    <tr>
+                      <td style={styles.badgeIconCell}>
+                        <div style={styles.successCheckCircle}>
+                          ✓
+                        </div>
+                      </td>
+                      <td style={styles.badgeTextCell}>
+                        <span style={styles.successBadgeText}>
+                          Salon registration complete
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {bookingServices.length > 0 ? (
-                      bookingServices.map((s, idx) => {
-                        const staffName =
-                          s.staff?.name ||
-                          [s.staff?.first_name, s.staff?.last_name]
-                            .filter(Boolean)
-                            .join(" ") ||
-                          "Assigned Stylist";
-                        const isLast = idx === bookingServices.length - 1;
-                        return (
-                          <tr
-                            key={idx}
-                            style={{
-                              borderBottom: isLast
-                                ? "none"
-                                : "1px solid #F0F0F0",
-                            }}
-                          >
-                            <td
-                              style={{
-                                padding: "10px 12px",
-                                textAlign: "center",
-                                color: "#888888",
-                              }}
-                            >
-                              0{idx + 1}
-                            </td>
-                            <td style={{ padding: "10px 12px" }}>
-                              <strong style={{ color: "#1A1A1A" }}>
-                                {s.service?.name || "Service"}
-                              </strong>
-                            </td>
-                            <td
-                              style={{
-                                padding: "10px 12px",
-                                color: "#8C7A6B",
-                                fontSize: "11px",
-                              }}
-                            >
-                              {staffName}
-                            </td>
-                            <td
-                              style={{
-                                padding: "10px 12px",
-                                textAlign: "center",
-                                color: "#555",
-                              }}
-                            >
-                              {s.duration_minutes
-                                ? `${s.duration_minutes} mins`
-                                : "-"}
-                            </td>
-                            <td
-                              style={{
-                                padding: "10px 12px",
-                                textAlign: "right",
-                                fontWeight: "600",
-                                color: "#222",
-                              }}
-                            >
-                              {formatCurrency(s.price)}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          style={{
-                            padding: "16px",
-                            textAlign: "center",
-                            color: "#888888",
-                          }}
-                        >
-                          No services recorded.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </Section>
+                  </table>
+                </Section>
 
-              <Section style={{ marginBottom: "24px" }}>
-                <Row>
-                  <Column
-                    style={{
-                      width: "55%",
-                      verticalAlign: "top",
-                      paddingRight: "16px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        backgroundColor: "#F5F5F0",
-                        borderLeft: "3px solid #8C7A6B",
-                        padding: "12px",
-                        borderRadius: "0 6px 6px 0",
-                        fontSize: "12px",
-                        color: "#555555",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontWeight: "700",
-                          color: "#2C2C2C",
-                          marginBottom: "4px",
-                          textTransform: "uppercase",
-                          fontSize: "10px",
-                          letterSpacing: "0.5px",
-                        }}
-                      >
-                        Salon Policy &amp; Thank You
-                      </div>
-                      Thank you for choosing {brandName}! Please arrive 10
-                      minutes prior to appointments. Free reschedules up to 24 hours
-                      prior.
-                    </div>
-                  </Column>
-                  <Column style={{ width: "45%", verticalAlign: "top" }}>
-                    <div
-                      style={{
-                        backgroundColor: "#FFFFFF",
-                        border: "1px solid #E5E5E5",
-                        borderRadius: "8px",
-                        padding: "16px",
-                      }}
-                    >
-                      <Row style={{ marginBottom: "6px", fontSize: "13px" }}>
-                        <Column style={{ color: "#666666" }}>Subtotal</Column>
-                        <Column
-                          style={{
-                            textAlign: "right",
-                            fontWeight: "600",
-                            color: "#222",
-                          }}
-                        >
-                          {formatCurrency(invSubtotal)}
-                        </Column>
-                      </Row>
-                      <Row style={{ marginBottom: "6px", fontSize: "13px" }}>
-                        <Column style={{ color: "#666666" }}>Discount</Column>
-                        <Column
-                          style={{
-                            textAlign: "right",
-                            fontWeight: "600",
-                            color: "#059669",
-                          }}
-                        >
-                          - {formatCurrency(invDiscount)}
-                        </Column>
-                      </Row>
-                      <Hr style={{ borderColor: "#E5E5E5", margin: "8px 0" }} />
-                      <Row style={{ marginBottom: "6px", fontSize: "15px" }}>
-                        <Column style={{ color: "#1A1A1A", fontWeight: "700" }}>
-                          Grand Total
-                        </Column>
-                        <Column
-                          style={{
-                            textAlign: "right",
-                            fontWeight: "700",
-                            color: "#1A1A1A",
-                          }}
-                        >
-                          {formatCurrency(invGrandTotal)}
-                        </Column>
-                      </Row>
-                      <div
-                        style={{
-                          backgroundColor: "#FEF2F2",
-                          padding: "8px 12px",
-                          borderRadius: "6px",
-                          marginTop: "8px",
-                        }}
-                      >
-                        <Row>
-                          <Column
-                            style={{
-                              color: "#991B1B",
-                              fontWeight: "600",
-                              fontSize: "12px",
-                            }}
-                          >
-                            Balance Due
-                          </Column>
-                          <Column
-                            style={{
-                              textAlign: "right",
-                              color: "#991B1B",
-                              fontWeight: "700",
-                              fontSize: "14px",
-                            }}
-                          >
-                            {formatCurrency(invBalanceDue)}
-                          </Column>
-                        </Row>
-                      </div>
-                    </div>
-                  </Column>
-                </Row>
-              </Section>
-            </>
-          )}
-
-          {/* OTHER EMAIL TYPES */}
-          {!isInvoice && (
-            <>
-              {renderedTitle && (
-                <Text
-                  style={{
-                    fontSize: "22px",
-                    fontWeight: "700",
-                    color: "#1A1A1A",
-                    marginBottom: "12px",
-                    textAlign: "center",
-                  }}
-                >
-                  {renderedTitle}
+                <Text style={styles.greetingText}>
+                  Hi {displayName},
                 </Text>
-              )}
 
-              {userName && (
-                <Text
-                  style={{
-                    fontSize: "14px",
-                    color: "#555555",
-                    marginBottom: "12px",
-                    lineHeight: "1.6",
-                  }}
-                >
-                  Hello <strong>{userName}</strong>,
+                <Text style={styles.bodyParagraph}>
+                  Great news — <strong style={{ color: colors.DARK_TEXT }}>{salon.name || salonName || "Your salon"}</strong> has been registered successfully. Your salon workspace is ready, and you can now shape the booking experience your clients will see.
                 </Text>
-              )}
 
-              {message && (
-                <Text
-                  style={{
-                    fontSize: "14px",
-                    color: "#555555",
-                    marginBottom: "20px",
-                    lineHeight: "1.6",
-                  }}
-                >
-                  {message}
-                </Text>
-              )}
-
-              {/* FORGOT PASSWORD */}
-              {type === "FORGOT_PASSWORD" && (
-                <>
-                  {resetLinkUrl ? (
-                    <Section style={{ textAlign: "center", marginTop: "20px", marginBottom: "28px" }}>
-                      <table
-                        width="100%"
-                        border="0"
-                        cellSpacing="0"
-                        cellPadding="0"
-                        style={{ margin: "0 auto" }}
-                      >
-                        <tr>
-                          <td align="center">
-                            <Button
-                              href={resetLinkUrl}
-                              style={{
-                                backgroundColor: "#D4AF37",
-                                color: "#1A1A1A",
-                                borderRadius: "6px",
-                                fontSize: "15px",
-                                fontWeight: "700",
-                                textDecoration: "none",
-                                display: "inline-block",
-                                padding: "14px 32px",
-                                border: "1px solid #B89628",
-                                textAlign: "center",
-                              }}
-                            >
-                              {ctaText || "Reset Password"}
-                            </Button>
-                          </td>
-                        </tr>
-                      </table>
-                    </Section>
-                  ) : null}
-                  <Section
-                    style={{
-                      backgroundColor: "#FFFBEB",
-                      borderLeft: "3px solid #D4AF37",
-                      padding: "12px 16px",
-                      borderRadius: "0 6px 6px 0",
-                      marginBottom: "20px",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: "12px",
-                        color: "#92400E",
-                        margin: 0,
-                        lineHeight: "1.5",
-                      }}
-                    >
-                      <strong>Note:</strong> This link is valid for{" "}
-                      <strong>{expiryMinutes} minutes</strong>. If you did not
-                      request a password reset, please ignore this email.
-                    </Text>
-                  </Section>
-                  {resetLinkUrl ? (
-                    <>
-                      <Text
-                        style={{
-                          fontSize: "12px",
-                          color: "#777777",
-                          marginBottom: "4px",
-                          wordBreak: "break-all",
-                        }}
-                      >
-                        If the button above doesn't work, copy and paste this link into your browser:
-                      </Text>
-                      <Text style={{ fontSize: "12px", marginBottom: "20px", wordBreak: "break-all" }}>
-                        <Link href={resetLinkUrl} style={{ color: "#D4AF37", fontWeight: "600" }}>
-                          {resetLinkUrl}
-                        </Link>
-                      </Text>
-                    </>
-                  ) : null}
-                </>
-              )}
-
-              {/* OTP VERIFICATION */}
-              {type === "OTP_VERIFICATION" && otpCode && (
-                <>
-                  <Section
-                    style={{
-                      backgroundColor: "#1A1A1A",
-                      borderRadius: "8px",
-                      border: "1px solid #D4AF37",
-                      padding: "20px",
-                      textAlign: "center",
-                      marginBottom: "24px",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: "36px",
-                        fontWeight: "700",
-                        letterSpacing: "10px",
-                        color: "#D4AF37",
-                        margin: 0,
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {otpCode}
-                    </Text>
-                  </Section>
-                  <Section
-                    style={{
-                      backgroundColor: "#FFFBEB",
-                      borderLeft: "3px solid #D4AF37",
-                      padding: "12px 16px",
-                      borderRadius: "0 6px 6px 0",
-                      marginBottom: "20px",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: "12px",
-                        color: "#92400E",
-                        margin: 0,
-                        lineHeight: "1.5",
-                      }}
-                    >
-                      <strong>Security Notice:</strong> This OTP is valid for{" "}
-                      <strong>{expiryMinutes} minutes</strong>. Never share this
-                      code with anyone.
-                    </Text>
-                  </Section>
-                </>
-              )}
-
-              {/* SALON LIVE */}
-              {type === "SALON_LIVE" && (
-                <>
-                  <Section
-                    style={{
-                      backgroundColor: "#F0FDF4",
-                      border: "1px solid #BBF7D0",
-                      borderRadius: "8px",
-                      padding: "16px",
-                      textAlign: "center",
-                      marginBottom: "24px",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: "18px",
-                        fontWeight: "700",
-                        color: "#166534",
-                        margin: "0 0 4px 0",
-                      }}
-                    >
-                      🎉 Your Salon Profile is Officially Live!
-                    </Text>
-                    <Text
-                      style={{ fontSize: "13px", color: "#15803D", margin: 0 }}
-                    >
-                      Customers can now view services, check schedules, and place
-                      bookings online.
-                    </Text>
-                  </Section>
-                  {dashboardUrl && (
-                    <Section style={{ textAlign: "center", marginBottom: "24px" }}>
-                      <Button
-                        href={dashboardUrl}
-                        style={{
-                          backgroundColor: "#D4AF37",
-                          color: "#1A1A1A",
-                          borderRadius: "6px",
-                          fontSize: "14px",
-                          fontWeight: "700",
-                          textDecoration: "none",
-                          display: "inline-block",
-                          padding: "12px 28px",
-                        }}
-                      >
-                        {ctaText || "Open Owner Dashboard"}
-                      </Button>
-                    </Section>
-                  )}
-                </>
-              )}
-
-              {/* RESET PASSWORD */}
-              {type === "RESET_PASSWORD" && (
-                <>
-                  <Section
-                    style={{
-                      backgroundColor: "#F0FDF4",
-                      border: "1px solid #BBF7D0",
-                      borderRadius: "8px",
-                      padding: "16px",
-                      textAlign: "center",
-                      marginBottom: "24px",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: "18px",
-                        fontWeight: "700",
-                        color: "#166534",
-                        margin: "0 0 4px 0",
-                      }}
-                    >
-                      ✓ Account Security Updated
-                    </Text>
-                    <Text
-                      style={{ fontSize: "13px", color: "#15803D", margin: 0 }}
-                    >
-                      Your password was successfully changed
-                      {changedAt ? ` on ${changedAt}` : ""}.
-                    </Text>
-                  </Section>
-                  {ctaUrl && (
-                    <Section style={{ textAlign: "center", marginBottom: "24px" }}>
-                      <Button
-                        href={ctaUrl}
-                        style={{
-                          backgroundColor: "#1A1A1A",
-                          color: "#FFFFFF",
-                          borderRadius: "6px",
-                          fontSize: "14px",
-                          fontWeight: "700",
-                          textDecoration: "none",
-                          display: "inline-block",
-                          padding: "12px 28px",
-                          border: "1px solid #D4AF37",
-                        }}
-                      >
-                        {ctaText || "Log In Now"}
-                      </Button>
-                    </Section>
-                  )}
-                </>
-              )}
-
-              {/* GENERIC CTA IF PROVIDED */}
-              {type === "GENERIC" && ctaUrl && (
-                <Section style={{ textAlign: "center", marginBottom: "24px" }}>
-                  <Button
-                    href={ctaUrl}
-                    style={{
-                      backgroundColor: "#1A1A1A",
-                      color: "#FFFFFF",
-                      borderRadius: "6px",
-                      fontSize: "14px",
-                      fontWeight: "700",
-                      textDecoration: "none",
-                      display: "inline-block",
-                      padding: "12px 28px",
-                    }}
-                  >
-                    {ctaText || "Continue"}
+                <Section style={styles.buttonSection}>
+                  <Button href={salonDashboardUrl} style={styles.primaryButton}>
+                    Go to salon dashboard
                   </Button>
                 </Section>
-              )}
-            </>
-          )}
 
-          {/* Footer */}
-          <Hr style={{ borderColor: "#E5E5E5", margin: "24px 0 16px 0" }} />
-          <Text
-            style={{
-              textAlign: "center",
-              fontSize: "12px",
-              color: "#888888",
-              margin: 0,
-            }}
-          >
-            Thank you for using {brandName}! • {brandWebsite}
-            <br />© {new Date().getFullYear()} {brandName}. All rights reserved.
-          </Text>
+                <Text style={styles.secondaryParagraph}>
+                  You’re all set to build a polished salon presence and turn interest into bookings. We can’t wait to see {salon.name || salonName || "your salon"} grow.
+                </Text>
+              </>
+            )}
+
+            {/* 4. PASSWORD RESET SUCCESSFUL */}
+            {isResetPassword && (
+              <>
+                <Text style={styles.greetingText}>
+                  Hi {displayName},
+                </Text>
+
+                <Section style={styles.passwordResetCard}>
+                  <Text style={styles.passwordResetTitle}>
+                    ✓ Account Security Updated
+                  </Text>
+                  <Text style={styles.passwordResetText}>
+                    Your password was successfully changed{changedAt ? ` on ${changedAt}` : ""}.
+                  </Text>
+                </Section>
+
+                <Text style={styles.bodyParagraph}>
+                  If you performed this change, no further action is needed. If you did not make this request, please contact our support team immediately.
+                </Text>
+
+                {ctaUrl && (
+                  <Section style={styles.buttonSectionSm}>
+                    <Button href={ctaUrl} style={styles.primaryButton}>
+                      {ctaText || "Log In to Account"}
+                    </Button>
+                  </Section>
+                )}
+              </>
+            )}
+
+            {/* 5. INVOICE EMAIL */}
+            {isInvoice && (() => {
+              const customerNameStr =
+                customer.name || customerName || displayName || "Valued Customer";
+              const customerFirstName =
+                customerNameStr.split(" ")[0] || customerNameStr;
+
+              const rawPaymentMethod = (
+                invoice.payment_method ||
+                booking.payment_policy ||
+                booking.payment_method ||
+                paymentMethod ||
+                props.paymentMethod ||
+                ""
+              ).toLowerCase();
+
+              const isPayAtVenue =
+                rawPaymentMethod.includes("pay_at_venue") ||
+                rawPaymentMethod.includes("venue") ||
+                (invoice.payment_status || paymentStatus || "").toLowerCase() === "unpaid";
+
+              const totalAmountVal =
+                invoice.grand_total ??
+                invoice.total_amount ??
+                booking.total_price ??
+                totalAmount ??
+                0;
+
+              const subtotalAmountVal =
+                invoice.subtotal ??
+                invoice.sub_total ??
+                totalAmountVal;
+
+              const formattedTotal = formatCurrency(totalAmountVal);
+              const formattedSubtotal = formatCurrency(subtotalAmountVal);
+
+              const rawInvoiceDate =
+                invoice.issued_at || invoice.created_at || booking.booking_date || bookingDate;
+              const formattedInvoiceDate = (() => {
+                if (!rawInvoiceDate) {
+                  return new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+                }
+                const d = new Date(rawInvoiceDate);
+                return isNaN(d.getTime())
+                  ? String(rawInvoiceDate)
+                  : d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+              })();
+
+              const rawAppointmentTime =
+                booking.booking_start_time || booking.start_time || booking.booking_date || bookingDate;
+              const formattedAppointmentTime = (() => {
+                if (!rawAppointmentTime) return "Thursday, 2:30 PM";
+                const d = new Date(rawAppointmentTime);
+                if (isNaN(d.getTime())) return String(rawAppointmentTime);
+                const weekday = d.toLocaleDateString("en-US", { weekday: "short" });
+                const month = d.toLocaleDateString("en-US", { month: "short" });
+                const day = d.getDate();
+                const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+                return `${weekday}, ${month} ${day} · ${time}`;
+              })();
+
+              const formattedDuration = (() => {
+                const minutes = Number(booking.total_duration || 0);
+                if (!minutes) return null;
+                const hrs = Math.floor(minutes / 60);
+                const mins = minutes % 60;
+                if (hrs > 0 && mins > 0) return `Duration: ${hrs} hr ${mins} min`;
+                if (hrs > 0) return `Duration: ${hrs} hr`;
+                return `Duration: ${mins} min`;
+              })();
+
+              const customerPhone = customer.phone || customer.phone_number || booking.customer_phone || "";
+              const salonAddress = salon.address || "";
+              const salonCityState = [salon.city, salon.state, salon.zip_code].filter(Boolean).join(", ");
+
+              const servicesList =
+                Array.isArray(bookingServices) && bookingServices.length > 0
+                  ? bookingServices
+                  : Array.isArray(booking.booking_services) && booking.booking_services.length > 0
+                  ? booking.booking_services
+                  : [
+                      {
+                        name: "Signature haircut & style",
+                        description: "Consultation, shampoo, and finish.",
+                        quantity: 1,
+                        price: totalAmountVal,
+                      },
+                    ];
+
+              return (
+                <>
+                  {/* Top Status Badge */}
+                  <Section
+                    style={{
+                      backgroundColor: isPayAtVenue ? colors.PEACH_BG : colors.SUCCESS_BG,
+                      borderRadius: "6px",
+                      padding: "12px 16px",
+                      marginBottom: "24px",
+                    }}
+                  >
+                    <table cellPadding="0" cellSpacing="0" border="0">
+                      <tr>
+                        <td style={{ verticalAlign: "middle", paddingRight: "10px" }}>
+                          {isPayAtVenue ? (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                width: "22px",
+                                height: "22px",
+                                borderRadius: "50%",
+                                backgroundColor: colors.PRIMARY_ORANGE,
+                                color: "#FFFFFF",
+                                textAlign: "center",
+                                lineHeight: "22px",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              !
+                            </span>
+                          ) : (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                width: "22px",
+                                height: "22px",
+                                borderRadius: "50%",
+                                backgroundColor: "#22C55E",
+                                color: "#FFFFFF",
+                                textAlign: "center",
+                                lineHeight: "22px",
+                                fontSize: "13px",
+                                fontWeight: "bold",
+                              }}
+                            >
+                              ✓
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ verticalAlign: "middle" }}>
+                          <Text
+                            style={{
+                              margin: 0,
+                              fontSize: "16px",
+                              fontWeight: 700,
+                              color: colors.DARK_TEXT,
+                              fontFamily: "'Inter', sans-serif",
+                            }}
+                          >
+                            {isPayAtVenue
+                              ? `Unpaid: ${formattedTotal}`
+                              : `Successfully paid: ${formattedTotal}.`}
+                          </Text>
+                        </td>
+                      </tr>
+                    </table>
+                  </Section>
+
+                  {/* Greeting & Subtitle */}
+                  <Text style={{ ...styles.greetingText, margin: "0 0 8px 0" }}>
+                    Thanks, {customerFirstName}!
+                  </Text>
+                  <Text style={{ ...styles.bodyParagraph, margin: "0 0 24px 0" }}>
+                    Your salon appointment is confirmed.
+                  </Text>
+
+                  {/* Metadata: Invoice Number & Date */}
+                  <table width="100%" cellPadding="0" cellSpacing="0" border="0" style={{ marginBottom: "16px" }}>
+                    <tr>
+                      <td style={{ verticalAlign: "top" }}>
+                        <Text style={{ fontSize: "11px", fontWeight: 700, color: colors.GREYSCALE_500, letterSpacing: "0.5px", margin: "0 0 4px 0", textTransform: "uppercase" }}>
+                          INVOICE NUMBER:
+                        </Text>
+                        <Text style={{ fontSize: "15px", fontWeight: 500, color: colors.DARK_TEXT, margin: 0 }}>
+                          {invoice.invoice_number || invoiceNumber || "UB-20481"}
+                        </Text>
+                      </td>
+                      <td style={{ verticalAlign: "top", textAlign: "right" }}>
+                        <Text style={{ fontSize: "11px", fontWeight: 700, color: colors.GREYSCALE_500, letterSpacing: "0.5px", margin: "0 0 4px 0", textTransform: "uppercase" }}>
+                          INVOICE DATE:
+                        </Text>
+                        <Text style={{ fontSize: "15px", fontWeight: 500, color: colors.DARK_TEXT, margin: 0 }}>
+                          {formattedInvoiceDate}
+                        </Text>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <Hr style={{ borderColor: colors.BORDER, margin: "0 0 20px 0" }} />
+
+                  {/* Salon & Customer Details */}
+                  <table width="100%" cellPadding="0" cellSpacing="0" border="0" style={{ marginBottom: "24px" }}>
+                    <tr>
+                      <td style={{ width: "50%", verticalAlign: "top", paddingRight: "12px" }}>
+                        <Text style={{ fontSize: "11px", fontWeight: 700, color: colors.GREYSCALE_500, letterSpacing: "0.5px", margin: "0 0 6px 0", textTransform: "uppercase" }}>
+                          SALON:
+                        </Text>
+                        <Text style={{ fontSize: "14px", fontWeight: 600, color: colors.DARK_TEXT, margin: "0 0 2px 0" }}>
+                          {salon.name || salonName || platformName}
+                        </Text>
+                        {salonAddress && (
+                          <Text style={{ fontSize: "13px", color: colors.BODY_TEXT, margin: "0 0 2px 0", lineHeight: "140%" }}>
+                            {salonAddress}
+                          </Text>
+                        )}
+                        {salonCityState && (
+                          <Text style={{ fontSize: "13px", color: colors.BODY_TEXT, margin: 0, lineHeight: "140%" }}>
+                            {salonCityState}
+                          </Text>
+                        )}
+                      </td>
+                      <td style={{ width: "50%", verticalAlign: "top", textAlign: "right", paddingLeft: "12px" }}>
+                        <Text style={{ fontSize: "11px", fontWeight: 700, color: colors.GREYSCALE_500, letterSpacing: "0.5px", margin: "0 0 6px 0", textTransform: "uppercase" }}>
+                          CUSTOMER:
+                        </Text>
+                        <Text style={{ fontSize: "14px", fontWeight: 600, color: colors.DARK_TEXT, margin: "0 0 2px 0" }}>
+                          {customerNameStr}
+                        </Text>
+                        {recipientEmail && (
+                          <Text style={{ fontSize: "13px", color: colors.BODY_TEXT, margin: "0 0 2px 0" }}>
+                            {recipientEmail}
+                          </Text>
+                        )}
+                        {customerPhone && (
+                          <Text style={{ fontSize: "13px", color: colors.BODY_TEXT, margin: 0 }}>
+                            {customerPhone}
+                          </Text>
+                        )}
+                      </td>
+                    </tr>
+                  </table>
+
+                  {/* Services Card / Table */}
+                  <Section
+                    style={{
+                      border: `1px solid ${colors.BORDER}`,
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      marginBottom: "24px",
+                      backgroundColor: colors.WHITE,
+                    }}
+                  >
+                    <table width="100%" cellPadding="0" cellSpacing="0" border="0">
+                      <thead>
+                        <tr style={{ backgroundColor: colors.PEACH_BG }}>
+                          <th style={{ textAlign: "left", padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: colors.BODY_TEXT, letterSpacing: "0.5px" }}>SERVICE</th>
+                          <th style={{ textAlign: "center", padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: colors.BODY_TEXT, letterSpacing: "0.5px" }}>QUANTITY</th>
+                          <th style={{ textAlign: "right", padding: "10px 16px", fontSize: "11px", fontWeight: 700, color: colors.BODY_TEXT, letterSpacing: "0.5px" }}>PRICE</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {servicesList.map((service, idx) => {
+                          const sName = service.service?.name || service.name || service.service_name || "Salon Service";
+                          const sDesc = service.service?.description || service.description || "";
+                          const sQty = service.quantity || 1;
+                          const sPrice = service.price || service.rate || 0;
+
+                          return (
+                            <tr key={idx}>
+                              <td style={{ padding: "14px 16px", borderBottom: `1px solid ${colors.BORDER}`, verticalAlign: "top" }}>
+                                <Text style={{ fontSize: "14px", fontWeight: 600, color: colors.DARK_TEXT, margin: "0 0 2px 0" }}>
+                                  {sName}
+                                </Text>
+                                {sDesc && (
+                                  <Text style={{ fontSize: "12px", color: colors.GREYSCALE_500, margin: 0 }}>
+                                    {sDesc}
+                                  </Text>
+                                )}
+                              </td>
+                              <td style={{ padding: "14px 16px", borderBottom: `1px solid ${colors.BORDER}`, textAlign: "center", verticalAlign: "top", fontSize: "14px", color: colors.DARK_TEXT }}>
+                                {sQty}
+                              </td>
+                              <td style={{ padding: "14px 16px", borderBottom: `1px solid ${colors.BORDER}`, textAlign: "right", verticalAlign: "top", fontSize: "14px", fontWeight: 600, color: colors.DARK_TEXT }}>
+                                {formatCurrency(sPrice)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    {/* Subtotal & Total (excluding sales & service fee as instructed) */}
+                    <table width="100%" cellPadding="0" cellSpacing="0" border="0" style={{ padding: "16px" }}>
+                      <tr>
+                        <td style={{ width: "40%" }}></td>
+                        <td style={{ width: "60%" }}>
+                          <table width="100%" cellPadding="0" cellSpacing="0" border="0">
+                            <tr>
+                              <td style={{ paddingBottom: "10px", fontSize: "14px", color: colors.BODY_TEXT }}>
+                                Subtotal:
+                              </td>
+                              <td style={{ paddingBottom: "10px", textAlign: "right", fontSize: "14px", fontWeight: 600, color: colors.DARK_TEXT }}>
+                                {formattedSubtotal}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style={{ paddingTop: "10px", borderTop: `1px solid ${colors.BORDER}`, fontSize: "16px", fontWeight: 700, color: colors.DARK_TEXT }}>
+                                {isPayAtVenue ? "Total due:" : "Total paid:"}
+                              </td>
+                              <td style={{ paddingTop: "10px", borderTop: `1px solid ${colors.BORDER}`, textAlign: "right", fontSize: "18px", fontWeight: 700, color: isPayAtVenue ? colors.DARK_TEXT : colors.SUCCESS_TEXT }}>
+                                {formattedTotal}
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </Section>
+
+                  {/* Payment Method & Appointment Cards */}
+                  <table width="100%" cellPadding="0" cellSpacing="0" border="0" style={{ marginBottom: "20px" }}>
+                    <tr>
+                      <td style={{ width: "48%", verticalAlign: "top", backgroundColor: colors.PEACH_BG, borderRadius: "8px", padding: "16px" }}>
+                        <Text style={{ fontSize: "11px", fontWeight: 700, color: colors.GREYSCALE_500, letterSpacing: "0.5px", margin: "0 0 6px 0", textTransform: "uppercase" }}>
+                          PAYMENT METHOD:
+                        </Text>
+                        <Text style={{ fontSize: "15px", fontWeight: 700, color: colors.DARK_TEXT, margin: "0 0 4px 0" }}>
+                          {isPayAtVenue ? "Pay at Venue" : (invoice.payment_method || booking.payment_policy || "Card / Online")}
+                        </Text>
+                        <Text style={{ fontSize: "12px", color: isPayAtVenue ? colors.GREYSCALE_500 : colors.SUCCESS_TEXT, margin: 0 }}>
+                          {isPayAtVenue ? "Pay upon arrival" : `Paid on ${formattedInvoiceDate}.`}
+                        </Text>
+                      </td>
+                      <td style={{ width: "4%" }}></td>
+                      <td style={{ width: "48%", verticalAlign: "top", backgroundColor: colors.PEACH_BG, borderRadius: "8px", padding: "16px" }}>
+                        <Text style={{ fontSize: "11px", fontWeight: 700, color: colors.GREYSCALE_500, letterSpacing: "0.5px", margin: "0 0 6px 0", textTransform: "uppercase" }}>
+                          APPOINTMENT:
+                        </Text>
+                        <Text style={{ fontSize: "15px", fontWeight: 700, color: colors.DARK_TEXT, margin: "0 0 4px 0" }}>
+                          {formattedAppointmentTime}
+                        </Text>
+                        {formattedDuration && (
+                          <Text style={{ fontSize: "12px", color: colors.GREYSCALE_500, margin: 0 }}>
+                            {formattedDuration}
+                          </Text>
+                        )}
+                      </td>
+                    </tr>
+                  </table>
+
+                  {/* Bottom Notice */}
+                  <Text style={{ fontSize: "12px", color: colors.GREYSCALE_500, lineHeight: "150%", margin: 0 }}>
+                    Please ensure to save this invoice for your records. It contains important details regarding your transaction.
+                  </Text>
+                </>
+              );
+            })()}
+
+            {/* 6. GENERIC FALLBACK */}
+            {type === "GENERIC" && message && (
+              <>
+                <Text style={styles.greetingText}>
+                  Hi {displayName},
+                </Text>
+                <Text style={styles.bodyParagraph}>
+                  {message}
+                </Text>
+                {ctaUrl && (
+                  <Section style={styles.buttonSection}>
+                    <Button href={ctaUrl} style={styles.primaryButton}>
+                      {ctaText || "Continue"}
+                    </Button>
+                  </Section>
+                )}
+              </>
+            )}
+          </Section>
+
+          {/* Divider */}
+          <Hr style={styles.divider} />
+
+          {/* Reusable Footer: 24px vertical, 48px horizontal */}
+          <Footer
+            footerTitle={resolvedFooterTitle}
+            footerBody={resolvedFooterBody}
+          />
         </Container>
       </Body>
     </Html>
   );
 }
-
-export const EmailType = Object.freeze({
-  FORGOT_PASSWORD: "FORGOT_PASSWORD",
-  OTP_VERIFICATION: "OTP_VERIFICATION",
-  SALON_LIVE: "SALON_LIVE",
-  RESET_PASSWORD: "RESET_PASSWORD",
-  INVOICE: "INVOICE",
-  GENERIC: "GENERIC",
-});
-
-export const buildEmailHtml = (props) => {
-  return renderToStaticMarkup(<EmailTemplate {...props} />);
-};
 
 export default EmailTemplate;

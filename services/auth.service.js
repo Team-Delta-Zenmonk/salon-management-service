@@ -145,6 +145,7 @@ exports.forgotPassword = async (payload) => {
     resetLink: resetUrl,
     expiryMinutes: 15,
     salonName: salon.name || "SALON",
+    email,
   });
 
   await mailService.sendMailToUser(

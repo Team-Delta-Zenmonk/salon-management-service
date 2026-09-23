@@ -1,0 +1,13 @@
+const EmailType = Object.freeze({
+  FORGOT_PASSWORD: "FORGOT_PASSWORD",
+  OTP_VERIFICATION: "OTP_VERIFICATION",
+  SALON_LIVE: "SALON_LIVE",
+  RESET_PASSWORD: "RESET_PASSWORD",
+  INVOICE: "INVOICE",
+  GENERIC: "GENERIC",
+});
+
+module.exports = {
+  EmailType,
+};
+

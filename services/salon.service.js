@@ -91,18 +91,20 @@ exports.updateSalon = async (payload) => {
         const storefrontUrl = `https://${salonSlug}.${baseDomain}`;
         setImmediate(async () => {
           try {
+            const platformName = process.env.BRAND_NAME || "Vellora";
             const liveHtml = buildSalonLiveEmailHtml({
               ownerName: currentSalon.name || "Salon Partner",
               salonName: currentSalon.name || "Your Salon",
               salonUrl: storefrontUrl,
-              dashboardUrl: `${process.env.FRONTEND_URL || "https://salon.com"}/owner/dashboard`,
-              platformName: "ZenMonk Salon",
+              dashboardUrl: `${process.env.MANAGEMENT_APP_URL || "https://salon.com"}/owner/dashboard`,
+              platformName,
+              email: salonEmail,
             });
 
             await mailService.sendMailToUser(
               salonEmail,
-              "Welcome to ZenMonk — Your Salon is Live!",
-              `Congratulations!\n\nYour salon storefront is now live and ready to accept bookings at:\n${storefrontUrl}\n\nYour 14-day free trial has been activated.\nShare your link with your clients or on your social media profiles!\n\nBest,\nThe ZenMonk Team`,
+              `Welcome to ${platformName} — Your Salon is Live!`,
+              `Congratulations!\n\nYour salon storefront is now live and ready to accept bookings at:\n${storefrontUrl}\n\nYour 14-day free trial has been activated.\nShare your link with your clients or on your social media profiles!\n\nBest,\nThe ${platformName} Team`,
               liveHtml
             );
           } catch (mailErr) {

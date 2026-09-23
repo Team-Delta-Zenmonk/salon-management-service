@@ -8,6 +8,7 @@ if (!global.port) {
   process.exit(128);
 }
 
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const { errorMiddleware } = require("./middlewares");
@@ -66,6 +67,9 @@ app.use(
 );
 
 app.use("/stripe", stripeRouter);
+
+app.use("/public", express.static(path.join(__dirname, "public")));
+app.use("/static", express.static(path.join(__dirname, "templates/static")));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -1,18 +1,27 @@
 require("../libs/jsx-loader");
-const { buildEmailHtml, EmailTemplate, EmailType } = require("./email.jsx");
+const EmailTemplate =
+  require("./email.jsx").default || require("./email.jsx").EmailTemplate;
+const { EmailType } = require("./email.types");
+const {
+  buildEmailHtml,
+  buildForgotPasswordEmailHtml,
+  buildOtpVerificationEmailHtml,
+  buildSalonLiveEmailHtml,
+  buildResetPasswordEmailHtml,
+  buildInvoiceEmailHtml,
+} = require("./email.builder.jsx");
+const { Header } = require("./header.jsx");
+const { Footer } = require("./footer.jsx");
 
 module.exports = {
+  Header,
+  Footer,
   EmailType,
   EmailTemplate,
   buildEmailHtml,
-  buildForgotPasswordEmailHtml: (props) =>
-    buildEmailHtml({ ...props, type: EmailType.FORGOT_PASSWORD }),
-  buildOtpVerificationEmailHtml: (props) =>
-    buildEmailHtml({ ...props, type: EmailType.OTP_VERIFICATION }),
-  buildSalonLiveEmailHtml: (props) =>
-    buildEmailHtml({ ...props, type: EmailType.SALON_LIVE }),
-  buildResetPasswordEmailHtml: (props) =>
-    buildEmailHtml({ ...props, type: EmailType.RESET_PASSWORD }),
-  buildInvoiceEmailHtml: (props) =>
-    buildEmailHtml({ ...props, type: EmailType.INVOICE }),
+  buildForgotPasswordEmailHtml,
+  buildOtpVerificationEmailHtml,
+  buildSalonLiveEmailHtml,
+  buildResetPasswordEmailHtml,
+  buildInvoiceEmailHtml,
 };
