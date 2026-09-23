@@ -22,4 +22,5 @@ module.exports = {
   adminController: require("./admin.controller"),
   storefrontController: require("./storefront.controller"),
   notificationController: require("./notification.controller"),
+  publicController: require("./public.controller"),
 };

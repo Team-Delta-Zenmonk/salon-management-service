@@ -26,6 +26,7 @@ router.use("/bookings", require("./booking.router"));
 router.use("/payments", require("./payment.router"));
 router.use("/admin", require("./admin.router"));
 router.use("/storefront", require("./storefront.router"));
+router.use("/public", require("./public.router"));
 router.use("/invoices", require("./invoice.router"));
 router.use("/notifications", require("./notification.router"));
 

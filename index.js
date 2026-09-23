@@ -70,6 +70,7 @@ app.use("/stripe", stripeRouter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.use("/api", require("./routes"));
 app.use("/", require("./routes"));
 
 app.use((req, res, next) => {
