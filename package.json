@@ -57,6 +57,7 @@
   "devDependencies": {
     "@faker-js/faker": "^10.2.0",
     "@react-email/ui": "6.9.5",
+    "@vercel/nft": "^1.11.0",
     "nodemon": "^3.1.11",
     "react-email": "6.9.5",
     "sequelize-cli": "^6.6.3"
