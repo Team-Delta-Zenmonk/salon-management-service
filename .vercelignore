@@ -1,7 +1,6 @@
 node_modules
 migrations
 seeders
-templates
 .git
 *.log
 *.md
