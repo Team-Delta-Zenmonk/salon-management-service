@@ -81,7 +81,7 @@ export function EmailTemplate(props) {
   const salonDashboardUrl =
     dashboardUrl ||
     ctaUrl ||
-    `${process.env.FRONTEND_URL || "https://vellora.com"}/owner/dashboard`;
+    `${process.env.MANAGEMENT_APP_URL}/dashboard`;
 
   const isInvoice = type === "INVOICE";
   const isOtp = type === "OTP_VERIFICATION";

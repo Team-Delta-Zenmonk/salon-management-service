@@ -138,7 +138,7 @@ exports.forgotPassword = async (payload) => {
     criteria: { email },
   });
 
-  const resetUrl = `${process.env.FRONTEND_URL || "https://salon.com"}/reset-password/${token}`;
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
   const html = buildForgotPasswordEmailHtml({
     userName: salon.name || "Valued Partner",
@@ -192,7 +192,7 @@ exports.resetPassword = async (payload) => {
   const html = buildResetPasswordEmailHtml({
     userName: salon.name || "Valued Partner",
     changedAt,
-    loginUrl: `${process.env.FRONTEND_URL || "https://salon.com"}/login`,
+    loginUrl: `${process.env.FRONTEND_URL}/login`,
     salonName: salon.name || "SALON",
   });
 

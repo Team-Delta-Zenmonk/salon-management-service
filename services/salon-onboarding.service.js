@@ -101,7 +101,7 @@ exports.verifyOnboarding = async (payload) => {
     const liveHtml = buildSalonLiveEmailHtml({
       ownerName: record.name || "Salon Owner",
       salonName: record.name || "Your Salon",
-      dashboardUrl: `${process.env.FRONTEND_URL || "https://salon.com"}/owner/dashboard`,
+      dashboardUrl: `${process.env.FRONTEND_URL}/owner/dashboard`,
       email,
     });
 

@@ -96,7 +96,7 @@ exports.updateSalon = async (payload) => {
               ownerName: currentSalon.name || "Salon Partner",
               salonName: currentSalon.name || "Your Salon",
               salonUrl: storefrontUrl,
-              dashboardUrl: `${process.env.MANAGEMENT_APP_URL || "https://salon.com"}/owner/dashboard`,
+              dashboardUrl: `${process.env.MANAGEMENT_APP_URL}/dashboard`,
               platformName,
               email: salonEmail,
             });
