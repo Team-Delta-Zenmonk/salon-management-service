@@ -6,6 +6,8 @@ const redisConnection = {
   tls: process.env.REDIS_TLS === "true" ? {} : undefined,
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  socket_keepalive: true,
+  socket_initial_delay: 60_000,
 };
 
 module.exports = { redisConnection };
