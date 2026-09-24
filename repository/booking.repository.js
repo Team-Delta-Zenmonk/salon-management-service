@@ -226,7 +226,7 @@ class BookingRepository extends BaseRepository {
       },
       {
         association: "customer",
-        attributes: ["id", "name", "email"],
+        attributes: ["id", "name", "email", "phone_number"],
       },
       {
         association: "salon",

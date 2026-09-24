@@ -1,6 +1,6 @@
 import React from "react";
 import { Section, Text } from "@react-email/components";
-import styles from "./email.styles";
+import styles from "../email.styles";
 
 export function Footer({ footerTitle, footerBody }) {
   return (

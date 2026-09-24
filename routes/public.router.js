@@ -3,8 +3,8 @@ const { publicController } = require("../controllers");
 const { rateLimitMiddleware } = require("../middlewares");
 
 const leadLimiter = rateLimitMiddleware.rateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 lead submissions per 15 mins
+  windowMs: process.env.MAX_WINDOW_MS,
+  max: process.env.MAX_RATE_LIMIT,
   message: "Too many lead submissions from this IP. Please try again after 15 minutes.",
 });
 

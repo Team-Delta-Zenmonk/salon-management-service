@@ -5,6 +5,7 @@ const EmailType = Object.freeze({
   RESET_PASSWORD: "RESET_PASSWORD",
   INVOICE: "INVOICE",
   GENERIC: "GENERIC",
+  LEAD: "LEAD",
 });
 
 module.exports = {

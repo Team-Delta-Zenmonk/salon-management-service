@@ -11,7 +11,7 @@ const derivePaymentStatus = (paid, total) => {
 
 const generateInvoiceNumber = (bookingId) => {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return `INV-${dateStr}-${String(bookingId).padStart(4, "0")}`;
+  return `INV-${bookingId}-${dateStr}`;
 };
 
 const resolveCustomerName = (booking) =>
@@ -19,6 +19,9 @@ const resolveCustomerName = (booking) =>
 
 const resolveCustomerEmail = (booking) =>
   booking.customer?.email || null;
+
+const resolveCustomerPhone = (booking) =>
+    booking.customer?.phone_number || booking.admin_booking?.phone || null;
 
 exports.generateAndSendInvoiceForBooking = async ({ bookingId }) => {
   const booking = await bookingRepository.findBookingWithDetails({ id: bookingId });
@@ -36,6 +39,7 @@ exports.generateAndSendInvoiceForBooking = async ({ bookingId }) => {
 
   const customerName = resolveCustomerName(booking);
   const customerEmail = resolveCustomerEmail(booking);
+  const customerPhone = resolveCustomerPhone(booking);
 
   let invoice = await invoiceRepository.findOne({ booking_id: booking.id });
   const invoiceNumber = invoice?.invoice_number || generateInvoiceNumber(booking.id);
@@ -44,7 +48,11 @@ exports.generateAndSendInvoiceForBooking = async ({ bookingId }) => {
     invoice: invoice || { invoice_number: invoiceNumber, grand_total: totalAmount, amount_paid: paidAmount, balance_due: balanceDue, currency: "INR", payment_status: paymentStatus, payment_method: paymentMethod },
     booking,
     salon: booking.salon,
-    customer: booking.customer || { name: customerName, email: customerEmail },
+    customer: {
+      name: customerName,
+      email: customerEmail,
+      phone: customerPhone,
+    },
     bookingServices: booking.booking_services,
   });
 

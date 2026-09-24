@@ -1,6 +1,6 @@
 import React from "react";
 import { Section, Text, Img } from "@react-email/components";
-import styles from "./email.styles";
+import styles from "../email.styles";
 
 export function Header({ title }) {
   const displayBrand = process.env.BRAND_NAME || "Vellora";

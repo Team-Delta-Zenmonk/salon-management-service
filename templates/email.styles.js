@@ -4,7 +4,7 @@ const {
   fontSizes,
   fontWeights,
   lineHeights,
-} = require("./email.tokens");
+} = require("./theme");
 
 const styles = {
   // Page Body & Container
@@ -240,6 +240,33 @@ const styles = {
     fontWeight: fontWeights.BOLD,
     backgroundColor: colors.UNPAID_BG,
     color: colors.UNPAID_TEXT,
+  },
+
+  // Lead Submission Styles
+  leadCard: {
+    border: `1px solid ${colors.BORDER}`,
+    borderRadius: "8px",
+    overflow: "hidden",
+    marginBottom: "24px",
+    backgroundColor: colors.WHITE,
+  },
+  leadTable: {
+    width: "100%",
+    borderCollapse: "collapse",
+  },
+  leadLabelCell: {
+    padding: "12px 16px",
+    fontSize: fontSizes.SM,
+    fontWeight: fontWeights.SEMIBOLD,
+    color: colors.DARK_TEXT,
+    width: "35%",
+    verticalAlign: "top",
+  },
+  leadValueCell: {
+    padding: "12px 16px",
+    fontSize: fontSizes.SM,
+    color: colors.BODY_TEXT,
+    verticalAlign: "top",
   },
 
   // Divider

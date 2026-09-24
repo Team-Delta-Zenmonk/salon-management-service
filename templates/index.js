@@ -9,9 +9,10 @@ const {
   buildSalonLiveEmailHtml,
   buildResetPasswordEmailHtml,
   buildInvoiceEmailHtml,
+  buildLeadEmailHtml,
 } = require("./email.builder.jsx");
-const { Header } = require("./header.jsx");
-const { Footer } = require("./footer.jsx");
+const { Header, Footer } = require("./components");
+
 
 module.exports = {
   Header,
@@ -24,4 +25,5 @@ module.exports = {
   buildSalonLiveEmailHtml,
   buildResetPasswordEmailHtml,
   buildInvoiceEmailHtml,
+  buildLeadEmailHtml,
 };

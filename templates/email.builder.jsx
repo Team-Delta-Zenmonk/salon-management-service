@@ -22,5 +22,8 @@ export const buildResetPasswordEmailHtml = (props) =>
 export const buildInvoiceEmailHtml = (props) =>
   buildEmailHtml({ ...props, type: EmailType.INVOICE });
 
+export const buildLeadEmailHtml = (props) =>
+  buildEmailHtml({ ...props, type: EmailType.LEAD });
+
 export default buildEmailHtml;
 
