@@ -12,7 +12,7 @@ exports.submitLead = async (payload) => {
 
   let recipientEmails = [];
   try {
-       const admins = await adminUserRepository.find({ is_active: true });
+    const admins = await adminUserRepository.findAll({ criteria: { is_active: true } });
     if (admins && admins.length > 0) {
       recipientEmails = admins.map((admin) => admin.email).filter(Boolean);
     }
