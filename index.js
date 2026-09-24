@@ -69,7 +69,8 @@ app.use(
 app.use("/stripe", stripeRouter);
 
 app.use("/public", express.static(path.join(__dirname, "public")));
-app.use("/static", express.static(path.join(__dirname, "templates/static")));
+app.use("/static", express.static(path.join(__dirname, "public/assets")));
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

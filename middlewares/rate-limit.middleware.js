@@ -21,11 +21,29 @@ try {
   redisClient = null;
 }
 
+function parseNumber(value, defaultValue) {
+  if (typeof value === "number" && !isNaN(value)) return value;
+  if (typeof value === "string") {
+    if (value.includes("*")) {
+      const parts = value.split("*").map((p) => Number(p.trim()));
+      if (parts.every((p) => !isNaN(p))) {
+        return parts.reduce((acc, curr) => acc * curr, 1);
+      }
+    }
+    const num = Number(value.trim());
+    if (!isNaN(num) && num > 0) return num;
+  }
+  return defaultValue;
+}
+
 exports.rateLimiter = ({
   windowMs = 15 * 60 * 1000,
   max = 5,
   message = "Too many requests from this IP, please try again later.",
 } = {}) => {
+  const numericWindowMs = parseNumber(windowMs, 15 * 60 * 1000);
+  const numericMax = parseNumber(max, 5);
+
   const store =
     redisClient && redisClient.status === "ready"
       ? new RedisStore({
@@ -37,6 +55,8 @@ exports.rateLimiter = ({
   return rateLimit({
     windowMs,
     max,
+    windowMs: numericWindowMs,
+    max: numericMax,
     standardHeaders: true, // Return standard RateLimit-* headers
     legacyHeaders: false, // Disable X-RateLimit-* headers
     store,

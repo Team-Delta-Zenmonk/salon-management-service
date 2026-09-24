@@ -5,7 +5,7 @@ import styles from "../email.styles";
 export function Header({ title }) {
   const displayBrand = process.env.BRAND_NAME || "Vellora";
   const baseUrl = process.env.BACKEND_URL || "";
-  const displayLogo = `${baseUrl}/static/logo.png`;
+  const displayLogo =`${baseUrl}/static/logo.png`;
 
   return (
     <>
