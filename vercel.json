@@ -10,7 +10,17 @@
           "public/**",
           "node_modules/react/**",
           "node_modules/react-dom/**",
-          "node_modules/@react-email/**"
+          "node_modules/@react-email/html/**",
+          "node_modules/@react-email/head/**",
+          "node_modules/@react-email/preview/**",
+          "node_modules/@react-email/body/**",
+          "node_modules/@react-email/container/**",
+          "node_modules/@react-email/section/**",
+          "node_modules/@react-email/text/**",
+          "node_modules/@react-email/hr/**",
+          "node_modules/@react-email/button/**",
+          "node_modules/@react-email/link/**",
+          "node_modules/@react-email/img/**"
         ]
       }
     }

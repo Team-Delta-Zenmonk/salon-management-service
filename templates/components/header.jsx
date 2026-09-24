@@ -1,5 +1,7 @@
 import React from "react";
-import { Section, Text, Img } from "@react-email/components";
+import { Section } from "@react-email/section";
+import { Text } from "@react-email/text";
+import { Img } from "@react-email/img";
 import styles from "../email.styles";
 
 export function Header({ title }) {

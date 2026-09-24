@@ -1,24 +1,18 @@
 import React from "react";
-import {
-  Html,
-  Head,
-  Preview,
-  Body,
-  Container,
-  Section,
-  Text,
-  Hr,
-  Button,
-  Link,
-} from "@react-email/components";
+import { Html } from "@react-email/html";
+import { Head } from "@react-email/head";
+import { Preview } from "@react-email/preview";
+import { Body } from "@react-email/body";
+import { Container } from "@react-email/container";
+import { Section } from "@react-email/section";
+import { Text } from "@react-email/text";
+import { Hr } from "@react-email/hr";
+import { Button } from "@react-email/button";
+import { Link } from "@react-email/link";
 import { colors } from "./theme";
 import styles from "./email.styles";
 import { Header } from "./components/header";
 import { Footer } from "./components/footer";
-
-
-
-
 
 export function EmailTemplate(props) {
   const {
