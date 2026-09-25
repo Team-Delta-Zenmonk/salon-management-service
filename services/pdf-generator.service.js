@@ -515,9 +515,9 @@ exports.generateInvoicePDF = async ({ invoice = {}, booking = {}, salon = {}, cu
   });
 
   // Register system fonts directly
-  if (fs.existsSync(FONT_SERIF_PATH)) doc.registerFont("Lora", FONT_SERIF_PATH);
-  if (fs.existsSync(FONT_REGULAR_PATH)) doc.registerFont("Inter", FONT_REGULAR_PATH);
-  if (fs.existsSync(FONT_BOLD_PATH)) doc.registerFont("Inter-Bold", FONT_BOLD_PATH);
+  if (FONT_SERIF_PATH && fs.existsSync(FONT_SERIF_PATH)) doc.registerFont("Lora", FONT_SERIF_PATH);
+  if (FONT_REGULAR_PATH && fs.existsSync(FONT_REGULAR_PATH)) doc.registerFont("Inter", FONT_REGULAR_PATH);
+  if (FONT_BOLD_PATH && fs.existsSync(FONT_BOLD_PATH)) doc.registerFont("Inter-Bold", FONT_BOLD_PATH);
 
   const bufferPromise = collectPdfBuffer(doc);
 

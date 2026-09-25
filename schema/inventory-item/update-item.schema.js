@@ -10,9 +10,9 @@ exports.updateInventoryItemSchema = z.object({
     logo: z.string().nullable().optional(),
     variant_name: z.string().nullable().optional(),
     unit: z.string().nullable().optional(),
-    unit_price: z.number().positive().nullable().optional(),
+    unit_price: z.number().positive().max(100000, { message: "Unit price cannot exceed 100,000" }).nullable().optional(),
     current_stock: z.number().min(0).optional(),
-    min_stock_level: z.number().min(0).optional(),
+    min_stock_level: z.number().min(0).max(10000, { message: "Minimum stock level cannot exceed 10,000" }).optional(),
   }),
   params: z.object({
     uuid: z.string().uuid(),
