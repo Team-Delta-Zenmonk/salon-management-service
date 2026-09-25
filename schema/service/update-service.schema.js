@@ -1,8 +1,8 @@
 const { z } = require("zod");
-const { createServiceSchema } = require("./create-service.schema");
+const { serviceBodySchema, validateServiceDiscount } = require("./create-service.schema");
 
 exports.updateServiceSchema = z.object({
-  body: createServiceSchema.shape.body.partial(),
+  body: serviceBodySchema.partial().superRefine(validateServiceDiscount),
   params: z.object({
     uuid: z.string().min(1, "Service uuid is required"),
   }),
