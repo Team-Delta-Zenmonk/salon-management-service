@@ -22,9 +22,9 @@ const FONT_SERIF_PATH = resolveFontPath(
 
 // Font aliases — registered directly, fallback only if system font missing
 const FONTS = {
-  lora: fs.existsSync(FONT_SERIF_PATH) ? "Lora" : "Times-Roman",
-  regular: fs.existsSync(FONT_REGULAR_PATH) ? "Inter" : "Helvetica",
-  bold: fs.existsSync(FONT_BOLD_PATH) ? "Inter-Bold" : "Helvetica-Bold",
+  lora: FONT_SERIF_PATH && fs.existsSync(FONT_SERIF_PATH) ? "Lora" : "Times-Roman",
+  regular: FONT_REGULAR_PATH && fs.existsSync(FONT_REGULAR_PATH) ? "Inter" : "Helvetica",
+  bold: FONT_BOLD_PATH && fs.existsSync(FONT_BOLD_PATH) ? "Inter-Bold" : "Helvetica-Bold",
 };
 
 // Colors matching Figma CSS specifications

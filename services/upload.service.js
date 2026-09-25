@@ -124,11 +124,11 @@ exports.uploadPdfBuffer = async ({ pdfBuffer, filename, folder = "invoices" }) =
     : folder;
 
   const dataUri = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+  const cleanFilename = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
   const result = await cloudinary.uploader.upload(dataUri, {
     folder: folderPath,
-    public_id: filename.replace(/\.pdf$/i, ""),
+    public_id: cleanFilename,
     resource_type: "raw",
-    format: "pdf",
     upload_preset: process.env.CLOUDINARY_DOC_PRESET || "doc_preset",
   });
 
