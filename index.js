@@ -1,23 +1,23 @@
 require("dotenv").config();
 global.argv = process.argv.slice(2);
 global.port = global.argv[0] || process.env.APP_PORT || 8080;
+const http = require("http");
+const path = require("path");
+const express = require("express");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const stripeRouter = require("./routes/stripe.router");
+const { errorMiddleware } = require("./middlewares");
+const { checkConnection } = require("./config/").dbConnection;
+const { initPresets } = require("./config");
+const socketManager = require("./libs/socket.manager");
+
+const app = express();
 
 if (!global.port) {
   console.log("port is not defined. argv = ", global.argv);
   process.exit(128);
 }
-
-const path = require("path");
-const express = require("express");
-const cors = require("cors");
-const { errorMiddleware } = require("./middlewares");
-const { checkConnection } = require("./config/").dbConnection;
-const cookieParser = require("cookie-parser");
-const { initPresets } = require("./config");
-const socketManager = require("./libs/socket.manager");
-
-const app = express();
 
 app.use(cookieParser());
 
@@ -96,11 +96,12 @@ if (process.env.NODE_ENV !== "test") {
   checkConnection()
     .then(async () => {
       await initPresets();
-      const server = app.listen(global.port, () => {
+      const server = http.createServer(app);
+      socketManager.init(server);
+      server.listen(global.port, () => {
         const NODE_ENV = process.env.NODE_ENV;
         console.log(`${NODE_ENV} Server is listening on port ${global.port}`);
       });
-      socketManager.init(server);
       require("./jobs");
     })
     .catch((err) => {
