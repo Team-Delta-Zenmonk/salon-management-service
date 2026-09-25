@@ -66,7 +66,7 @@ exports.generateAndSendInvoiceForBooking = async ({ bookingId }) => {
       });
       console.log(`[InvoiceService] Uploaded PDF to Cloudinary for Booking #${booking.id}: ${invoiceUrl}`);
     } catch (uploadErr) {
-      console.warn(`[InvoiceService] Could not upload PDF to Cloudinary:`, uploadErr.message);
+      console.warn(`[InvoiceService] Could not upload PDF to Cloudinary:`, uploadErr?.message || uploadErr);
       invoiceUrl = invoice?.invoice_url || null;
     }
   }

@@ -6,6 +6,8 @@ ENV PROJECT_DIR=/app
 # Set the working directory
 WORKDIR $PROJECT_DIR
 
+RUN apk add --no-cache font-dejavu
+
 # Copy package.json and package-lock.json
 COPY ./package*.json ./
 

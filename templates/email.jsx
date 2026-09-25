@@ -165,10 +165,7 @@ export function EmailTemplate(props) {
     }
   }
 
-  const formattedOtp =
-    typeof otpCode === "string" && otpCode.length === 6
-      ? `${otpCode.slice(0, 3)} ${otpCode.slice(3)}`
-      : String(otpCode || "");
+  const shouldGiveSpace = typeof otpCode === "string" && otpCode.length === 6;
 
   return (
     <Html lang="en" dir="ltr">
@@ -205,9 +202,20 @@ export function EmailTemplate(props) {
 
                 {/* Light Peach OTP Box */}
                 <Section style={styles.otpCard}>
-                  <Text style={styles.otpDigits}>
-                    {formattedOtp}
-                  </Text>
+                  {shouldGiveSpace ?
+                    <>
+                      <Text style={styles.otpDigits}>
+                        {otpCode.slice(0, 3)}
+                      </Text>{" "}
+                      <Text style={styles.otpDigits}>
+                        {otpCode.slice(3)}
+                      </Text>
+                    </>
+                    :
+                    <Text style={styles.otpDigits}>
+                      {otpCode}
+                    </Text>
+                  }
                   <Text style={styles.otpExpiry}>
                     This code expires in {expiryMinutes} minutes.
                   </Text>
@@ -259,7 +267,7 @@ export function EmailTemplate(props) {
                       </td>
                       <td style={styles.badgeTextCell}>
                         <span style={styles.successBadgeText}>
-                          Salon registration complete
+                          {brandName} registration complete
                         </span>
                       </td>
                     </tr>
@@ -364,7 +372,7 @@ export function EmailTemplate(props) {
                 )}
 
                 <Text style={styles.secondaryParagraph}>
-                  Sent automatically by Salon Management Platform Public Lead API.
+                  Sent automatically by {brandName} Management Platform Public Lead API.
                 </Text>
               </>
             )}

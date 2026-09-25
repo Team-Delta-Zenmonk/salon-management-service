@@ -119,15 +119,16 @@ exports.generatePresignedUrls = async (payload) => {
 };
 
 exports.uploadPdfBuffer = async ({ pdfBuffer, filename, folder = "invoices" }) => {
-  const base64Data = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
   const folderPath = process.env.CLOUDINARY_FOLDER
     ? `${process.env.CLOUDINARY_FOLDER}/${folder}`
     : folder;
 
-  const result = await cloudinary.uploader.upload(base64Data, {
+  const dataUri = `data:application/pdf;base64,${pdfBuffer.toString("base64")}`;
+  const result = await cloudinary.uploader.upload(dataUri, {
     folder: folderPath,
     public_id: filename.replace(/\.pdf$/i, ""),
-    resource_type: "auto",
+    resource_type: "raw",
+    format: "pdf",
     upload_preset: process.env.CLOUDINARY_DOC_PRESET || "doc_preset",
   });
 

@@ -1,10 +1,24 @@
 const fs = require("fs");
 const PDFDocument = require("pdfkit");
 
-// System font paths — DejaVuSans supports ₹ (rupee)
-const FONT_REGULAR_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-const FONT_BOLD_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
-const FONT_SERIF_PATH = "/usr/share/fonts/truetype/noto/NotoSerif-Regular.ttf";
+const resolveFontPath = (ubuntuPath, alpinePath) => {
+  if (fs.existsSync(ubuntuPath)) return ubuntuPath;
+  if (fs.existsSync(alpinePath)) return alpinePath;
+  return null;
+};
+
+const FONT_REGULAR_PATH = resolveFontPath(
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  "/usr/share/fonts/dejavu/DejaVuSans.ttf"
+);
+const FONT_BOLD_PATH = resolveFontPath(
+  "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+  "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf"
+);
+const FONT_SERIF_PATH = resolveFontPath(
+  "/usr/share/fonts/truetype/noto/NotoSerif-Regular.ttf",
+  null
+);
 
 // Font aliases — registered directly, fallback only if system font missing
 const FONTS = {

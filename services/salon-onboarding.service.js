@@ -66,7 +66,7 @@ exports.initOnboarding = async (payload) => {
 
     await mailService.sendMailToUser(
       email,
-      "Verify your salon account",
+      `Verify your ${process.env.BRAND_NAME || "salon"} account`,
       `Your OTP is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`,
       otpHtml
     );
@@ -107,7 +107,7 @@ exports.verifyOnboarding = async (payload) => {
 
     await mailService.sendMailToUser(
       email,
-      "Welcome to Salon — Your Account is Ready!",
+      `Welcome to ${process.env.BRAND_NAME} — Your Account is Ready!`,
       "Your account is ready. You can login now.",
       liveHtml
     );
