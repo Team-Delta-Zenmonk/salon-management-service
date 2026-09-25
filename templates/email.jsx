@@ -202,20 +202,16 @@ export function EmailTemplate(props) {
 
                 {/* Light Peach OTP Box */}
                 <Section style={styles.otpCard}>
-                  {shouldGiveSpace ?
-                    <>
-                      <Text style={styles.otpDigits}>
-                        {otpCode.slice(0, 3)}
-                      </Text>{" "}
-                      <Text style={styles.otpDigits}>
-                        {otpCode.slice(3)}
-                      </Text>
-                    </>
-                    :
-                    <Text style={styles.otpDigits}>
-                      {otpCode}
-                    </Text>
-                  }
+                  <Text style={styles.otpDigits}>
+                    {shouldGiveSpace ? (
+                      <>
+                        <span>{otpCode.slice(0, 3)}</span>
+                        <span style={{ paddingLeft: "16px" }}>{otpCode.slice(3)}</span>
+                      </>
+                    ) : (
+                      otpCode
+                    )}
+                  </Text>
                   <Text style={styles.otpExpiry}>
                     This code expires in {expiryMinutes} minutes.
                   </Text>

@@ -78,6 +78,12 @@ module.exports = {
           },
         }
       : {}),
+    pool: {
+      max: Number(process.env.DB_POOL_MAX) || 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
     seederStorage: "sequelize",
     logging: false,
     define: {
@@ -95,6 +101,12 @@ module.exports = {
     url: process.env.DATABASE_URL,
     dialectOptions: {
       ssl: sslConfig,
+    },
+    pool: {
+      max: Number(process.env.DB_POOL_MAX) || 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
     },
     seederStorage: "sequelize",
     logging: false,
