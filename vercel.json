@@ -20,7 +20,8 @@
           "node_modules/@react-email/hr/**",
           "node_modules/@react-email/button/**",
           "node_modules/@react-email/link/**",
-          "node_modules/@react-email/img/**"
+          "node_modules/@react-email/img/**",
+          "node_modules/pdfkit/**"
         ]
       }
     }

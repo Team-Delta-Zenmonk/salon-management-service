@@ -897,6 +897,8 @@ exports.upgradeSubscription = async (payload) => {
     criteria: { uuid },
   });
 
+  const updatedSalon = await salonRepository.findOne({ uuid }, [], {}, {});
+
   const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
   const amount = dbPlan ? Number(dbPlan.amount) : (plan === SubscriptionPlan.ENUM.YEARLY ? 24990 : 2499);
   const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
