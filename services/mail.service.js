@@ -13,7 +13,6 @@ exports.sendMailToUser = async (to, subject, text, html) => {
   };
 
   try {
-    await transporter.verify();
     await transporter.sendMail(mailOptions);
   } catch (error) {
     console.log("Error in sending mail", error);
