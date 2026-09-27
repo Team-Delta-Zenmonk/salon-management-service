@@ -32,6 +32,10 @@ exports.update = async (payload) => {
   });
   if (!staff) throw new error.NotFound("Staff not found");
 
+  if (body?.end_date === "" || body?.end_date === null) {
+    body.end_date = null;
+  }
+
   if (body?.active_hours) {
     const result = {};
     for (const [day, value] of Object.entries(body.active_hours)) {

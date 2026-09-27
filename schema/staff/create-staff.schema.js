@@ -35,7 +35,9 @@ exports.createStaffSchema = z.object({
     end_date: z
       .string()
       .regex(/^\d{2}-\d{2}-\d{4}$/, "End date must be in DD-MM-YYYY format")
-      .optional(),
+      .nullable()
+      .optional()
+      .or(z.literal("")),
     address: z.string(),
     emergency_contact: z.object({
       name: z.string().min(1),
