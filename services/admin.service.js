@@ -38,13 +38,13 @@ exports.loginAdmin = async (payload) => {
   const token = jwt.sign(
     { email: admin.email, uuid: admin.uuid, role: admin.role, type: "admin" },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" },
+    { expiresIn: "2d" },
   );
 
   const refreshToken = jwt.sign(
     { email: admin.email, uuid: admin.uuid, role: admin.role, type: "admin" },
     process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
-    { expiresIn: "7d" },
+    { expiresIn: "30d" },
   );
 
   return {
@@ -81,7 +81,7 @@ exports.refreshAdminToken = async (refreshToken) => {
     const token = jwt.sign(
       { email: admin.email, uuid: admin.uuid, role: admin.role, type: "admin" },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" },
+      { expiresIn: "2d" },
     );
     return { token };
   } catch (err) {

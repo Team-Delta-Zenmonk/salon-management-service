@@ -112,7 +112,7 @@ exports.verifyOnboarding = async (payload) => {
       liveHtml
     );
 
-    const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET);
+    const token = jwt.sign({ email: salon.email, uuid: salon.uuid }, process.env.JWT_SECRET, { expiresIn: "2d" });
     return { token, salon };
   });
 

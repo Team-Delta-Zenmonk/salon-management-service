@@ -12,11 +12,11 @@ exports.loginAdmin = async (req, res, next) => {
     const response = await adminService.loginAdmin({ body: req.body });
     res.cookie("admin_jwt", response.token, {
       ...COOKIE_OPTIONS,
-      maxAge: 15 * 60 * 1000,
+      maxAge: 2 * 24 * 60 * 60 * 1000,
     });
     res.cookie("admin_refresh_jwt", response.refreshToken, {
       ...COOKIE_OPTIONS,
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
     });
     return res.status(SUCCESS).json(response);
   } catch (error) {
@@ -31,7 +31,7 @@ exports.refreshAdmin = async (req, res, next) => {
     const response = await adminService.refreshAdminToken(refreshToken);
     res.cookie("admin_jwt", response.token, {
       ...COOKIE_OPTIONS,
-      maxAge: 15 * 60 * 1000,
+      maxAge: 2 * 24 * 60 * 60 * 1000,
     });
     return res.status(SUCCESS).json(response);
   } catch (error) {

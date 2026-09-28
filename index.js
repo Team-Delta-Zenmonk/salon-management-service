@@ -54,6 +54,7 @@ app.use(
     },
     methods: ["GET", "POST", "DELETE", "PUT", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "stripe-signature", "X-Requested-With", "Accept"],
+    exposedHeaders: ["x-refreshed-access-token"],
     credentials: true,
   }),
 );

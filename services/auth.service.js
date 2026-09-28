@@ -26,12 +26,12 @@ exports.loginSalon = async (payload) => {
   const accessToken = jwt.sign(
     { email: salon.email, uuid: salon.uuid, type: "salon" },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" }
+    { expiresIn: "2d" }
   );
   const refreshToken = jwt.sign(
     { email: salon.email, uuid: salon.uuid, type: "salon" },
     process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
-    { expiresIn: "7d" }
+    { expiresIn: "30d" }
   );
 
   return { token: accessToken, refreshToken, salon };
@@ -56,7 +56,7 @@ exports.refreshSalonToken = async (refreshToken) => {
     const accessToken = jwt.sign(
       { email: salon.email, uuid: salon.uuid, type: "salon" },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "2d" }
     );
     return { token: accessToken };
   } catch (err) {
@@ -83,12 +83,12 @@ exports.loginCustomer = async (payload) => {
   const jwtToken = jwt.sign(
     { email: customer.email, uuid: customer.uuid, role: "customer", type: "customer" },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" }
+    { expiresIn: "2d" }
   );
   const refreshToken = jwt.sign(
     { email: customer.email, uuid: customer.uuid, role: "customer", type: "customer" },
     process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET + "_refresh",
-    { expiresIn: "7d" }
+    { expiresIn: "30d" }
   );
 
   return { token: jwtToken, refreshToken, customer };
@@ -113,7 +113,7 @@ exports.refreshCustomerToken = async (refreshToken) => {
     const jwtToken = jwt.sign(
       { email: customer.email, uuid: customer.uuid, role: "customer", type: "customer" },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "2d" }
     );
     return { token: jwtToken };
   } catch (err) {
