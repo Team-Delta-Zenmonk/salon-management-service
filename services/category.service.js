@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const { error } = require("../libs");
 const { categoryRepository } = require("../repository");
+const { Service } = require("../models");
 
 exports.createCategory = async (payload) => {
   const { body, salon } = payload;
@@ -60,6 +61,14 @@ exports.deleteCategory = async (payload) => {
 
   const category = await categoryRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
   if (!category) throw new error.NotFound("Category not found");
+
+  const activeServicesCount = await Service.count({
+    where: { category_id: category.id, salon_id: salon.id },
+  });
+
+  if (activeServicesCount > 0) {
+    throw new error.BadRequest("Cannot delete category with active services. Please delete or reassign all services in this category first.");
+  }
 
   await categoryRepository.destroy({ criteria: { uuid: params.uuid } });
 

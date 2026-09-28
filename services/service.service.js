@@ -163,11 +163,25 @@ exports.deleteService = async (payload) => {
         throw new error.NotFound("Service not found");
     }
 
-    await serviceRepository.softDelete({
-        [Op.or]: [
-            { uuid: params.uuid },
-            { parent_id: service.id },
-        ],
+    const subServices = await serviceRepository.findAll({
+        criteria: { parent_id: service.id },
+        paranoid: false,
+    });
+    const targetIds = [service.id, ...subServices.map((s) => s.id)];
+
+    await staffServiceRepository.destroy({
+        criteria: { service_id: { [Op.in]: targetIds } },
+        options: { force: true },
+    });
+
+    await serviceRepository.destroy({
+        criteria: {
+            [Op.or]: [
+                { uuid: params.uuid },
+                { parent_id: service.id },
+            ],
+        },
+        options: { force: true },
     });
 
     return { message: 'Service deleted successfully' };
