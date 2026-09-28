@@ -1,0 +1,23 @@
+const FIELD_LIMITS = {
+  NAME: 255,
+  EMAIL: 100,
+  PHONE: 10,
+  TITLE: 100,
+  ADDRESS: 255,
+  CITY_STATE: 100,
+  PINCODE: 12,
+  ITEM_NAME: 250,
+  DESCRIPTION: 300,
+  CODE: 50,
+  PASSWORD: 50,
+  SLUG: 50,
+  URL: 500,
+  SKU: 50,
+  PRICE: 10,
+  DURATION: 5,
+  QUANTITY: 10,
+  STOCK: 10,
+  PERCENTAGE: 3,
+};
+
+module.exports = { FIELD_LIMITS };

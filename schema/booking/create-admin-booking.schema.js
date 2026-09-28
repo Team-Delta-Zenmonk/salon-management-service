@@ -1,11 +1,12 @@
 const { default: z } = require("zod");
 const { PaymentPolicy } = require("../../models/salon/salon-types");
+const { FIELD_LIMITS } = require("../../common/field-limits");
 
 exports.createAdminBookingSchema = z.object({
   body: z.object({
     admin_booking: z.object({
-      name: z.string(),
-      phone: z.string(),
+      name: z.string().max(FIELD_LIMITS.NAME, `Name cannot exceed ${FIELD_LIMITS.NAME} characters`),
+      phone: z.string().max(FIELD_LIMITS.PHONE, `Phone cannot exceed ${FIELD_LIMITS.PHONE} digits`),
     }),
     customer_id: z.number().optional().nullable(),
     booking_start_time: z.coerce.date().refine((val) => val.getTime() >= Date.now() - 60 * 1000, {

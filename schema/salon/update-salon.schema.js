@@ -1,5 +1,6 @@
 const { z } = require("zod");
 const { SalonType, PaymentPolicy, SubscriptionPlan } = require("../../models/salon/salon-types");
+const { FIELD_LIMITS } = require("../../common/field-limits");
 
 const businessDaySchema = z
   .object({
@@ -23,21 +24,21 @@ const photoSchema = z.object({
 
 exports.updateSalonSchema = z.object({
   body: z.object({
-    name: z.string().min(1, "Name is required").optional(),
-    email: z.email("Invalid email").min(1, "Email is required").optional(),
-    phone: z.string().optional(),
-    about: z.string().optional(),
+    name: z.string().min(1, "Name is required").max(FIELD_LIMITS.NAME, `Name cannot exceed ${FIELD_LIMITS.NAME} characters`).optional(),
+    email: z.email("Invalid email").min(1, "Email is required").max(FIELD_LIMITS.EMAIL, `Email cannot exceed ${FIELD_LIMITS.EMAIL} characters`).optional(),
+    phone: z.string().max(FIELD_LIMITS.PHONE, `Phone cannot exceed ${FIELD_LIMITS.PHONE} digits`).optional(),
+    about: z.string().max(FIELD_LIMITS.DESCRIPTION, `About cannot exceed ${FIELD_LIMITS.DESCRIPTION} characters`).optional(),
     latitude: z.string().optional(),
     longitude: z.string().optional(),
-    address: z.string().optional(),
-    owner_name: z.string().optional(),
+    address: z.string().max(FIELD_LIMITS.ADDRESS, `Address cannot exceed ${FIELD_LIMITS.ADDRESS} characters`).optional(),
+    owner_name: z.string().max(FIELD_LIMITS.NAME, `Owner name cannot exceed ${FIELD_LIMITS.NAME} characters`).optional(),
     type: z.enum(SalonType.getValues(), { message: "Invalid salon type" }).optional(),
-    map_link: z.string().optional(),
+    map_link: z.string().max(FIELD_LIMITS.URL, `Map link cannot exceed ${FIELD_LIMITS.URL} characters`).optional(),
     logo: z.string().optional(),
     slug: z
       .string()
       .min(3, "Slug must be at least 3 characters")
-      .max(50, "Slug cannot exceed 50 characters")
+      .max(FIELD_LIMITS.SLUG, `Slug cannot exceed ${FIELD_LIMITS.SLUG} characters`)
       .regex(
         /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
         "Slug must contain only lowercase letters, numbers, and hyphens"

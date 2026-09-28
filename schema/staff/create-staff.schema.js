@@ -1,4 +1,5 @@
 const { z } = require("zod");
+const { FIELD_LIMITS } = require("../../common/field-limits");
 
 const activeDaySchema = z
   .object({
@@ -24,13 +25,13 @@ const maxStaffDocs = Number(process.env.MAX_STAFF_DOCS_LIMIT) || 10;
 
 exports.createStaffSchema = z.object({
   body: z.object({
-    first_name: z.string().min(1, "First name is required"),
-    last_name: z.string().optional(),
-    email: z.email("Invalid email address"),
-    phone_number: z.string().min(8, "Phone number must be valid"),
-    additional_phone_number: z.string().min(8).optional(),
+    first_name: z.string().min(1, "First name is required").max(FIELD_LIMITS.NAME, `First name cannot exceed ${FIELD_LIMITS.NAME} characters`),
+    last_name: z.string().max(FIELD_LIMITS.NAME, `Last name cannot exceed ${FIELD_LIMITS.NAME} characters`).optional(),
+    email: z.email("Invalid email address").max(FIELD_LIMITS.EMAIL, `Email cannot exceed ${FIELD_LIMITS.EMAIL} characters`),
+    phone_number: z.string().min(8, "Phone number must be valid").max(FIELD_LIMITS.PHONE, `Phone number cannot exceed ${FIELD_LIMITS.PHONE} digits`),
+    additional_phone_number: z.string().min(8).max(FIELD_LIMITS.PHONE, `Phone number cannot exceed ${FIELD_LIMITS.PHONE} digits`).optional(),
     dob: z.string().regex(/^\d{2}-\d{2}-\d{4}$/, "DOB must be in DD-MM-YYYY format"),
-    title: z.string().min(1, "Title is required"),
+    title: z.string().min(1, "Title is required").max(FIELD_LIMITS.TITLE, `Title cannot exceed ${FIELD_LIMITS.TITLE} characters`),
     joining_date: z.string().regex(/^\d{2}-\d{2}-\d{4}$/, "Joining date must be in DD-MM-YYYY format"),
     end_date: z
       .string()
@@ -38,10 +39,10 @@ exports.createStaffSchema = z.object({
       .nullable()
       .optional()
       .or(z.literal("")),
-    address: z.string(),
+    address: z.string().max(FIELD_LIMITS.ADDRESS, `Address cannot exceed ${FIELD_LIMITS.ADDRESS} characters`),
     emergency_contact: z.object({
-      name: z.string().min(1),
-      phone: z.string().min(8),
+      name: z.string().min(1).max(FIELD_LIMITS.NAME, `Name cannot exceed ${FIELD_LIMITS.NAME} characters`),
+      phone: z.string().min(8).max(FIELD_LIMITS.PHONE, `Phone cannot exceed ${FIELD_LIMITS.PHONE} digits`),
       relation: z.string().optional(),
     }),
     photos: docSchema.nullable().optional(),

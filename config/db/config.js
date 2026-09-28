@@ -69,15 +69,15 @@ module.exports = {
     host: parsedDbUrl.host || process.env.DB_HOST,
     port: parsedDbUrl.port || process.env.DB_PORT || 5432,
     dialect: "postgres",
-    use_env_variable: process.env.DATABASE_URL ? "DATABASE_URL" : undefined,
-    url: process.env.DATABASE_URL,
-    ...(process.env.DATABASE_URL || process.env.DB_HOST
-      ? {
-          dialectOptions: {
-            ssl: sslConfig,
-          },
-        }
-      : {}),
+    // use_env_variable: process.env.DATABASE_URL ? "DATABASE_URL" : undefined,
+    // url: process.env.DATABASE_URL,
+    // ...(process.env.DATABASE_URL || process.env.DB_HOST
+    //   ? {
+    //       dialectOptions: {
+    //         ssl: sslConfig,
+    //       },
+    //     }
+    //   : {}),
     pool: {
       max: Number(process.env.DB_POOL_MAX) || 10,
       min: 0,

@@ -1,9 +1,10 @@
 const { z } = require("zod");
 const { ServiceGender, PriceType, DiscountType } = require("../../models/service/service-types");
+const { FIELD_LIMITS } = require("../../common/field-limits");
 
 const serviceBodySchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
+  name: z.string().min(1, "Name is required").max(FIELD_LIMITS.ITEM_NAME, `Name cannot exceed ${FIELD_LIMITS.ITEM_NAME} characters`),
+  description: z.string().max(FIELD_LIMITS.DESCRIPTION, `Description cannot exceed ${FIELD_LIMITS.DESCRIPTION} characters`).optional(),
   category_id: z.string().optional(),
   parent_id: z.string().optional(),
   is_active: z.boolean().optional(),
