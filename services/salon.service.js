@@ -567,12 +567,6 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
           };
         } else if (intent.status === "succeeded") {
           await exports.activateSubscriptionFromWebhook(intent);
-          return {
-            clientSecret: intent.client_secret,
-            paymentIntentId: intent.id,
-            amount: amountInRupees,
-            plan,
-          };
         } else {
           await subscriptionInvoiceRepository.update({
             payload: { status: SubscriptionInvoiceStatus.ENUM.FAILED },

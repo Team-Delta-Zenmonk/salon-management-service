@@ -658,6 +658,13 @@ exports.updateAdminBooking = async (payload) => {
       previousDate = new Date(booking.booking_date).getTime();
       previousStartTime = new Date(booking.booking_start_time).getTime();
 
+      if (status === BookingStatus.ENUM.COMPLETED) {
+        const startTimeToCheck = new Date(booking_start_time || booking.booking_start_time);
+        if (startTimeToCheck > new Date()) {
+          throw new error.BadRequest("Cannot mark a future booking as completed before its start time");
+        }
+      }
+
       let total_price = booking.total_price;
       let total_duration = booking.total_duration;
       let current_start_time = new Date(
