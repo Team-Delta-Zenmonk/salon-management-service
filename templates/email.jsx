@@ -368,7 +368,7 @@ export function EmailTemplate(props) {
                 )}
 
                 <Text style={styles.secondaryParagraph}>
-                  Sent automatically by {brandName} Management Platform Public Lead API.
+                  Sent automatically by {brandName} Management Platform.Do not reply to this email.
                 </Text>
               </>
             )}
