@@ -150,7 +150,7 @@ export function EmailTemplate(props) {
       resolvedFooterBody = `This confirmation was sent to ${recipientEmail} because you registered a salon on ${brandName}.`;
     } else if (isLead) {
       resolvedFooterTitle = `The ${brandName} Team`;
-      resolvedFooterBody = `Sent automatically by ${brandName} Public Lead API.`;
+      resolvedFooterBody = `Sent automatically by ${brandName}.Donot reply to this email.`;
     } else {
       resolvedFooterTitle = `The ${brandName} Team`;
       resolvedFooterBody = (
