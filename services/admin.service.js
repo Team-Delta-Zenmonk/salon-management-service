@@ -352,7 +352,6 @@ exports.getSubscriptionPlans = async () => {
       formatted_price,
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
-      badge: plan.badge,
       description: plan.description,
       is_active: plan.is_active,
     };
@@ -361,7 +360,7 @@ exports.getSubscriptionPlans = async () => {
 
 exports.updateSubscriptionPlan = async (payload) => {
   const { code } = payload.params;
-  const { amount, name, description, badge, billing_cycle } = payload.body;
+  const { amount, name, description, billing_cycle } = payload.body;
 
   const plan = await subscriptionPlanRepository.findOne({ code });
   if (!plan) {
@@ -377,7 +376,6 @@ exports.updateSubscriptionPlan = async (payload) => {
   }
   if (name !== undefined) updates.name = name;
   if (description !== undefined) updates.description = description;
-  if (badge !== undefined) updates.badge = badge;
   if (billing_cycle !== undefined) updates.billing_cycle = billing_cycle;
 
   await plan.update(updates);
@@ -399,7 +397,6 @@ exports.updateSubscriptionPlan = async (payload) => {
       formatted_price,
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
-      badge: plan.badge,
       description: plan.description,
       is_active: plan.is_active,
     },

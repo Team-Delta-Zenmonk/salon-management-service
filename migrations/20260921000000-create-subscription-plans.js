@@ -32,10 +32,6 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
-      badge: {
-        type: Sequelize.STRING,
-        allowNull: true,
-      },
       description: {
         type: Sequelize.TEXT,
         allowNull: true,
