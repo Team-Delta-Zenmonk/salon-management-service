@@ -623,7 +623,7 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
   );
 
   // 4. Save PENDING record in DB
-  const durationDays = plan === "yearly" ? 365 : 30;
+  const durationDays = dbPlan.duration_days ?? 30;
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + durationDays);
   const pendingInvoiceNumber = `INV-PENDING-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
@@ -691,7 +691,11 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
         return;
       }
 
-      const durationDays = plan === "yearly" ? 365 : 30;
+      const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
+      if (!dbPlan) {
+        throw new error.BadRequest("Plan not found");
+      }
+      const durationDays = dbPlan.duration_days;
       const now = new Date();
 
       const hasActiveUnexpiredPlan =
@@ -867,7 +871,11 @@ exports.upgradeSubscription = async (payload) => {
     throw new error.BadRequest("Salon not found");
   }
 
-  const durationDays = plan === SubscriptionPlan.ENUM.YEARLY ? 365 : 30;
+  const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
+  if (!dbPlan) {
+    throw new error.BadRequest("Plan not found");
+  }
+  const durationDays = dbPlan.duration_days;
   const now = new Date();
 
   const hasActiveUnexpiredPlan =
@@ -893,7 +901,6 @@ exports.upgradeSubscription = async (payload) => {
 
   const updatedSalon = await salonRepository.findOne({ uuid }, [], {}, {});
 
-  const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
   const amount = dbPlan ? Number(dbPlan.amount) : (plan === SubscriptionPlan.ENUM.YEARLY ? 24990 : 2499);
   const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
   const effectiveTxId =

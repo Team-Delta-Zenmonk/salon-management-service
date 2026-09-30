@@ -353,6 +353,7 @@ exports.getSubscriptionPlans = async () => {
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
       description: plan.description,
+      duration_days: plan.duration_days ?? 30,
       is_active: plan.is_active,
     };
   });
@@ -360,7 +361,7 @@ exports.getSubscriptionPlans = async () => {
 
 exports.updateSubscriptionPlan = async (payload) => {
   const { code } = payload.params;
-  const { amount, name, description, billing_cycle } = payload.body;
+  const { amount, name, description, billing_cycle, duration_days } = payload.body;
 
   const plan = await subscriptionPlanRepository.findOne({ code });
   if (!plan) {
@@ -372,11 +373,20 @@ exports.updateSubscriptionPlan = async (payload) => {
     if (isNaN(Number(amount)) || Number(amount) < 0) {
       throw new BadRequest("Amount must be a non-negative number");
     }
+    if (plan.code !== "trial" && Number(amount) <= 0) {
+      throw new BadRequest("Price amount 0 is only allowed for the free trial tier (code: trial)");
+    }
     updates.amount = Number(amount);
   }
   if (name !== undefined) updates.name = name;
   if (description !== undefined) updates.description = description;
   if (billing_cycle !== undefined) updates.billing_cycle = billing_cycle;
+  if (duration_days !== undefined) {
+    if (isNaN(Number(duration_days)) || Number(duration_days) <= 0) {
+      throw new BadRequest("Duration days must be a positive integer");
+    }
+    updates.duration_days = Number(duration_days);
+  }
 
   await plan.update(updates);
 
@@ -398,15 +408,84 @@ exports.updateSubscriptionPlan = async (payload) => {
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
       description: plan.description,
+      duration_days: plan.duration_days,
       is_active: plan.is_active,
     },
+  };
+};
+
+exports.createSubscriptionPlan = async (payload) => {
+  const { name, amount, duration_days, billing_cycle, description, badge, code: inputCode } = payload.body;
+
+  let code = inputCode
+    ? inputCode.toLowerCase().trim().replace(/[^a-z0-9_]/g, "_")
+    : name.toLowerCase().trim().replace(/[^a-z0-9\s_-]/g, "").replace(/[\s_-]+/g, "_");
+
+  const existingPlan = await subscriptionPlanRepository.findOne({ code });
+  if (existingPlan) {
+    code = `${code}_${Date.now().toString().slice(-4)}`;
+  }
+
+  const numAmount = Number(amount);
+  const numDuration = Number(duration_days);
+
+  const plan = await subscriptionPlanRepository.create({
+    code,
+    name: name.trim(),
+    amount: numAmount,
+    currency: "INR",
+    duration_days: numDuration,
+    billing_cycle: billing_cycle || `${numDuration} Days`,
+    description: description || "",
+    badge: badge || null,
+    is_active: true,
+  });
+
+  const formatted_price = numAmount === 0 ? "Free" : `₹${numAmount.toLocaleString("en-IN")}`;
+
+  return {
+    message: "Subscription plan created successfully",
+    plan: {
+      id: plan.code,
+      db_id: plan.id,
+      code: plan.code,
+      name: plan.name,
+      amount: numAmount,
+      formatted_price,
+      currency: plan.currency || "INR",
+      billing_cycle: plan.billing_cycle,
+      description: plan.description,
+      is_active: plan.is_active,
+    },
+  };
+};
+
+exports.deleteSubscriptionPlan = async (payload) => {
+  const { code } = payload.params;
+  const plan = await subscriptionPlanRepository.findOne({ code });
+  if (!plan) {
+    throw new NotFound(`Subscription plan '${code}' not found`);
+  }
+
+  await subscriptionPlanRepository.destroy({
+    criteria: { code },
+    options: { force: true },
+  });
+
+  return {
+    message: `Subscription plan '${code}' deleted successfully`,
+    code,
   };
 };
 
 exports.createSubscriptionInvoice = async (payload, options = {}) => {
   const { salon_id, plan, amount, discount_details } = payload.body;
 
-  const durationDays = plan === "yearly" ? 365 : 30;
+  const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
+  if (!dbPlan) {
+    throw new error.BadRequest("Plan not found");
+  }
+  const durationDays = dbPlan.duration_days;
   const now = new Date();
   const expiresAt = new Date(
     now.getTime() + durationDays * 24 * 60 * 60 * 1000,

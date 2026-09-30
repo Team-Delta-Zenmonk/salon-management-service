@@ -108,3 +108,28 @@ exports.updateSubscriptionPlan = async (req, res, next) => {
     return next(error);
   }
 };
+
+exports.createSubscriptionPlan = async (req, res, next) => {
+  try {
+    const response = await adminService.createSubscriptionPlan({
+      body: req.body,
+    });
+    return res.status(CREATED).json(response);
+  } catch (error) {
+    console.log("Error in controller createSubscriptionPlan", error);
+    return next(error);
+  }
+};
+
+exports.deleteSubscriptionPlan = async (req, res, next) => {
+  try {
+    const response = await adminService.deleteSubscriptionPlan({
+      params: req.params,
+    });
+    return res.status(SUCCESS).json(response);
+  } catch (error) {
+    console.log("Error in controller deleteSubscriptionPlan", error);
+    return next(error);
+  }
+};
+
