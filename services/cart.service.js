@@ -1,4 +1,5 @@
 const { error } = require("../libs");
+const { Op } = require("sequelize");
 const { staffServiceRepository } = require("../repository");
 const { DiscountType } = require("../models/service/service-types");
 const {
@@ -166,22 +167,43 @@ exports.updateItem = async (payload) => {
     if (body.duration === undefined) updateData.duration = service.duration;
   }
 
+  const targetServiceId = updateData.service_id || item.service_id;
+
   if (staff_id) {
     const staff = await staffRepository.findOne({ uuid: staff_id });
     if (!staff) throw new error.NotFound("Staff not found");
 
     assertStaffActive(staff, error);
 
-    const staffService = await staffServiceRepository.findOne({
+    let staffService = await staffServiceRepository.findOne({
       staff_id: staff.id,
-      service_id: item.service_id,
+      service_id: targetServiceId,
     });
+
+    if (!staffService) {
+      const itemService = await serviceRepository.findOne({ id: targetServiceId });
+      if (itemService && itemService.parent_id) {
+        staffService = await staffServiceRepository.findOne({
+          staff_id: staff.id,
+          service_id: itemService.parent_id,
+        });
+      } else if (itemService && !itemService.parent_id) {
+        const childServices = await serviceRepository.findAll({ criteria: { parent_id: itemService.id } });
+        const childIds = childServices.map((cs) => cs.id);
+        if (childIds.length > 0) {
+          staffService = await staffServiceRepository.findOne({
+            staff_id: staff.id,
+            service_id: { [Op.in]: childIds },
+          });
+        }
+      }
+    }
 
     if (!staffService) throw new error.NotFound("This staff is not assigned to this service");
 
     updateData.staff_id = staff.id;
     updateData.final_price = staffService.price ? parseFloat(staffService.price) : item.base_price;
-    updateData.duration = staffService.duration;
+    updateData.duration = staffService.duration || item.duration;
   }
   if (body.price !== undefined) updateData.price = body.price;
   if (body.duration !== undefined) updateData.duration = body.duration;
