@@ -8,6 +8,7 @@ const {
   serviceRepository,
   salonRepository,
   invoiceRepository,
+  cartItemRepository,
 } = require("../repository");
 const {
   acquireTransactionAdvisoryLock,
@@ -286,6 +287,15 @@ exports.createBooking = async (payload) => {
       await bookingServiceRepository.createBulk(bookingServicesPayload, {
         transaction,
       });
+
+      await cartItemRepository.softDelete(
+        { cart_id: cart.id },
+        { transaction }
+      );
+      await cartRepository.softDelete(
+        { id: cart.id },
+        { transaction }
+      );
 
       return {
         action: "BOOKING_CREATED",
