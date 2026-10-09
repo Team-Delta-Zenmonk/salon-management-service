@@ -70,6 +70,11 @@ exports.createCart = async (payload) => {
       const service = await serviceRepository.findOne({ uuid: itemData.service_id });
       if (!service) throw new error.NotFound(`Service with UUID ${itemData.service_id} not found`);
 
+      const childServices = await serviceRepository.findAll({ criteria: { parent_id: service.id } });
+      if (childServices && childServices.length > 0) {
+        throw new error.BadRequest(`Parent service '${service.name}' cannot be added directly. Please select a specific sub-service.`);
+      }
+
       let staff = null;
       if (itemData.staff_id) {
         staff = await staffRepository.findOne({ uuid: itemData.staff_id });
@@ -126,6 +131,11 @@ exports.addItem = async (payload) => {
 
   const service = await serviceRepository.findOne({ uuid: service_id });
   if (!service) throw new error.NotFound("Service not found");
+
+  const childServices = await serviceRepository.findAll({ criteria: { parent_id: service.id } });
+  if (childServices && childServices.length > 0) {
+    throw new error.BadRequest(`Parent service '${service.name}' cannot be added directly. Please select a specific sub-service.`);
+  }
 
   const basePrice = base_price ?? service.price;
 
