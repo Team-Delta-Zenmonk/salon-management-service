@@ -21,7 +21,7 @@ class SalonRepository extends BaseRepository {
       include: [
         {
           association: "staff",
-          attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos"],
+          attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos", "title", "active_hours"],
         },
         {
           association: "categories",
@@ -45,7 +45,7 @@ class SalonRepository extends BaseRepository {
       include: [
         {
           association: "staff",
-          attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos"],
+          attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos", "title", "active_hours"],
         },
         {
           association: "categories",

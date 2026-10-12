@@ -3,6 +3,8 @@ const { storefrontController, salonController } = require("../controllers");
 
 router.get("/:slug/profile", storefrontController.getStorefrontProfile);
 router.get("/:slug/services", storefrontController.getStorefrontServices);
+router.get("/:slug/services/:serviceUuid/staffs", storefrontController.getStorefrontServiceStaff);
+router.get("/:slug/services/:serviceUuid/staff", storefrontController.getStorefrontServiceStaff);
 router.get("/:slug/staff", storefrontController.getStorefrontStaff);
 router.get("/:slug/slots", salonController.getAvailableSlots);
 

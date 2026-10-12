@@ -26,6 +26,7 @@ const {
 } = require("../repository");
 const { Op } = require("sequelize");
 const { Category, sequelize } = require("../models");
+const { formatStaffListTiming } = require("../utils/staff-timing.util");
 
 exports.updateSalon = async (payload) => {
   const { uuid } = payload.salon;
@@ -446,8 +447,12 @@ exports.getSalon = async (payload) => {
   if (!salon) {
     throw new error.BadRequest("Salon not found");
   }
+  const rawSalon = typeof salon.toJSON === "function" ? salon.toJSON() : { ...salon };
+  if (Array.isArray(rawSalon.staff)) {
+    rawSalon.staff = formatStaffListTiming(rawSalon.staff);
+  }
 
-  return salon;
+  return rawSalon;
 };
 
 exports.checkSlugAvailability = async (payload) => {

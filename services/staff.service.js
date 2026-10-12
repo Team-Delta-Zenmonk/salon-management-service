@@ -2,8 +2,10 @@ const { error } = require("../libs");
 const { DayOfWeek } = require("../models/salon/salon-types");
 const { staffRepository, staffServiceRepository, salonRepository } = require("../repository");
 const { Op, fn, col, where: sequelizeWhere } = require("sequelize");
-
-const numberToDay = Object.fromEntries(Object.entries(DayOfWeek.ENUM).map(([day, num]) => [num, day]));
+const {
+  formatStaffTiming,
+  formatStaffListTiming,
+} = require("../utils/staff-timing.util");
 
 exports.create = async (payload) => {
   const { body, salon } = payload;
@@ -81,22 +83,11 @@ exports.list = async (payload) => {
     order: [["created_at", "DESC"]]
   });
 
-  const updatedStaffs = staffs.rows.map((staff) => {
-    if (staff?.active_hours) {
-      const result = {};
-      for (const [num, value] of Object.entries(staff.active_hours)) {
-        result[numberToDay[num]] = value;
-      }
-      staff.active_hours = result;
-    }
-    return staff;
-  });
-
   return {
     total: staffs.count,
     page,
     limit,
-    data: updatedStaffs,
+    data: formatStaffListTiming(staffs.rows),
   };
 };
 
@@ -111,14 +102,7 @@ exports.get = async (payload) => {
     uuid: params.uuid,
   });
 
-  if (staff?.active_hours) {
-    const result = {};
-    for (const [num, value] of Object.entries(staff.active_hours)) {
-      result[numberToDay[num]] = value;
-    }
-    staff.active_hours = result;
-  }
-  return staff;
+  return formatStaffTiming(staff);
 };
 
 exports.listServices = async (payload) => {

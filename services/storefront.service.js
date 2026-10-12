@@ -1,5 +1,11 @@
-const { salonRepository } = require("../repository");
+const {
+  salonRepository,
+  serviceRepository,
+  staffServiceRepository,
+} = require("../repository");
+const { Op } = require("sequelize");
 const { NotFound } = require("../libs/error");
+const { formatStaffListTiming, formatStaffTiming } = require("../utils/staff-timing.util");
 
 exports.getStorefrontProfile = async (payload) => {
   const { slug } = payload.params;
@@ -13,6 +19,8 @@ exports.getStorefrontProfile = async (payload) => {
   if (!salon) {
     throw new NotFound(`Salon '${slug}' not found or inactive`);
   }
+
+  const formattedStaff = formatStaffListTiming(salon.staff);
 
   return {
     salon: {
@@ -36,7 +44,7 @@ exports.getStorefrontProfile = async (payload) => {
         salon.subscription_status !== "suspended",
       categories: salon.categories,
       services: salon.services,
-      staff: salon.staff,
+      staff: formattedStaff,
       holidays: salon.holidays,
     },
   };
@@ -65,6 +73,53 @@ exports.getStorefrontStaff = async (payload) => {
   }
 
   return {
-    staff: salon.staff || [],
+    staff: formatStaffListTiming(salon.staff),
   };
+};
+
+exports.getStorefrontServiceStaff = async (payload) => {
+  const { slug, serviceUuid } = payload.params;
+
+  let salon = null;
+  if (slug) {
+    salon = await salonRepository.findBySlug(slug.toLowerCase().trim());
+    if (!salon) {
+      salon = await salonRepository.findOne({ uuid: slug });
+    }
+  }
+
+  if (!salon && payload.query?.salon_id) {
+    salon = await salonRepository.findOne({ uuid: payload.query.salon_id });
+  }
+
+  if (!salon) {
+    throw new NotFound(`Salon '${slug || payload.query?.salon_id}' not found or inactive`);
+  }
+
+  const service = await serviceRepository.findOne({
+    uuid: serviceUuid,
+    salon_id: salon.id,
+  });
+
+  if (!service) {
+    throw new NotFound("Service not found");
+  }
+
+  const serviceIds = [service.id];
+  if (service.parent_id) {
+    serviceIds.push(service.parent_id);
+  }
+
+  const staffServices = await staffServiceRepository.findAll({
+    criteria: { service_id: { [Op.in]: serviceIds } },
+    include: ["staff"],
+  });
+
+  return staffServices.map((row) => {
+    const raw = typeof row.toJSON === "function" ? row.toJSON() : { ...row };
+    if (raw.staff) {
+      raw.staff = formatStaffTiming(raw.staff);
+    }
+    return raw;
+  });
 };
