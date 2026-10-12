@@ -67,6 +67,20 @@ exports.updateSalon = async (payload) => {
   let isNewlyOnboarded = false;
   let currentSalon = null;
 
+  if (payload?.body?.theme_uuid) {
+    currentSalon = await salonRepository.findOne({ uuid }, [], {}, {});
+    if (!currentSalon) {
+      throw new error.BadRequest("Salon not found");
+    }
+    const themeService = require("./theme.service");
+    const targetTheme = await themeService.validateThemeOwnership(
+      currentSalon.id,
+      payload.body.theme_uuid
+    );
+    payload.body.storefront_theme_id = targetTheme.id;
+    delete payload.body.theme_uuid;
+  }
+
   if (payload?.body?.is_onboarded === true) {
     currentSalon = await salonRepository.findOne({ uuid }, [], {}, {});
     if (currentSalon && !currentSalon.is_onboarded) {

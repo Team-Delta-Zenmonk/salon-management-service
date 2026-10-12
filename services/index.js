@@ -23,4 +23,5 @@ module.exports = {
   invoiceService: require("./invoice.service"),
   notificationService: require("./notification.service"),
   publicService: require("./public.service"),
+  themeService: require("./theme.service"),
 };

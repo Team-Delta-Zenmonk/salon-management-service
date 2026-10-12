@@ -38,6 +38,15 @@ exports.getStorefrontProfile = async (payload) => {
       map_link: salon.map_link,
       allowed_payment_policies: salon.allowed_payment_policies,
       deposit_percentage: salon.deposit_percentage,
+      theme: salon.storefrontTheme
+        ? {
+            id: salon.storefrontTheme.id,
+            uuid: salon.storefrontTheme.uuid,
+            code: salon.storefrontTheme.code,
+            name: salon.storefrontTheme.name,
+            preview_image: salon.storefrontTheme.preview_image,
+          }
+        : null,
       is_accepting_bookings:
         salon.is_active !== false &&
         salon.subscription_status !== "expired" &&

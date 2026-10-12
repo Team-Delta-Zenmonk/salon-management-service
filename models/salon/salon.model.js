@@ -62,6 +62,14 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "salon_id",
         as: "notifications",
       });
+      this.hasMany(models.ThemeInvoice, {
+        foreignKey: "salon_id",
+        as: "themeInvoices",
+      });
+      this.belongsTo(models.StorefrontTheme, {
+        foreignKey: "storefront_theme_id",
+        as: "storefrontTheme",
+      });
     }
   }
   Salon.init(
@@ -164,6 +172,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: true,
         unique: true,
+      },
+      storefront_theme_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
       },
       is_active: {
         type: DataTypes.BOOLEAN,

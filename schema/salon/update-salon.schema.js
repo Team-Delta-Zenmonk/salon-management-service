@@ -44,6 +44,7 @@ exports.updateSalonSchema = z.object({
         "Slug must contain only lowercase letters, numbers, and hyphens"
       )
       .optional(),
+    theme_uuid: z.string().uuid("Valid theme UUID is required").optional(),
     is_onboarded: z.boolean().optional(),
     allowed_payment_policies: z.array(z.enum(PaymentPolicy.getValues()), { message: "Invalid allowed payment policies" }).min(1, "At least one payment policy must be enabled").optional(),
     deposit_percentage: z.number().min(1).max(100).nullable().optional(),

@@ -1,6 +1,6 @@
 const stripe = require("../config/stripe");
 const { BAD_REQUEST, INTERNAL_SERVER_ERROR } = require("../libs/constants");
-const { paymentService, salonService } = require("../services");
+const { paymentService, salonService, themeService } = require("../services");
 const { webhookEventRepository } = require("../repository");
 
 exports.webhook = async (req, res) => {
@@ -32,6 +32,8 @@ exports.webhook = async (req, res) => {
         const paymentIntent = event.data.object;
         if (paymentIntent.metadata?.type === "subscription") {
           await salonService.activateSubscriptionFromWebhook(paymentIntent);
+        } else if (paymentIntent.metadata?.type === "theme_purchase") {
+          await themeService.handleThemePaymentSucceeded(paymentIntent);
         } else {
           await paymentService.handlePaymentSucceeded(paymentIntent);
         }
@@ -42,6 +44,8 @@ exports.webhook = async (req, res) => {
         const paymentIntent = event.data.object;
         if (paymentIntent.metadata?.type === "subscription") {
           await salonService.handleSubscriptionPaymentFailed(paymentIntent);
+        } else if (paymentIntent.metadata?.type === "theme_purchase") {
+          await themeService.handleThemePaymentFailed(paymentIntent);
         } else {
           await paymentService.handlePaymentFailed(paymentIntent);
         }

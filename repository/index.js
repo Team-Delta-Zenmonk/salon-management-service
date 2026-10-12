@@ -22,4 +22,6 @@ module.exports = {
   invoiceRepository: require("./invoice.repository"),
   subscriptionPlanRepository: require("./subscription-plan.repository"),
   notificationRepository: require("./notification.repository"),
+  storefrontThemeRepository: require("./storefront-theme.repository"),
+  themeInvoiceRepository: require("./theme-invoice.repository"),
 };

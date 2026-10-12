@@ -19,6 +19,7 @@ router.use("/salons/inventory-items", salonOperationalGate, require("./inventory
 router.use("/salons/items-category", salonOperationalGate, require("./items-category.router"));
 router.use("/salons/inventory-transactions", salonOperationalGate, require("./inventory-transactions.router"));
 router.use("/salons/stripe", require("./stripe-connect.router"));
+router.use("/salons/themes", require("./theme.router"));
 router.use("/salons", require("./salon.router"));
 router.use("/cart", authMiddleware.authCustomerMiddleware, require("./cart.router"));
 router.use("/customers", require("./customer.router"));

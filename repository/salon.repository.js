@@ -32,6 +32,9 @@ class SalonRepository extends BaseRepository {
         {
           association: "holidays",
         },
+        {
+          association: "storefrontTheme",
+        },
       ],
     });
   }
@@ -55,6 +58,9 @@ class SalonRepository extends BaseRepository {
         },
         {
           association: "holidays",
+        },
+        {
+          association: "storefrontTheme",
         },
       ],
     });
