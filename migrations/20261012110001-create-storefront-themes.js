@@ -1,5 +1,7 @@
 "use strict";
 
+const crypto = require("crypto");
+
 module.exports = {
   async up(queryInterface, Sequelize) {
     await queryInterface.createTable("storefront_themes", {
@@ -68,6 +70,46 @@ module.exports = {
         name: "storefront_themes_code_unique",
       })
       .catch(() => {});
+
+    const now = new Date();
+    await queryInterface.bulkInsert("storefront_themes", [
+      {
+        uuid: crypto.randomUUID(),
+        code: "crimsonShear",
+        name: "Atelier Solstice (Warm Alabaster Luxury)",
+        price: 0,
+        currency: "INR",
+        preview_image: "/atelierSolstice.png",
+        is_free: true,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        uuid: crypto.randomUUID(),
+        code: "obsidianFlame",
+        name: "Obsidian Flame (Ultra Dark Gold)",
+        price: 1999,
+        currency: "INR",
+        preview_image: "/obsidianFlame.png",
+        is_free: false,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        uuid: crypto.randomUUID(),
+        code: "softRosePearl",
+        name: "Soft Rose Pearl (Luxury Light)",
+        price: 1499,
+        currency: "INR",
+        preview_image: "/softRosePearl.png",
+        is_free: false,
+        is_active: true,
+        created_at: now,
+        updated_at: now,
+      },
+    ]);
   },
 
   async down(queryInterface, Sequelize) {

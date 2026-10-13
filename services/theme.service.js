@@ -23,26 +23,6 @@ exports.getThemesForSalon = async (payload) => {
     order: [["id", "ASC"]],
   });
 
-  const pendingInvoices = await themeInvoiceRepository.findAll({
-    criteria: {
-      salon_id: currentSalon.id,
-      status: ThemeInvoiceStatus.ENUM.PENDING,
-    },
-  });
-
-  for (const inv of pendingInvoices || []) {
-    if (inv.stripe_payment_intent_id) {
-      try {
-        const intent = await stripe.paymentIntents.retrieve(
-          inv.stripe_payment_intent_id
-        );
-        if (intent.status === "succeeded") {
-          await exports.handleThemePaymentSucceeded(intent);
-        }
-      } catch (err) {}
-    }
-  }
-
   const paidInvoices = await themeInvoiceRepository.findAll({
     criteria: {
       salon_id: currentSalon.id,
