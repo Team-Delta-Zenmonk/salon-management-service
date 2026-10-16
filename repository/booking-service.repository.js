@@ -8,10 +8,35 @@ class BookingServiceRepository extends BaseRepository {
     super(payload);
   }
 
-  async getBookingsByStaff({ salon_id, start_date, days }) {
+  async getBookingsByStaff({ salon_id, start_date, days, exclude_booking_id }) {
     const start = new Date(start_date);
     const end = new Date(start_date);
     end.setDate(end.getDate() + Number(days));
+
+    const bookingWhere = {
+      salon_id,
+      booking_date: {
+        [Op.gte]: start,
+        [Op.lt]: end,
+      },
+      [Op.or]: [
+        {
+          status: {
+            [Op.in]: [BookingStatus.ENUM.CONFIRMED, BookingStatus.ENUM.COMPLETED],
+          },
+        },
+        {
+          status: BookingStatus.ENUM.PENDING,
+          expires_at: {
+            [Op.gt]: new Date(),
+          },
+        },
+      ],
+    };
+
+    if (exclude_booking_id) {
+      bookingWhere.id = { [Op.ne]: exclude_booking_id };
+    }
 
     const rows = await this.model.findAll({
       attributes: ["staff_id", "start_time", "end_time"],
@@ -21,26 +46,7 @@ class BookingServiceRepository extends BaseRepository {
           as: "booking",
           attributes: [],
           required: true,
-          where: {
-            salon_id,
-            booking_date: {
-              [Op.gte]: start,
-              [Op.lt]: end,
-            },
-            [Op.or]: [
-              {
-                status: {
-                  [Op.in]: [BookingStatus.ENUM.CONFIRMED, BookingStatus.ENUM.COMPLETED],
-                },
-              },
-              {
-                status: BookingStatus.ENUM.PENDING,
-                expires_at: {
-                  [Op.gt]: new Date(),
-                },
-              },
-            ],
-          },
+          where: bookingWhere,
         },
       ],
       where: {

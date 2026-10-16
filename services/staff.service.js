@@ -106,16 +106,32 @@ exports.get = async (payload) => {
 };
 
 exports.listServices = async (payload) => {
-  const { params, salon } = payload;
+  const { params, salon, query = {} } = payload;
 
   const staff = await staffRepository.findOne({
     uuid: params.uuid,
     salon_id: salon.id,
   });
-  const services = await staffServiceRepository.findAll({
+  if (!staff) throw new error.NotFound("Staff not found");
+
+  const page = Number(query.page) > 0 ? Number(query.page) : 1;
+  const limit = Number(query.limit) > 0 ? Number(query.limit) : 10;
+  const offset = query.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
+
+  const { count, rows } = await staffServiceRepository.findAndCountAll({
     criteria: { staff_id: staff.id },
+    include: ["service"],
+    limit,
+    offset,
+    order: [["created_at", "DESC"]],
   });
-  return services;
+
+  return {
+    total: count,
+    page,
+    limit,
+    data: rows,
+  };
 };
 
 exports.remove = async (payload) => {

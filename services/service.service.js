@@ -87,7 +87,8 @@ exports.listServices = async (payload) => {
 exports.listStaff = async (payload) => {
     const { params, query } = payload;
 
-    const salon = await salonRepository.findOne({ uuid: query.salon_id });
+    const salonUuid = query.salon_uuid || query.salon_id;
+    const salon = await salonRepository.findOne({ uuid: salonUuid });
     if (!salon) throw new error.NotFound("Salon not found");
 
     const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
@@ -98,11 +99,69 @@ exports.listStaff = async (payload) => {
         serviceIds.push(service.parent_id);
     }
 
-    const staffs = await staffServiceRepository.findAll({
-        criteria: { service_id: { [Op.in]: serviceIds } },
-        include: ["staff"]
+    const page = Number(query.page) > 0 ? Number(query.page) : 1;
+    const limit = Number(query.limit) > 0 ? Number(query.limit) : 10;
+    const offset = query.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
+
+    const serviceIdsList = serviceIds.join(",");
+    const countQuery = `
+        SELECT COUNT(DISTINCT staff_id) AS total
+        FROM staff_services
+        WHERE service_id IN (${serviceIdsList}) AND deleted_at IS NULL
+    `;
+    const [countResult] = await sequelize.query(countQuery);
+    const total = Number(countResult?.[0]?.total || 0);
+
+    const idsQuery = `
+        SELECT staff_id, MAX(created_at) AS latest_created_at
+        FROM staff_services
+        WHERE service_id IN (${serviceIdsList}) AND deleted_at IS NULL
+        GROUP BY staff_id
+        ORDER BY latest_created_at DESC
+        LIMIT :limit OFFSET :offset
+    `;
+    const [paginatedRows] = await sequelize.query(idsQuery, {
+        replacements: { limit, offset }
     });
-    return staffs;
+
+    const paginatedStaffIds = paginatedRows.map((r) => r.staff_id);
+
+    if (paginatedStaffIds.length === 0) {
+        return {
+            total,
+            page,
+            limit,
+            data: [],
+        };
+    }
+
+    const rows = await staffServiceRepository.findAll({
+        criteria: {
+            service_id: { [Op.in]: serviceIds },
+            staff_id: { [Op.in]: paginatedStaffIds }
+        },
+        include: ["staff"],
+        order: [["created_at", "DESC"]],
+    });
+
+    const uniqueMap = new Map();
+    for (const item of rows) {
+        const existing = uniqueMap.get(item.staff_id);
+        if (!existing || item.service_id === service.id) {
+            uniqueMap.set(item.staff_id, item);
+        }
+    }
+
+    const data = paginatedStaffIds
+        .map((staffId) => uniqueMap.get(staffId))
+        .filter(Boolean);
+
+    return {
+        total,
+        page,
+        limit,
+        data,
+    };
 }
 
 exports.getService = async (payload) => {

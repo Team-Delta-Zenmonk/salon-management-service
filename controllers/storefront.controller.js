@@ -17,6 +17,7 @@ exports.getStorefrontServices = async (req, res, next) => {
   try {
     const response = await storefrontService.getStorefrontServices({
       params: req.params,
+      query: req.query,
     });
     return res.status(SUCCESS).json(response);
   } catch (error) {
@@ -29,6 +30,7 @@ exports.getStorefrontStaff = async (req, res, next) => {
   try {
     const response = await storefrontService.getStorefrontStaff({
       params: req.params,
+      query: req.query,
     });
     return res.status(SUCCESS).json(response);
   } catch (error) {

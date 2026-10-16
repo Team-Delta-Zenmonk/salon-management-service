@@ -11,6 +11,7 @@ const { listBookingsSchema } = require("../schema/booking/list-booking.schema");
 const { listCustomerBookingsSchema } = require("../schema/booking/list-customer-bookings.schema");
 const { cancelBookingSchema } = require("../schema/booking/cancel-booking-schema");
 const { rescheduleBookingSchema } = require("../schema/booking/reschedule-booking.schema");
+const { getBookingAvailableSlotsSchema } = require("../schema/booking/get-booking-slots.schema");
 
 router.post("/", authCustomerMiddleware, validate(createBookingSchema), bookingController.createBooking);
 router.post("/admin", authMiddleware.authSalonMiddleware, subscriptionMiddleware.subscriptionGateMiddleware, validate(createAdminBookingSchema), bookingController.createAdminBooking);
@@ -19,6 +20,7 @@ router.delete("/admin/:uuid", authMiddleware.authSalonMiddleware, subscriptionMi
 router.get("/", authMiddleware.authSalonMiddleware, validate(listBookingsSchema), bookingController.listBookings);
 router.get("/history", authCustomerMiddleware, validate(listCustomerBookingsSchema), bookingController.listCustomerBookings);
 router.get("/active", authCustomerMiddleware, bookingController.getActiveBooking);
+router.get("/:uuid/available-slots", authCustomerMiddleware, validate(getBookingAvailableSlotsSchema), bookingController.getBookingAvailableSlots);
 router.get("/:uuid", authCustomerMiddleware, bookingController.getBookingByUuid);
 router.post("/:uuid/cancel", authCustomerMiddleware, validate(cancelBookingSchema), bookingController.cancelBooking);
 router.post("/:uuid/reschedule", authCustomerMiddleware, validate(rescheduleBookingSchema), bookingController.rescheduleBooking);

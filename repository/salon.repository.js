@@ -39,6 +39,47 @@ class SalonRepository extends BaseRepository {
     });
   }
 
+  async findStorefrontProfileBySlug(slug) {
+    return await this.model.findOne({
+      where: { slug, is_active: true },
+      attributes: {
+        exclude: ["password", "reset_password_token", "reset_token_expiry", "deleted_at"],
+      },
+      include: [
+        {
+          association: "staff",
+          attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos", "title", "active_hours"],
+          limit: 10,
+        },
+        {
+          association: "categories",
+        },
+        {
+          association: "services",
+          where: { parent_id: null },
+          required: false,
+          limit: 10,
+          include: [
+            {
+              association: "category",
+              attributes: ["id", "uuid", "name"],
+            },
+            {
+              association: "children",
+              required: false,
+            },
+          ],
+        },
+        {
+          association: "holidays",
+        },
+        {
+          association: "storefrontTheme",
+        },
+      ],
+    });
+  }
+
   async findBySlug(slug) {
     return await this.model.findOne({
       where: { slug, is_active: true },

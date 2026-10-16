@@ -130,6 +130,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0,
       },
+      max_reschedule_attempts: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 2,
+      },
       rescheduled_at: {
         type: DataTypes.DATE,
         allowNull: true,

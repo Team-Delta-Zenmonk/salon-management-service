@@ -9,6 +9,8 @@ const {
   salonRepository,
   invoiceRepository,
   cartItemRepository,
+  staffRepository,
+  holidayRepository,
 } = require("../repository");
 const {
   acquireTransactionAdvisoryLock,
@@ -405,6 +407,14 @@ exports.listBookings = async (payload) => {
   };
 };
 
+const getMaxRescheduleAttempts = (bookingRecord) => {
+  if (bookingRecord && typeof bookingRecord.max_reschedule_attempts === "number") {
+    return bookingRecord.max_reschedule_attempts;
+  }
+  const defaultVal = bookingRepository.model?.rawAttributes?.max_reschedule_attempts?.defaultValue;
+  return typeof defaultVal === "number" ? defaultVal : 2;
+};
+
 exports.listCustomerBookings = async (payload) => {
   const { query, customer } = payload;
   const { page, limit, status } = query;
@@ -417,8 +427,19 @@ exports.listCustomerBookings = async (payload) => {
       status,
     });
 
+  const formattedBookings = bookings.map((b) => {
+    const bookingJson = b.toJSON ? b.toJSON() : b;
+    const rescheduleCount = bookingJson.reschedule_count || 0;
+    const maxAttempts = getMaxRescheduleAttempts(bookingJson);
+    return {
+      ...bookingJson,
+      max_reschedule_attempts: maxAttempts,
+      remaining_reschedule_count: Math.max(0, maxAttempts - rescheduleCount),
+    };
+  });
+
   return {
-    bookings,
+    bookings: formattedBookings,
     pagination: {
       total: count,
       page: Number(page),
@@ -904,11 +925,7 @@ exports.rescheduleBooking = async (payload) => {
     async (transaction) => {
       const booking = await bookingRepository.findOne(
         { uuid, customer_id: customer.id },
-        [
-          {
-            association: "booking_services",
-          },
-        ],
+        [],
         {},
         { transaction, lock: transaction.LOCK.UPDATE },
       );
@@ -929,14 +946,19 @@ exports.rescheduleBooking = async (payload) => {
         );
       }
 
-      if (booking.reschedule_count >= 2) {
+      const maxAttempts = getMaxRescheduleAttempts(booking);
+      if (booking.reschedule_count >= maxAttempts) {
         throw new error.BadRequest(
-          "Booking can only be rescheduled a maximum of 2 times",
+          `Booking can only be rescheduled a maximum of ${maxAttempts} times`,
         );
       }
 
-      const bookingServices = booking.booking_services || [];
-      if (bookingServices.length === 0) {
+      const bookingServices = await bookingServiceRepository.findAll({
+        criteria: { booking_id: booking.id },
+        transaction,
+      });
+
+      if (!bookingServices || bookingServices.length === 0) {
         throw new error.BadRequest(
           "Booking has no services associated with it",
         );
@@ -1266,3 +1288,229 @@ exports.collectPayment = async ({ params }) => {
   });
   return await bookingRepository.findBookingWithDetails({ id: booking.id });
 };
+
+const toISODateTime = (dateStr, minutes) => {
+  const d = new Date(dateStr);
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCMinutes(minutes);
+  return d.toISOString();
+};
+
+const toMinutes = (dateTime) => {
+  if (typeof dateTime === "string" && /^\d{1,2}:\d{2}$/.test(dateTime)) {
+    const [h, m] = dateTime.split(":").map(Number);
+    return h * 60 + m;
+  }
+  const d = new Date(dateTime);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
+};
+
+const isStaffAvailable = (
+  staff,
+  serviceStart,
+  serviceEnd,
+  dateStr,
+  staffHolidays,
+  bookingsByStaff,
+) => {
+  if (staffHolidays.get(staff.id)?.has(dateStr)) {
+    return false;
+  }
+
+  const day = new Date(dateStr).getDay();
+
+  const active = staff.active_hours?.[day];
+  if (!active) {
+    return false;
+  }
+
+  const activeStart = toMinutes(active.start_time);
+  const activeEnd = toMinutes(active.end_time);
+
+  if (serviceStart < activeStart || serviceEnd > activeEnd) {
+    return false;
+  }
+
+  const staffBookings = bookingsByStaff[staff.id] || [];
+
+  const serviceStartDate = new Date(dateStr);
+  serviceStartDate.setUTCHours(0, 0, 0, 0);
+  serviceStartDate.setUTCMinutes(serviceStart);
+
+  const serviceEndDate = new Date(dateStr);
+  serviceEndDate.setUTCHours(0, 0, 0, 0);
+  serviceEndDate.setUTCMinutes(serviceEnd);
+
+  for (const booking of staffBookings) {
+    if (serviceStartDate < booking.end && serviceEndDate > booking.start) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+exports.getBookingAvailableSlots = async (payload) => {
+  const { uuid } = payload.params;
+  const { start_date, days = 7 } = payload.query;
+  const { customer } = payload;
+
+  if (!customer) {
+    throw new error.Unauthorized("Customer authentication required");
+  }
+
+  const booking = await bookingRepository.findBookingWithDetails({
+    uuid,
+    customer_id: customer.id,
+  });
+
+  if (!booking) {
+    throw new error.BadRequest("Booking not found or not authorized");
+  }
+
+  if (
+    [
+      BookingStatus.ENUM.CANCELLED,
+      BookingStatus.ENUM.EXPIRED,
+      BookingStatus.ENUM.COMPLETED,
+    ].includes(booking.status)
+  ) {
+    throw new error.BadRequest(`Cannot reschedule booking with status '${booking.status}'`);
+  }
+
+  const maxAttempts = getMaxRescheduleAttempts(booking);
+  if (booking.reschedule_count >= maxAttempts) {
+    throw new error.BadRequest(`Booking can only be rescheduled a maximum of ${maxAttempts} times`);
+  }
+
+  const salon = booking.salon;
+  if (!salon) {
+    throw new error.BadRequest("Salon not found");
+  }
+
+  const bookingServices = (booking.booking_services || []).sort(
+    (a, b) => (a.sequence || 0) - (b.sequence || 0)
+  );
+
+  if (bookingServices.length === 0) {
+    throw new error.BadRequest("Booking has no services");
+  }
+
+  const totalDuration = booking.total_duration || bookingServices.reduce((acc, s) => acc + (s.duration_minutes || 0), 0);
+
+  const parsedDays = Number(days);
+  const salonHolidays = await holidayRepository.getSalonHolidaysByDate(
+    salon.id,
+    start_date,
+    parsedDays,
+  );
+
+  const staffIds = [
+    ...new Set(
+      bookingServices.map((s) => s.staff_id).filter(Boolean)
+    ),
+  ];
+
+  const staffMembers = await staffRepository.findAll({
+    criteria: { id: { [Op.in]: staffIds }, salon_id: salon.id },
+  });
+  const staffById = staffMembers.reduce((acc, s) => {
+    acc[s.id] = s;
+    return acc;
+  }, {});
+
+  const staffHolidays = await holidayRepository.getStaffHolidaysByDate(
+    staffIds,
+    start_date,
+    parsedDays,
+  );
+
+  const bookingsByStaff = await bookingServiceRepository.getBookingsByStaff({
+    salon_id: salon.id,
+    start_date,
+    days: parsedDays,
+    exclude_booking_id: booking.id,
+  });
+
+  const result = [];
+  const now = new Date();
+
+  for (let d = 0; d < parsedDays; d++) {
+    const date = new Date(start_date);
+    date.setDate(date.getDate() + d);
+    const dateStr = date.toISOString().slice(0, 10);
+    const dayOfWeek = date.getDay();
+
+    if (salonHolidays.includes(dateStr)) {
+      continue;
+    }
+
+    const businessHours = salon.business_hours?.[dayOfWeek];
+    if (!businessHours?.start_time || !businessHours?.end_time) {
+      continue;
+    }
+
+    const dayStart = toMinutes(businessHours.start_time);
+    const dayEnd = toMinutes(businessHours.end_time);
+
+    const slots = [];
+
+    for (
+      let slotStart = dayStart;
+      slotStart + totalDuration <= dayEnd;
+      slotStart += 15
+    ) {
+      const slotStartIso = toISODateTime(dateStr, slotStart);
+      if (new Date(slotStartIso).getTime() <= now.getTime()) {
+        continue;
+      }
+
+      let offset = 0;
+      let validSlot = true;
+      const serviceOptions = [];
+
+      for (const service of bookingServices) {
+        const duration = service.duration_minutes;
+        const serviceStart = slotStart + offset;
+        const serviceEnd = serviceStart + duration;
+        offset += duration;
+
+        const staff = staffById[service.staff_id];
+        if (
+          !staff ||
+          !isStaffAvailable(
+            staff,
+            serviceStart,
+            serviceEnd,
+            dateStr,
+            staffHolidays,
+            bookingsByStaff,
+          )
+        ) {
+          validSlot = false;
+          break;
+        }
+
+        serviceOptions.push({
+          service_id: service.service_id,
+          staff_id: service.staff_id,
+        });
+      }
+
+      if (validSlot) {
+        slots.push({
+          start: slotStartIso,
+          end: toISODateTime(dateStr, slotStart + totalDuration),
+          services: serviceOptions,
+        });
+      }
+    }
+
+    if (slots.length) {
+      result.push({ date: dateStr, slots });
+    }
+  }
+
+  return result;
+};
+

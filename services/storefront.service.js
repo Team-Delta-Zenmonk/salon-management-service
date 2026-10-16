@@ -1,9 +1,11 @@
 const {
   salonRepository,
   serviceRepository,
+  staffRepository,
   staffServiceRepository,
 } = require("../repository");
 const { Op } = require("sequelize");
+const { sequelize } = require("../config/db/db-connection");
 const { NotFound } = require("../libs/error");
 const { formatStaffListTiming, formatStaffTiming } = require("../utils/staff-timing.util");
 
@@ -14,7 +16,7 @@ exports.getStorefrontProfile = async (payload) => {
     throw new NotFound("Storefront slug is required");
   }
 
-  const salon = await salonRepository.findBySlug(slug.toLowerCase().trim());
+  const salon = await salonRepository.findStorefrontProfileBySlug(slug.toLowerCase().trim());
 
   if (!salon) {
     throw new NotFound(`Salon '${slug}' not found or inactive`);
@@ -61,33 +63,82 @@ exports.getStorefrontProfile = async (payload) => {
 
 exports.getStorefrontServices = async (payload) => {
   const { slug } = payload.params;
-  const salon = await salonRepository.findBySlug(slug.toLowerCase().trim());
+  const { page = 1, limit = 10, category_id, search, gender } = payload.query || {};
+
+  const salon = await salonRepository.findOne(
+    { slug: slug.toLowerCase().trim(), is_active: true },
+    [{ association: "categories" }]
+  );
 
   if (!salon) {
     throw new NotFound(`Salon '${slug}' not found or inactive`);
   }
 
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, Math.min(50, parseInt(limit, 10) || 10));
+  const offset = (pageNum - 1) * limitNum;
+
+  const { rows: services, count: total } = await serviceRepository.findAndCountStorefrontServices({
+    salonId: salon.id,
+    categoryId: category_id,
+    search,
+    gender,
+    offset,
+    limit: limitNum,
+  });
+
   return {
     categories: salon.categories || [],
-    services: salon.services || [],
+    services,
+    pagination: {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      hasMore: offset + services.length < total,
+    },
   };
 };
 
 exports.getStorefrontStaff = async (payload) => {
   const { slug } = payload.params;
-  const salon = await salonRepository.findBySlug(slug.toLowerCase().trim());
+  const { page = 1, limit = 10, search } = payload.query || {};
+
+  const salon = await salonRepository.findOne({
+    slug: slug.toLowerCase().trim(),
+    is_active: true,
+  });
 
   if (!salon) {
     throw new NotFound(`Salon '${slug}' not found or inactive`);
   }
 
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, Math.min(50, parseInt(limit, 10) || 10));
+  const offset = (pageNum - 1) * limitNum;
+
+  const { rows: staffList, count: total } = await staffRepository.findAndCountStorefrontStaff({
+    salonId: salon.id,
+    search,
+    offset,
+    limit: limitNum,
+  });
+
   return {
-    staff: formatStaffListTiming(salon.staff),
+    staff: formatStaffListTiming(staffList),
+    pagination: {
+      total,
+      page: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum),
+      hasMore: offset + staffList.length < total,
+    },
   };
 };
 
 exports.getStorefrontServiceStaff = async (payload) => {
   const { slug, serviceUuid } = payload.params;
+  const { query = {} } = payload;
 
   let salon = null;
   if (slug) {
@@ -97,12 +148,12 @@ exports.getStorefrontServiceStaff = async (payload) => {
     }
   }
 
-  if (!salon && payload.query?.salon_id) {
-    salon = await salonRepository.findOne({ uuid: payload.query.salon_id });
+  if (!salon && query?.salon_id) {
+    salon = await salonRepository.findOne({ uuid: query.salon_id });
   }
 
   if (!salon) {
-    throw new NotFound(`Salon '${slug || payload.query?.salon_id}' not found or inactive`);
+    throw new NotFound(`Salon '${slug || query?.salon_id}' not found or inactive`);
   }
 
   const service = await serviceRepository.findOne({
@@ -119,16 +170,73 @@ exports.getStorefrontServiceStaff = async (payload) => {
     serviceIds.push(service.parent_id);
   }
 
-  const staffServices = await staffServiceRepository.findAll({
-    criteria: { service_id: { [Op.in]: serviceIds } },
-    include: ["staff"],
+  const page = Number(query.page) > 0 ? Number(query.page) : 1;
+  const limit = Number(query.limit) > 0 ? Number(query.limit) : 10;
+  const offset = query.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
+
+  const serviceIdsList = serviceIds.join(",");
+  const countQuery = `
+    SELECT COUNT(DISTINCT staff_id) AS total
+    FROM staff_services
+    WHERE service_id IN (${serviceIdsList}) AND deleted_at IS NULL
+  `;
+  const [countResult] = await sequelize.query(countQuery);
+  const total = Number(countResult?.[0]?.total || 0);
+
+  const idsQuery = `
+    SELECT staff_id, MAX(created_at) AS latest_created_at
+    FROM staff_services
+    WHERE service_id IN (${serviceIdsList}) AND deleted_at IS NULL
+    GROUP BY staff_id
+    ORDER BY latest_created_at DESC
+    LIMIT :limit OFFSET :offset
+  `;
+  const [paginatedRows] = await sequelize.query(idsQuery, {
+    replacements: { limit, offset },
   });
 
-  return staffServices.map((row) => {
-    const raw = typeof row.toJSON === "function" ? row.toJSON() : { ...row };
+  const paginatedStaffIds = paginatedRows.map((r) => r.staff_id);
+
+  if (paginatedStaffIds.length === 0) {
+    return {
+      total,
+      page,
+      limit,
+      hasMore: false,
+      data: [],
+    };
+  }
+
+  const rows = await staffServiceRepository.findAll({
+    criteria: {
+      service_id: { [Op.in]: serviceIds },
+      staff_id: { [Op.in]: paginatedStaffIds },
+    },
+    include: ["staff"],
+    order: [["created_at", "DESC"]],
+  });
+
+  const uniqueMap = new Map();
+  for (const item of rows) {
+    const raw = typeof item.toJSON === "function" ? item.toJSON() : { ...item };
     if (raw.staff) {
       raw.staff = formatStaffTiming(raw.staff);
     }
-    return raw;
-  });
+    const existing = uniqueMap.get(raw.staff_id);
+    if (!existing || raw.service_id === service.id) {
+      uniqueMap.set(raw.staff_id, raw);
+    }
+  }
+
+  const data = paginatedStaffIds
+    .map((staffId) => uniqueMap.get(staffId))
+    .filter(Boolean);
+
+  return {
+    total,
+    page,
+    limit,
+    hasMore: offset + data.length < total,
+    data,
+  };
 };

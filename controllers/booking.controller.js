@@ -133,3 +133,17 @@ exports.collectPayment = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getBookingAvailableSlots = async (req, res, next) => {
+  try {
+    const slots = await bookingService.getBookingAvailableSlots({
+      params: req.params,
+      query: req.query,
+      customer: req.user,
+    });
+    return res.status(SUCCESS).json({ data: slots });
+  } catch (error) {
+    console.log("error in getBookingAvailableSlots controller", error);
+    next(error);
+  }
+};
