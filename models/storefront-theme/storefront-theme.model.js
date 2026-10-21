@@ -5,7 +5,7 @@ const { Model } = require("sequelize");
 module.exports = (sequelize, DataTypes) => {
   class StorefrontTheme extends Model {
     static associate(models) {
-      this.hasMany(models.ThemeInvoice, {
+      this.hasMany(models.Invoice, {
         foreignKey: "theme_id",
         as: "invoices",
       });

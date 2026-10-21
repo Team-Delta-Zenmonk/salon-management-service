@@ -68,18 +68,6 @@ exports.upgradeSubscription = async (req, res, next) => {
   }
 };
 
-exports.getSubscriptionInvoices = async (req, res, next) => {
-  try {
-    const result = await salonService.getSubscriptionInvoices({
-      salon: req.salon,
-    });
-    return res.status(SUCCESS).json(result);
-  } catch (error) {
-    console.log("Error in controller getSubscriptionInvoices", error);
-    return next(error);
-  }
-};
-
 exports.createSubscriptionPaymentIntent = async (req, res, next) => {
   try {
     const result = await salonService.createSubscriptionPaymentIntent({

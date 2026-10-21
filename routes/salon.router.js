@@ -1,6 +1,6 @@
 const router = require('express').Router();
 const { authMiddleware } = require('../middlewares');
-const { salonController, themeController } = require('../controllers');
+const { salonController, themeController, invoiceController } = require('../controllers');
 const { validate } = require('../middlewares/validate.middleware');
 const { getSalonSchema } = require('../schema/salon/get-salon.schema');
 const { listSalonsSchema } = require('../schema/salon/list-salons.schema');
@@ -12,7 +12,10 @@ const { activateThemeSchema } = require('../schema/theme/theme.schema');
 
 router.get('/', validate(listSalonsSchema), salonController.listSalons);
 router.get("/check-slug/:slug", authMiddleware.optionalAuthSalonMiddleware, validate(checkSlugSchema), salonController.checkSlugAvailability);
-router.get('/subscription/invoices', authMiddleware.authSalonMiddleware, salonController.getSubscriptionInvoices);
+router.get("/subscription/invoices", authMiddleware.authSalonMiddleware, (req, res, next) => {
+  req.query.type = "SUBSCRIPTION";
+  return invoiceController.getInvoices(req, res, next);
+});
 router.get("/:uuid", validate(getSalonSchema), salonController.getSalon);
 router.put('/', authMiddleware.authSalonMiddleware, validate(updateSalonSchema), salonController.updateSalon);
 router.patch('/theme', authMiddleware.authSalonMiddleware, validate(activateThemeSchema), themeController.activateTheme);

@@ -18,10 +18,8 @@ module.exports = {
   inventoryTransactionRepository: require("./inventory-transaction.repository"),
   webhookEventRepository: require("./webhook-event.repository"),
   adminUserRepository: require("./admin-user.repository"),
-  subscriptionInvoiceRepository: require("./subscription-invoice.repository"),
   invoiceRepository: require("./invoice.repository"),
   subscriptionPlanRepository: require("./subscription-plan.repository"),
   notificationRepository: require("./notification.repository"),
   storefrontThemeRepository: require("./storefront-theme.repository"),
-  themeInvoiceRepository: require("./theme-invoice.repository"),
 };

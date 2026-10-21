@@ -25,6 +25,7 @@ const {
 const { PaymentPolicy } = require("../models/salon/salon-types");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 const { enqueueNotificationJob } = require("../jobs/notification.worker");
+const invoiceService = require("./invoice.service");
 
 function buildBookingSnapshot({ cart, slot }) {
   return {
@@ -307,9 +308,14 @@ exports.createBooking = async (payload) => {
   );
 
   if (result.action === "BOOKING_CREATED") {
-    enqueueInvoiceJob(result.booking.id).catch((err) =>
-      console.error(`[CreateBooking] Failed to enqueue invoice job for Booking #${result.booking?.id}:`, err.message)
-    );
+    invoiceService
+      .createBookingInvoice(result.booking)
+      .then((inv) => {
+        if (inv?.id) enqueueInvoiceJob(inv.id);
+      })
+      .catch((err) =>
+        console.error(`[CreateBooking] Failed to create/enqueue invoice for Booking #${result.booking?.id}:`, err.message)
+      );
 
     enqueueNotificationJob({
       salonId: result.booking.salon_id,
@@ -627,9 +633,14 @@ exports.createAdminBooking = async (payload) => {
     },
   );
 
-  enqueueInvoiceJob(createdBooking.id).catch((err) =>
-    console.error(`[CreateAdminBooking] Failed to enqueue invoice job for Booking #${createdBooking?.id}:`, err.message)
-  );
+  invoiceService
+    .createBookingInvoice(createdBooking)
+    .then((inv) => {
+      if (inv?.id) enqueueInvoiceJob(inv.id);
+    })
+    .catch((err) =>
+      console.error(`[CreateAdminBooking] Failed to create/enqueue invoice for Booking #${createdBooking?.id}:`, err.message)
+    );
 
   const clientName = createdBooking.admin_booking?.name || createdBooking.customer?.name || "Client";
   enqueueNotificationJob({

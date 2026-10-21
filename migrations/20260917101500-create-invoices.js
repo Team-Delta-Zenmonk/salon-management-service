@@ -16,19 +16,24 @@ module.exports = {
         unique: true,
       },
       invoice_number: {
-        type: Sequelize.STRING(50),
+        type: Sequelize.STRING(100),
         allowNull: false,
         unique: true,
       },
+      invoice_type: {
+        type: Sequelize.ENUM("BOOKING", "SUBSCRIPTION", "THEME"),
+        allowNull: false,
+        defaultValue: "BOOKING",
+      },
       booking_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "bookings",
           key: "id",
         },
         onUpdate: "CASCADE",
-        onDelete: "RESTRICT",
+        onDelete: "SET NULL",
       },
       salon_id: {
         type: Sequelize.INTEGER,
@@ -38,7 +43,11 @@ module.exports = {
           key: "id",
         },
         onUpdate: "CASCADE",
-        onDelete: "RESTRICT",
+        onDelete: "CASCADE",
+      },
+      theme_id: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
       },
       grand_total: {
         type: Sequelize.DECIMAL(10, 2),
@@ -47,12 +56,12 @@ module.exports = {
       amount_paid: {
         type: Sequelize.DECIMAL(10, 2),
         allowNull: false,
-        defaultValue: 0.00,
+        defaultValue: 0.0,
       },
       balance_due: {
         type: Sequelize.DECIMAL(10, 2),
         allowNull: false,
-        defaultValue: 0.00,
+        defaultValue: 0.0,
       },
       currency: {
         type: Sequelize.STRING(3),
@@ -62,10 +71,31 @@ module.exports = {
       payment_status: {
         type: Sequelize.STRING(50),
         allowNull: false,
+        defaultValue: "PENDING",
       },
       payment_method: {
         type: Sequelize.STRING(50),
-        allowNull: false,
+        allowNull: true,
+      },
+      payment_details: {
+        type: Sequelize.JSON,
+        allowNull: true,
+      },
+      transaction_id: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
+      stripe_payment_intent_id: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
+      stripe_client_secret: {
+        type: Sequelize.STRING,
+        allowNull: true,
+      },
+      metadata: {
+        type: Sequelize.JSON,
+        allowNull: true,
       },
       issued_at: {
         type: Sequelize.DATE,
@@ -97,7 +127,10 @@ module.exports = {
     });
   },
 
-  async down(queryInterface) {
+  async down(queryInterface, Sequelize) {
     await queryInterface.dropTable("invoices");
+    await queryInterface.sequelize
+      .query('DROP TYPE IF EXISTS "enum_invoices_invoice_type" CASCADE;')
+      .catch(() => {});
   },
 };

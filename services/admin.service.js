@@ -2,20 +2,21 @@ const {
   adminUserRepository,
   salonRepository,
   subscriptionPlanRepository,
-  subscriptionInvoiceRepository,
+  invoiceRepository,
 } = require("../repository");
 const { hashPassword, comparePassword } = require("../libs/hash");
 const { BadRequest, NotFound, Conflict } = require("../libs/error");
 const jwt = require("jsonwebtoken");
 const { Op } = require("sequelize");
 const {
-  SubscriptionInvoiceStatus,
+  InvoiceType,
+  InvoicePaymentStatus,
   SubscriptionDiscountType,
-} = require("../models/subscription-invoice/subscription-invoice-types");
+} = require("../models/invoice/invoice-types");
 const {
-  SubscriptionPlan,
   SubscriptionStatus,
 } = require("../models/salon/salon-types");
+const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 
 exports.loginAdmin = async (payload) => {
   const { email, password } = payload.body;
@@ -520,26 +521,34 @@ exports.createSubscriptionInvoice = async (payload, options = {}) => {
 
   const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${salon_id}`;
 
-  const invoice = await subscriptionInvoiceRepository.create(
+  const invoice = await invoiceRepository.create(
     {
-      salon_id,
       invoice_number: invoiceNumber,
-      plan,
-      billing_cycle: plan,
-      amount: finalAmount,
+      invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+      salon_id,
+      grand_total: finalAmount,
+      amount_paid: finalAmount,
+      balance_due: 0,
       currency: "INR",
-      status: SubscriptionInvoiceStatus.ENUM.PAID,
-      discount_details: discountData,
-      payment_method: null,
-      payment_details: null,
-      transaction_id: null,
-      stripe_payment_intent_id: null,
-      stripe_client_secret: null,
-      billing_period_start: now,
-      billing_period_end: expiresAt,
+      payment_status: InvoicePaymentStatus.ENUM.PAID,
+      payment_method: "manual",
+      issued_at: now,
+      metadata: {
+        plan,
+        billing_cycle: plan,
+        billing_period_start: now,
+        billing_period_end: expiresAt,
+        discount_details: discountData,
+      },
     },
     options,
   );
+
+  if (invoice?.id) {
+    enqueueInvoiceJob(invoice.id).catch((err) =>
+      console.error(`[Admin Service] Failed to enqueue invoice job:`, err.message)
+    );
+  }
 
   return invoice;
 };

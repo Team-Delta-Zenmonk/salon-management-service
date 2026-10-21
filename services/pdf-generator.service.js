@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 const PDFDocument = require("pdfkit");
 
 const resolveFontPath = (ubuntuPath, alpinePath) => {
@@ -20,14 +21,12 @@ const FONT_SERIF_PATH = resolveFontPath(
   null
 );
 
-// Font aliases — registered directly, fallback only if system font missing
 const FONTS = {
   lora: FONT_SERIF_PATH && fs.existsSync(FONT_SERIF_PATH) ? "Lora" : "Times-Roman",
   regular: FONT_REGULAR_PATH && fs.existsSync(FONT_REGULAR_PATH) ? "Inter" : "Helvetica",
   bold: FONT_BOLD_PATH && fs.existsSync(FONT_BOLD_PATH) ? "Inter-Bold" : "Helvetica-Bold",
 };
 
-// Colors matching Figma CSS specifications
 const COLORS = {
   primaryOrange: "#F07825",
   darkText: "#121A26",
@@ -43,7 +42,6 @@ const COLORS = {
   white: "#FFFFFF",
 };
 
-// Page Dimensions (A4)
 const PAGE = {
   marginX: 48,
   marginY: 32,
@@ -52,9 +50,6 @@ const PAGE = {
 };
 PAGE.contentWidth = PAGE.width - PAGE.marginX * 2;
 
-// ── Utility functions ──
-
-// ₹ only works with DejaVuSans; Helvetica renders it as superscript ¹
 const RUPEE = fs.existsSync(FONT_REGULAR_PATH) ? "₹" : "Rs.";
 
 const formatCurrency = (amount) => {
@@ -90,17 +85,22 @@ const formatDuration = (minutes) => {
 };
 
 const humanisePaymentMethod = (method) => {
-  if (!method) return "Pay at Venue";
+  if (!method) return "Card / Online";
   return method
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-// Simple fetch — salon.logo is always a URL from Cloudinary
 const fetchImageBuffer = async (url) => {
   if (!url) return null;
   try {
+    if (typeof url === "string" && !url.startsWith("http")) {
+      const localPath = path.resolve(url);
+      if (fs.existsSync(localPath)) {
+        return fs.readFileSync(localPath);
+      }
+    }
     const res = await fetch(url);
     if (!res.ok) return null;
     const arrayBuffer = await res.arrayBuffer();
@@ -118,14 +118,17 @@ const collectPdfBuffer = (doc) =>
     doc.on("error", reject);
   });
 
-// ── HEADER (first page only) ──
-
-const drawHeader = (doc, { salon }, logoBuffer) => {
+const drawHeader = (doc, { salon, type }, logoBuffer) => {
   const y = PAGE.marginY;
   const logoSize = 36;
   let textLeft = PAGE.marginX;
 
-  // Salon Logo (circular clip) or fallback initial
+  const brandName = process.env.BRAND_NAME || "Vellora";
+  const headerTitle =
+    type === "BOOKING"
+      ? (salon?.name || "Salon")
+      : brandName;
+
   if (logoBuffer) {
     try {
       doc.save();
@@ -137,7 +140,7 @@ const drawHeader = (doc, { salon }, logoBuffer) => {
       textLeft = PAGE.marginX;
     }
   } else {
-    const initial = (salon.name || "S").charAt(0).toUpperCase();
+    const initial = headerTitle.charAt(0).toUpperCase();
     doc.save();
     doc.circle(PAGE.marginX + logoSize / 2, y + logoSize / 2, logoSize / 2).fill("#F3F4F6");
     doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(initial, PAGE.marginX, y + 10, { width: logoSize, align: "center" });
@@ -145,44 +148,44 @@ const drawHeader = (doc, { salon }, logoBuffer) => {
     textLeft += logoSize + 12;
   }
 
-  // Salon Name: Lora 31px
   doc
     .fillColor(COLORS.darkText)
     .font(FONTS.lora)
-    .fontSize(31)
-    .text(salon.name, textLeft, y + 1, {
+    .fontSize(28)
+    .text(headerTitle, textLeft, y + 3, {
       width: PAGE.contentWidth - (textLeft - PAGE.marginX),
       lineBreak: false,
       ellipsis: true,
-      characterSpacing: 1,
+      characterSpacing: 0.5,
     });
 
-  // Orange Banner
   const bannerY = y + logoSize + 14;
   const bannerHeight = 50;
   doc.roundedRect(PAGE.marginX, bannerY, PAGE.contentWidth, bannerHeight, 6).fill(COLORS.primaryOrange);
 
+  const bannerText =
+    type === "SUBSCRIPTION"
+      ? "Subscription payment confirmed."
+      : type === "THEME"
+      ? "Theme purchase confirmed."
+      : "Payment has been confirmed.";
+
   doc
     .fillColor(COLORS.white)
     .font(FONTS.bold)
-    .fontSize(24)
-    .text("Payment has been confirmed.", PAGE.marginX + 16, bannerY + 13, {
+    .fontSize(22)
+    .text(bannerText, PAGE.marginX + 16, bannerY + 14, {
       width: PAGE.contentWidth - 32,
       lineBreak: false,
       ellipsis: true,
     });
 
-  // Return Y where content starts (below header)
   return bannerY + bannerHeight + 20;
 };
 
-// ── FOOTER (last page only, pinned to bottom) ──
-
-const drawFooter = (doc, { salon, customer }) => {
-  // Footer is always pinned to the bottom of the current page
+const drawFooter = (doc, { salon, customer, type }) => {
   const footerStartY = PAGE.height - 90;
 
-  // Divider above footer
   doc
     .moveTo(PAGE.marginX, footerStartY)
     .lineTo(PAGE.width - PAGE.marginX, footerStartY)
@@ -190,12 +193,14 @@ const drawFooter = (doc, { salon, customer }) => {
     .lineWidth(0.75)
     .stroke();
 
-  // Contact line: Inter 14px, #202B3C
-  const contactParts = [];
-  if (salon.email) contactParts.push(salon.email);
-  if (salon.phone || salon.phone_number) contactParts.push(`call ${salon.phone || salon.phone_number}`);
-  const contactStr = contactParts.length > 0 ? `Reach out to ${contactParts.join(" or ")}.` : "";
-  const line1 = `Questions about your receipt? ${contactStr}`;
+  let line1 = `Questions about your receipt? Reach out to ${process.env.SUPPORT_EMAIL || "support@zenmonk.tech"}.`;
+  if (type === "BOOKING") {
+    const contactParts = [];
+    if (salon.email) contactParts.push(salon.email);
+    if (salon.phone || salon.phone_number) contactParts.push(`call ${salon.phone || salon.phone_number}`);
+    const contactStr = contactParts.length > 0 ? `Reach out to ${contactParts.join(" or ")}.` : "";
+    line1 = `Questions about your receipt? ${contactStr}`;
+  }
 
   doc
     .fillColor(COLORS.footerDark)
@@ -206,10 +211,10 @@ const drawFooter = (doc, { salon, customer }) => {
       lineGap: 2,
     });
 
-  // Security line: Inter 12px, #65748A
-  const customerEmail = customer.email || "";
-  const line2 = customerEmail
-    ? `This automated security email was sent to ${customerEmail}. Please do not reply.`
+  const recipientEmail =
+    type === "BOOKING" ? (customer.email || "") : (salon.email || "");
+  const line2 = recipientEmail
+    ? `This automated receipt was sent to ${recipientEmail}. Please do not reply.`
     : "This is an automated invoice. Please do not reply.";
 
   doc
@@ -222,16 +227,13 @@ const drawFooter = (doc, { salon, customer }) => {
     });
 };
 
-// ── SECTION 1: STATUS BADGE ──
-
 const drawStatusBadge = (doc, startY, { invoice }) => {
   const cardHeight = 48;
-  const isUnpaid = invoice.payment_status === "UNPAID";
+  const isUnpaid = invoice.payment_status === "UNPAID" || invoice.payment_status === "FAILED";
   const bg = isUnpaid ? COLORS.peachBg : COLORS.successBg;
 
   doc.roundedRect(PAGE.marginX, startY, PAGE.contentWidth, cardHeight, 6).fill(bg);
 
-  // Icon
   const iconRadius = 14;
   const iconX = PAGE.marginX + 16 + iconRadius;
   const iconY = startY + cardHeight / 2;
@@ -244,10 +246,9 @@ const drawStatusBadge = (doc, startY, { invoice }) => {
     doc.fillColor(COLORS.white).font(FONTS.bold).fontSize(14).text("✓", iconX - iconRadius, iconY - 8, { width: iconRadius * 2, align: "center" });
   }
 
-  // Badge text
   const badgeText = isUnpaid
-    ? `Unpaid: ${formatCurrency(invoice.grand_total)}`
-    : `Successfully paid: ${formatCurrency(invoice.grand_total)}.`;
+    ? `Pending / Unpaid: ${formatCurrency(invoice.grand_total || invoice.amount)}`
+    : `Successfully paid: ${formatCurrency(invoice.grand_total || invoice.amount)}.`;
 
   const textX = PAGE.marginX + 16 + iconRadius * 2 + 12;
   doc
@@ -263,16 +264,31 @@ const drawStatusBadge = (doc, startY, { invoice }) => {
   return startY + cardHeight + 20;
 };
 
-// ── SECTION 2: GREETING & SUBTITLE ──
+const drawGreeting = (doc, startY, { customer, salon, type, invoice }) => {
+  let title = "Thanks!";
+  let subtitle = "Your transaction has been processed.";
 
-const drawGreeting = (doc, startY, { customer }) => {
-  const firstName = (customer.name || "there").split(" ")[0];
+  if (type === "BOOKING") {
+    const firstName = (customer.name || "there").split(" ")[0];
+    title = `Thanks, ${firstName}!`;
+    subtitle = "Your salon appointment is confirmed.";
+  } else if (type === "SUBSCRIPTION") {
+    const salonName = salon.name || "Partner";
+    const planName = invoice.metadata?.plan || invoice.plan || "Subscription";
+    title = `Thanks, ${salonName}!`;
+    subtitle = `Your ${planName} plan is now active.`;
+  } else if (type === "THEME") {
+    const salonName = salon.name || "Partner";
+    const themeName = invoice.metadata?.theme_name || invoice.theme?.name || "Storefront Theme";
+    title = `Thanks, ${salonName}!`;
+    subtitle = `Your license for ${themeName} is now active.`;
+  }
 
   doc
     .fillColor(COLORS.darkText)
     .font(FONTS.regular)
     .fontSize(22)
-    .text(`Thanks, ${firstName}!`, PAGE.marginX, startY, {
+    .text(title, PAGE.marginX, startY, {
       width: PAGE.contentWidth,
       lineBreak: false,
       ellipsis: true,
@@ -284,7 +300,7 @@ const drawGreeting = (doc, startY, { customer }) => {
     .fillColor(COLORS.bodyText)
     .font(FONTS.regular)
     .fontSize(16)
-    .text("Your salon appointment is confirmed.", PAGE.marginX, subtitleY, {
+    .text(subtitle, PAGE.marginX, subtitleY, {
       width: PAGE.contentWidth,
       lineBreak: false,
       ellipsis: true,
@@ -294,191 +310,259 @@ const drawGreeting = (doc, startY, { customer }) => {
   return subtitleY + 20 + 20;
 };
 
-// ── SECTION 3: INVOICE NUMBER & DATE ──
-
 const drawInvoiceMeta = (doc, startY, { invoice }) => {
   let y = startY;
   const colWidth = (PAGE.contentWidth - 20) / 2;
   const rightX = PAGE.width - PAGE.marginX - colWidth;
 
-  // Labels
   doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(12).text("INVOICE NUMBER:", PAGE.marginX, y, { characterSpacing: 0.6 });
   doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(12).text("INVOICE DATE:", rightX, y, { align: "right", width: colWidth, characterSpacing: 0.6 });
 
   y += 16;
 
-  // Values
   doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14).text(invoice.invoice_number, PAGE.marginX, y, { width: colWidth, ellipsis: true });
   doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14).text(formatDate(invoice.issued_at || invoice.created_at), rightX, y, { align: "right", width: colWidth, ellipsis: true });
 
   y += 20;
 
-  // Divider
   doc.moveTo(PAGE.marginX, y).lineTo(PAGE.width - PAGE.marginX, y).strokeColor(COLORS.border).lineWidth(0.75).stroke();
 
   return y + 16;
 };
 
-// ── SECTION 4: SALON & CUSTOMER ──
-
-const drawPartiesInfo = (doc, startY, { salon, customer = {} }) => {
+const drawPartiesInfo = (doc, startY, { salon = {}, customer = {}, type }) => {
   const colWidth = (PAGE.contentWidth - 24) / 2;
   const leftX = PAGE.marginX;
   const rightX = PAGE.marginX + colWidth + 24;
 
-  // Labels
-  doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(12).text("SALON:", leftX, startY, { characterSpacing: 0.6 });
-  doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(12).text("CUSTOMER:", rightX, startY, { align: "right", width: colWidth, characterSpacing: 0.6 });
+  const leftLabel = type === "BOOKING" ? "SALON:" : "BILLED BY:";
+  const rightLabel = type === "BOOKING" ? "CUSTOMER:" : "BILLED TO:";
+
+  doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(12).text(leftLabel, leftX, startY, { characterSpacing: 0.6 });
+  doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(12).text(rightLabel, rightX, startY, { align: "right", width: colWidth, characterSpacing: 0.6 });
 
   let sy = startY + 16;
   let cy = startY + 16;
 
-  // Salon info
-  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(salon.name, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
-  sy += 16;
-
-  doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
-  if (salon.address) {
-    doc.text(salon.address, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+  if (type === "BOOKING") {
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(salon.name || "Salon", leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
     sy += 16;
-  }
-  const cityState = [salon.city, salon.state, salon.zip_code].filter(Boolean).join(", ");
-  if (cityState) {
-    doc.text(cityState, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
-    sy += 16;
-  }
+    doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
+    if (salon.address) {
+      doc.text(salon.address, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+      sy += 16;
+    }
+    const cityState = [salon.city, salon.state, salon.zip_code].filter(Boolean).join(", ");
+    if (cityState) {
+      doc.text(cityState, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+      sy += 16;
+    }
 
-  // Customer info (resolved upfront by caller)
-  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(customer.name || "Customer", rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
-  cy += 16;
-  doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
-  if (customer.email) {
-    doc.text(customer.email, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(customer.name || "Customer", rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
     cy += 16;
-  }
-  if (customer.phone) {
-    doc.text(customer.phone, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+    doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
+    if (customer.email) {
+      doc.text(customer.email, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      cy += 16;
+    }
+    if (customer.phone) {
+      doc.text(customer.phone, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      cy += 16;
+    }
+  } else {
+    const brandName = process.env.BRAND_NAME || "Vellora";
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(brandName, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+    sy += 16;
+    doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
+    doc.text("Cloud Salon Software Suite", leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+    sy += 16;
+    doc.text(process.env.SUPPORT_EMAIL || "support@zenmonk.tech", leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+    sy += 16;
+
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(salon.name || "Salon Partner", rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
     cy += 16;
+    doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
+    if (salon.email) {
+      doc.text(salon.email, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      cy += 16;
+    }
+    if (salon.phone || salon.phone_number) {
+      doc.text(salon.phone || salon.phone_number, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      cy += 16;
+    }
+    if (salon.address) {
+      doc.text(salon.address, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      cy += 16;
+    }
   }
 
   return Math.max(sy, cy) + 18;
 };
 
-// ── SECTION 5: SERVICES TABLE ──
-
-const drawServicesTable = (doc, startY, { bookingServices, invoice }) => {
+const drawServicesTable = (doc, startY, { items = [], invoice, type }) => {
   let y = startY;
   const headerHeight = 28;
   const startTableY = y;
 
-  // Header background
   doc.roundedRect(PAGE.marginX, y, PAGE.contentWidth, headerHeight, 4).fill(COLORS.peachBg);
 
-  // Header labels
+  const col1Label = type === "BOOKING" ? "SERVICE" : "ITEM DESCRIPTION";
+  const col2Label = type === "BOOKING" ? "QUANTITY" : "DURATION / TYPE";
+
+  const tableLeft = PAGE.marginX + 16;
+  const tableRight = PAGE.width - PAGE.marginX - 16;
+  const descColWidth = 230;
+  const qtyColWidth = 90;
+  const qtyColX = tableLeft + 235;
+  const priceColWidth = 130;
+  const priceColX = tableRight - priceColWidth;
+
   doc.fillColor(COLORS.bodyText).font(FONTS.bold).fontSize(11);
-  doc.text("SERVICE", PAGE.marginX + 16, y + 8, { characterSpacing: 0.7 });
-  doc.text("QUANTITY", PAGE.marginX + 300, y + 8, { width: 80, align: "center", characterSpacing: 0.7 });
-  doc.text("PRICE", PAGE.width - PAGE.marginX - 100, y + 8, { width: 84, align: "right", characterSpacing: 0.7 });
+  doc.text(col1Label, tableLeft, y + 8, { width: descColWidth, characterSpacing: 0.7 });
+  doc.text(col2Label, qtyColX, y + 8, { width: qtyColWidth, align: "center", characterSpacing: 0.7 });
+  doc.text("PRICE", priceColX, y + 8, { width: priceColWidth, align: "right", characterSpacing: 0.7 });
 
   y += headerHeight;
 
-  // Item Rows
-  bookingServices.forEach((item) => {
-    const sName = item.service?.name || item.name || "Service";
-    const sQty = String(item.quantity || 1);
+  items.forEach((item) => {
+    const sName = item.service?.name || item.name || "Item";
+    const sQty = String(item.quantity || item.details || "1");
     const sPrice = formatCurrency(item.price || item.rate || 0);
     const rowHeight = 32;
 
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(sName, PAGE.marginX + 16, y + 7, {
-      width: 280,
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(sName, tableLeft, y + 7, {
+      width: descColWidth,
       lineBreak: false,
       ellipsis: true,
     });
 
-    doc.fillColor(COLORS.bodyText).font(FONTS.regular).fontSize(14).text(sQty, PAGE.marginX + 300, y + 7, {
-      width: 80,
+    doc.fillColor(COLORS.bodyText).font(FONTS.regular).fontSize(14).text(sQty, qtyColX, y + 7, {
+      width: qtyColWidth,
       align: "center",
+      lineBreak: false,
+      ellipsis: true,
     });
 
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(sPrice, PAGE.width - PAGE.marginX - 100, y + 7, {
-      width: 84,
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(sPrice, priceColX, y + 7, {
+      width: priceColWidth,
       align: "right",
+      lineBreak: false,
     });
 
     y += rowHeight;
-    doc.moveTo(PAGE.marginX + 16, y).lineTo(PAGE.width - PAGE.marginX - 16, y).strokeColor(COLORS.rowBorder).lineWidth(0.5).stroke();
+    doc.moveTo(tableLeft, y).lineTo(tableRight, y).strokeColor(COLORS.rowBorder).lineWidth(0.5).stroke();
   });
 
-  // Totals
-  const totLabelX = PAGE.width - PAGE.marginX - 220;
-  const totWidth = 204;
+  const totalsPriceWidth = 140;
+  const totalsPriceX = tableRight - totalsPriceWidth;
+  const totalsLabelWidth = 140;
+  const totalsLabelX = totalsPriceX - totalsLabelWidth - 14;
   let totalsY = y + 8;
 
-  // Subtotal
-  doc.fillColor(COLORS.bodyText).font(FONTS.regular).fontSize(14).text("Subtotal:", totLabelX, totalsY);
-  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(formatCurrency(invoice.subtotal || invoice.sub_total || invoice.grand_total), totLabelX, totalsY, { align: "right", width: totWidth });
+  const grandTotal = invoice.grand_total || invoice.amount || 0;
 
-  totalsY += 20;
+  doc.fillColor(COLORS.bodyText).font(FONTS.regular).fontSize(14).text("Subtotal:", totalsLabelX, totalsY, {
+    width: totalsLabelWidth,
+    align: "right",
+  });
+  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(formatCurrency(grandTotal), totalsPriceX, totalsY, {
+    width: totalsPriceWidth,
+    align: "right",
+    lineBreak: false,
+  });
 
-  // Total due/paid
-  const isUnpaid = invoice.payment_status === "UNPAID";
+  totalsY += 22;
+
+  const isUnpaid = invoice.payment_status === "UNPAID" || invoice.payment_status === "FAILED";
   const totalLabel = isUnpaid ? "Total due:" : "Total paid:";
   const totalColor = isUnpaid ? COLORS.darkText : COLORS.successText;
 
-  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(16).text(totalLabel, totLabelX, totalsY);
-  doc.fillColor(totalColor).font(FONTS.bold).fontSize(18).text(formatCurrency(invoice.grand_total), totLabelX, totalsY, { align: "right", width: totWidth });
+  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(16).text(totalLabel, totalsLabelX, totalsY, {
+    width: totalsLabelWidth,
+    align: "right",
+  });
+  doc.fillColor(totalColor).font(FONTS.bold).fontSize(18).text(formatCurrency(grandTotal), totalsPriceX, totalsY, {
+    width: totalsPriceWidth,
+    align: "right",
+    lineBreak: false,
+  });
 
-  const totalTableHeight = totalsY + 26 - startTableY;
+  const totalTableHeight = totalsY + 28 - startTableY;
   doc.roundedRect(PAGE.marginX, startTableY, PAGE.contentWidth, totalTableHeight, 6).strokeColor(COLORS.border).lineWidth(0.75).stroke();
 
   return startTableY + totalTableHeight + 18;
 };
 
-// ── SECTION 6: PAYMENT METHOD & APPOINTMENT CARDS ──
-
-const drawInfoCards = (doc, startY, { invoice, booking }) => {
+const drawInfoCards = (doc, startY, { invoice, booking = {}, type, metadata = {} }) => {
   const cardWidth = (PAGE.contentWidth - 12) / 2;
   const leftX = PAGE.marginX;
   const rightX = PAGE.marginX + cardWidth + 12;
-  const cardHeight = 72;
+  const cardHeight = 76;
 
-  const isUnpaid = invoice.payment_status === "UNPAID";
+  const isUnpaid = invoice.payment_status === "UNPAID" || invoice.payment_status === "FAILED";
 
-  // Left Card: Payment Method
   doc.roundedRect(leftX, startY, cardWidth, cardHeight, 6).fill(COLORS.peachBg);
   doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(11).text("PAYMENT METHOD:", leftX + 16, startY + 12, { characterSpacing: 0.6 });
 
-  const methodTitle = isUnpaid ? "Pay at Venue" : humanisePaymentMethod(invoice.payment_method);
-  const methodSub = isUnpaid ? "Pay upon arrival" : `Paid on ${formatDate(invoice.issued_at || invoice.created_at)}.`;
+  const methodTitle = isUnpaid ? "Payment Pending" : humanisePaymentMethod(invoice.payment_method);
+  const methodSub = isUnpaid ? "Complete checkout" : `Paid on ${formatDate(invoice.issued_at || invoice.created_at)}.`;
   const subColor = isUnpaid ? COLORS.mutedText : COLORS.successText;
 
-  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(methodTitle, leftX + 16, startY + 28, {
+  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13).text(methodTitle, leftX + 16, startY + 28, {
     width: cardWidth - 32,
     lineBreak: false,
     ellipsis: true,
   });
 
-  doc.fillColor(subColor).font(FONTS.regular).fontSize(12).text(methodSub, leftX + 16, startY + 46, {
+  doc.fillColor(subColor).font(FONTS.regular).fontSize(12).text(methodSub, leftX + 16, startY + 48, {
     width: cardWidth - 32,
     lineBreak: false,
     ellipsis: true,
   });
 
-  // Right Card: Appointment
   doc.roundedRect(rightX, startY, cardWidth, cardHeight, 6).fill(COLORS.peachBg);
-  doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(11).text("APPOINTMENT:", rightX + 16, startY + 12, { characterSpacing: 0.6 });
 
-  const apptTime = formatAppointmentTime(booking.booking_start_time || booking.booking_date);
-  const durationStr = formatDuration(booking.total_duration);
+  if (type === "BOOKING") {
+    doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(11).text("APPOINTMENT:", rightX + 16, startY + 12, { characterSpacing: 0.6 });
+    const apptTime = formatAppointmentTime(booking.booking_start_time || booking.booking_date);
+    const durationStr = formatDuration(booking.total_duration);
 
-  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(apptTime, rightX + 16, startY + 28, {
-    width: cardWidth - 32,
-    lineBreak: false,
-    ellipsis: true,
-  });
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13).text(apptTime, rightX + 16, startY + 28, {
+      width: cardWidth - 32,
+      lineBreak: false,
+      ellipsis: true,
+    });
+    if (durationStr) {
+      doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12).text(durationStr, rightX + 16, startY + 48, {
+        width: cardWidth - 32,
+        lineBreak: false,
+        ellipsis: true,
+      });
+    }
+  } else if (type === "SUBSCRIPTION") {
+    doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(11).text("VALIDITY & ACCESS:", rightX + 16, startY + 12, { characterSpacing: 0.6 });
+    const cycle = metadata.billing_cycle || invoice.billing_cycle || "Monthly";
+    const end = metadata.billing_period_end ? formatDate(metadata.billing_period_end) : "Active";
+    const formattedCycle = cycle ? cycle.charAt(0).toUpperCase() + cycle.slice(1) : "Monthly";
 
-  if (durationStr) {
-    doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12).text(durationStr, rightX + 16, startY + 46, {
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(12.5).text(`Valid to: ${end}`, rightX + 16, startY + 28, {
+      width: cardWidth - 32,
+      lineBreak: false,
+      ellipsis: true,
+    });
+    doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12).text(`Billing Cycle: ${formattedCycle}`, rightX + 16, startY + 48, {
+      width: cardWidth - 32,
+      lineBreak: false,
+      ellipsis: true,
+    });
+  } else {
+    doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(11).text("LICENSE TYPE:", rightX + 16, startY + 12, { characterSpacing: 0.6 });
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13).text("Lifetime Access", rightX + 16, startY + 28, {
+      width: cardWidth - 32,
+      lineBreak: false,
+      ellipsis: true,
+    });
+    doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12).text("Unlimited storefront usage", rightX + 16, startY + 48, {
       width: cardWidth - 32,
       lineBreak: false,
       ellipsis: true,
@@ -487,8 +571,6 @@ const drawInfoCards = (doc, startY, { invoice, booking }) => {
 
   return startY + cardHeight + 16;
 };
-
-// ── SECTION 7: RECORD NOTICE ──
 
 const drawNotice = (doc, startY) => {
   doc
@@ -503,10 +585,53 @@ const drawNotice = (doc, startY) => {
     );
 };
 
-// ── MAIN INVOICE PDF GENERATOR ──
+exports.generateInvoicePDF = async ({
+  invoice = {},
+  booking = {},
+  salon = {},
+  customer = {},
+  bookingServices = [],
+  items = null,
+  type = null,
+}) => {
+  const resolvedType = (type || invoice.invoice_type || "BOOKING").toUpperCase();
 
-exports.generateInvoicePDF = async ({ invoice = {}, booking = {}, salon = {}, customer = {}, bookingServices = [] }) => {
-  const logoBuffer = await fetchImageBuffer(salon.logo);
+  let logoBuffer = null;
+  if (resolvedType === "BOOKING") {
+    logoBuffer = await fetchImageBuffer(salon.logo);
+  } else {
+    const localLogoPath = path.join(__dirname, "../public/assets/logo.png");
+    logoBuffer = await fetchImageBuffer(localLogoPath);
+  }
+
+  let resolvedItems = items;
+  if (!resolvedItems || resolvedItems.length === 0) {
+    if (resolvedType === "BOOKING") {
+      resolvedItems = bookingServices;
+    } else if (resolvedType === "SUBSCRIPTION") {
+      const rawPlan = invoice.metadata?.plan || invoice.plan || "Subscription";
+      const planName = String(rawPlan).charAt(0).toUpperCase() + String(rawPlan).slice(1);
+      const rawCycle = invoice.metadata?.billing_cycle || invoice.billing_cycle || "Monthly";
+      const cycle = String(rawCycle).charAt(0).toUpperCase() + String(rawCycle).slice(1);
+      resolvedItems = [
+        {
+          name: `${planName} Subscription`,
+          details: cycle,
+          price: invoice.grand_total || invoice.amount || 0,
+        },
+      ];
+    } else if (resolvedType === "THEME") {
+      const rawTheme = invoice.metadata?.theme_name || invoice.theme?.name || "Storefront Theme";
+      const themeName = String(rawTheme).charAt(0).toUpperCase() + String(rawTheme).slice(1);
+      resolvedItems = [
+        {
+          name: `${themeName} Storefront Theme`,
+          details: "Lifetime License",
+          price: invoice.grand_total || invoice.amount || 0,
+        },
+      ];
+    }
+  }
 
   const doc = new PDFDocument({
     margin: 0,
@@ -514,60 +639,47 @@ exports.generateInvoicePDF = async ({ invoice = {}, booking = {}, salon = {}, cu
     bufferPages: true,
   });
 
-  // Register system fonts directly
   if (FONT_SERIF_PATH && fs.existsSync(FONT_SERIF_PATH)) doc.registerFont("Lora", FONT_SERIF_PATH);
   if (FONT_REGULAR_PATH && fs.existsSync(FONT_REGULAR_PATH)) doc.registerFont("Inter", FONT_REGULAR_PATH);
   if (FONT_BOLD_PATH && fs.existsSync(FONT_BOLD_PATH)) doc.registerFont("Inter-Bold", FONT_BOLD_PATH);
 
   const bufferPromise = collectPdfBuffer(doc);
 
-  // 1. Header (first page only) — returns Y where content starts
-  let y = drawHeader(doc, { salon }, logoBuffer);
+  let y = drawHeader(doc, { salon, type: resolvedType }, logoBuffer);
 
-  // 2. Status Badge
   y = drawStatusBadge(doc, y, { invoice });
 
-  // 3. Greeting & Subtitle
-  y = drawGreeting(doc, y, { customer });
+  y = drawGreeting(doc, y, { customer, salon, type: resolvedType, invoice });
 
-  // 4. Invoice Number & Date
   y = drawInvoiceMeta(doc, y, { invoice });
 
-  // 5. Salon & Customer Info
-  y = drawPartiesInfo(doc, y, { salon, customer });
+  y = drawPartiesInfo(doc, y, { salon, customer, type: resolvedType });
 
-  // Page break check before table
   if (y + 110 > PAGE.height - 100) {
     doc.addPage();
     y = PAGE.marginY;
   }
 
-  // 6. Services Table
-  y = drawServicesTable(doc, y, { bookingServices, invoice });
+  y = drawServicesTable(doc, y, { items: resolvedItems, invoice, type: resolvedType });
 
-  // Page break check before cards
   if (y + 76 > PAGE.height - 100) {
     doc.addPage();
     y = PAGE.marginY;
   }
 
-  // 7. Payment Method & Appointment Cards
-  y = drawInfoCards(doc, y, { invoice, booking });
+  y = drawInfoCards(doc, y, { invoice, booking, type: resolvedType, metadata: invoice.metadata || {} });
 
-  // Page break check before notice
   if (y + 24 > PAGE.height - 100) {
     doc.addPage();
     y = PAGE.marginY;
   }
 
-  // 8. Notice
   drawNotice(doc, y);
 
-  // 9. Footer (last page only, pinned to bottom)
   const range = doc.bufferedPageRange();
   const lastPage = range.start + range.count - 1;
   doc.switchToPage(lastPage);
-  drawFooter(doc, { salon, customer });
+  drawFooter(doc, { salon, customer, type: resolvedType });
 
   doc.end();
 

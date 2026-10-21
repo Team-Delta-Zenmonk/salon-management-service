@@ -7,13 +7,14 @@ const {
   SubscriptionStatus,
 } = require("../models/salon/salon-types");
 const {
-  SubscriptionInvoiceStatus,
-  SubscriptionPaymentMethod,
-} = require("../models/subscription-invoice/subscription-invoice-types");
+  InvoiceType,
+  InvoicePaymentStatus,
+} = require("../models/invoice/invoice-types");
 const { isReservedSlug } = require("../libs/reserved-slugs");
 const mailService = require("./mail.service");
 const { buildSalonLiveEmailHtml } = require("../templates");
 const { enqueueNotificationJob } = require("../jobs/notification.worker");
+const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 const {
   salonRepository,
   cartRepository,
@@ -21,7 +22,7 @@ const {
   staffRepository,
   staffServiceRepository,
   bookingServiceRepository,
-  subscriptionInvoiceRepository,
+  invoiceRepository,
   subscriptionPlanRepository,
 } = require("../repository");
 const { Op } = require("sequelize");
@@ -551,13 +552,12 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
   const amountInPaise = Math.round(Number(dbPlan.amount) * 100);
   const amountInRupees = Number(dbPlan.amount);
 
-  // 1. Reuse active PENDING invoice for this salon & plan if created within 24h
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const existingPendingInvoice = await subscriptionInvoiceRepository.findOne(
+  const existingPendingInvoice = await invoiceRepository.findOne(
     {
       salon_id: currentSalon.id,
-      status: SubscriptionInvoiceStatus.ENUM.PENDING,
-      plan,
+      invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+      payment_status: InvoicePaymentStatus.ENUM.PENDING,
     },
     [],
     {},
@@ -587,8 +587,8 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
         } else if (intent.status === "succeeded") {
           await exports.activateSubscriptionFromWebhook(intent);
         } else {
-          await subscriptionInvoiceRepository.update({
-            payload: { status: SubscriptionInvoiceStatus.ENUM.FAILED },
+          await invoiceRepository.update({
+            payload: { payment_status: InvoicePaymentStatus.ENUM.FAILED },
             criteria: { id: existingPendingInvoice.id },
           });
         }
@@ -598,30 +598,29 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
         );
       }
     } else {
-      await subscriptionInvoiceRepository.update({
-        payload: { status: SubscriptionInvoiceStatus.ENUM.FAILED },
+      await invoiceRepository.update({
+        payload: { payment_status: InvoicePaymentStatus.ENUM.FAILED },
         criteria: { id: existingPendingInvoice.id },
       });
     }
   }
 
-  // 2. Mark any other pending invoices for different plans as FAILED
-  const otherPendingInvoices = await subscriptionInvoiceRepository.findAll({
+  const otherPendingInvoices = await invoiceRepository.findAll({
     criteria: {
       salon_id: currentSalon.id,
-      status: SubscriptionInvoiceStatus.ENUM.PENDING,
+      invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+      payment_status: InvoicePaymentStatus.ENUM.PENDING,
     },
   });
   if (otherPendingInvoices && otherPendingInvoices.length > 0) {
     for (const inv of otherPendingInvoices) {
-      await subscriptionInvoiceRepository.update({
-        payload: { status: SubscriptionInvoiceStatus.ENUM.FAILED },
+      await invoiceRepository.update({
+        payload: { payment_status: InvoicePaymentStatus.ENUM.FAILED },
         criteria: { id: inv.id },
       });
     }
   }
 
-  // 3. Create fresh Stripe PaymentIntent with unique UUID
   const idempotencyKey = `sub_pi_${currentSalon.id}_${plan}_${crypto.randomUUID()}`;
 
   const paymentIntent = await stripe.paymentIntents.create(
@@ -641,26 +640,31 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
     },
   );
 
-  // 4. Save PENDING record in DB
   const durationDays = dbPlan.duration_days ?? 30;
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + durationDays);
   const pendingInvoiceNumber = `INV-PENDING-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
 
-  await subscriptionInvoiceRepository.create({
-    salon_id: currentSalon.id,
+  await invoiceRepository.create({
     invoice_number: pendingInvoiceNumber,
-    plan,
-    billing_cycle: plan,
-    amount: amountInRupees,
+    invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+    salon_id: currentSalon.id,
+    grand_total: amountInRupees,
+    amount_paid: 0,
+    balance_due: amountInRupees,
     currency: "INR",
-    status: SubscriptionInvoiceStatus.ENUM.PENDING,
-    payment_method: SubscriptionPaymentMethod.ENUM.CARD,
+    payment_status: InvoicePaymentStatus.ENUM.PENDING,
+    payment_method: "card",
     transaction_id: paymentIntent.id,
     stripe_payment_intent_id: paymentIntent.id,
     stripe_client_secret: paymentIntent.client_secret,
-    billing_period_start: now,
-    billing_period_end: expiresAt,
+    issued_at: now,
+    metadata: {
+      plan,
+      billing_cycle: plan,
+      billing_period_start: now,
+      billing_period_end: expiresAt,
+    },
   });
 
   return {
@@ -678,15 +682,15 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
     return;
   }
 
-  return await subscriptionInvoiceRepository.handleManagedTransaction(
+  return await invoiceRepository.handleManagedTransaction(
     async (transaction) => {
-      const existing = await subscriptionInvoiceRepository.findOne(
-        { stripe_payment_intent_id: paymentIntent.id },
+      const existing = await invoiceRepository.findOne(
+        { stripe_payment_intent_id: paymentIntent.id, invoice_type: InvoiceType.ENUM.SUBSCRIPTION },
         [],
         {},
         { transaction },
       );
-      if (existing && existing.status === SubscriptionInvoiceStatus.ENUM.PAID) {
+      if (existing && existing.payment_status === InvoicePaymentStatus.ENUM.PAID) {
         console.log(
           `[Subscription Webhook] PaymentIntent ${paymentIntent.id} already processed. Skipping.`,
         );
@@ -741,8 +745,7 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
       const amount = paymentIntent.amount / 100;
       const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
       const pmDetails = paymentIntent.payment_method_details || {};
-      const paymentMethod =
-        pmDetails.type || SubscriptionPaymentMethod.ENUM.CARD;
+      const paymentMethod = pmDetails.type || "card";
       const paymentDetails =
         paymentMethod === "card" && pmDetails.card
           ? {
@@ -753,37 +756,49 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
             ? { upi_id: pmDetails.upi.vpa }
             : {};
 
-      if (existing && existing.status === SubscriptionInvoiceStatus.ENUM.PENDING) {
-        await subscriptionInvoiceRepository.update({
+      if (existing && existing.payment_status === InvoicePaymentStatus.ENUM.PENDING) {
+        await invoiceRepository.update({
           payload: {
             invoice_number: invoiceNumber,
-            status: SubscriptionInvoiceStatus.ENUM.PAID,
+            payment_status: InvoicePaymentStatus.ENUM.PAID,
+            amount_paid: amount,
+            balance_due: 0,
             payment_method: paymentMethod,
             payment_details: paymentDetails,
-            billing_period_start: baseDate,
-            billing_period_end: expiresAt,
+            metadata: {
+              plan,
+              billing_cycle: plan,
+              billing_period_start: baseDate,
+              billing_period_end: expiresAt,
+            },
           },
           criteria: { id: existing.id },
           options: { transaction },
         });
       } else if (!existing) {
         try {
-          await subscriptionInvoiceRepository.create(
+          await invoiceRepository.create(
             {
-              salon_id: currentSalon.id,
               invoice_number: invoiceNumber,
-              plan,
-              billing_cycle: plan,
-              amount,
+              invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+              salon_id: currentSalon.id,
+              grand_total: amount,
+              amount_paid: amount,
+              balance_due: 0,
               currency: "INR",
-              status: SubscriptionInvoiceStatus.ENUM.PAID,
+              payment_status: InvoicePaymentStatus.ENUM.PAID,
               payment_method: paymentMethod,
               payment_details: paymentDetails,
               transaction_id: paymentIntent.id,
               stripe_payment_intent_id: paymentIntent.id,
               stripe_client_secret: paymentIntent.client_secret,
-              billing_period_start: baseDate,
-              billing_period_end: expiresAt,
+              issued_at: new Date(),
+              metadata: {
+                plan,
+                billing_cycle: plan,
+                billing_period_start: baseDate,
+                billing_period_end: expiresAt,
+              },
             },
             { transaction },
           );
@@ -803,6 +818,16 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
       );
     },
   );
+
+  const paidInvoice = await invoiceRepository.findOne({
+    stripe_payment_intent_id: paymentIntent.id,
+    invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+  });
+  if (paidInvoice) {
+    enqueueInvoiceJob(paidInvoice.id).catch((err) =>
+      console.error(`[Subscription Webhook] Failed to enqueue invoice job:`, err.message)
+    );
+  }
 };
 
 exports.handleSubscriptionPaymentFailed = async (paymentIntent) => {
@@ -817,8 +842,9 @@ exports.handleSubscriptionPaymentFailed = async (paymentIntent) => {
   );
   if (!currentSalon) return;
 
-  const existing = await subscriptionInvoiceRepository.findOne({
+  const existing = await invoiceRepository.findOne({
     stripe_payment_intent_id: paymentIntent.id,
+    invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
   });
 
   const failureReason =
@@ -832,9 +858,9 @@ exports.handleSubscriptionPaymentFailed = async (paymentIntent) => {
   };
 
   if (existing) {
-    await subscriptionInvoiceRepository.update({
+    await invoiceRepository.update({
       payload: {
-        status: SubscriptionInvoiceStatus.ENUM.FAILED,
+        payment_status: InvoicePaymentStatus.ENUM.FAILED,
         payment_details: failureDetails,
       },
       criteria: { id: existing.id },
@@ -849,21 +875,27 @@ exports.handleSubscriptionPaymentFailed = async (paymentIntent) => {
   const invoiceNumber = `INV-FAIL-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
 
   try {
-    await subscriptionInvoiceRepository.create({
-      salon_id: currentSalon.id,
+    await invoiceRepository.create({
       invoice_number: invoiceNumber,
-      plan,
-      billing_cycle: plan,
-      amount,
+      invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+      salon_id: currentSalon.id,
+      grand_total: amount,
+      amount_paid: 0,
+      balance_due: amount,
       currency: "INR",
-      status: SubscriptionInvoiceStatus.ENUM.FAILED,
-      payment_method: pmDetails.type || SubscriptionPaymentMethod.ENUM.CARD,
+      payment_status: InvoicePaymentStatus.ENUM.FAILED,
+      payment_method: pmDetails.type || "card",
       payment_details: failureDetails,
       transaction_id: paymentIntent.id,
       stripe_payment_intent_id: paymentIntent.id,
       stripe_client_secret: paymentIntent.client_secret,
-      billing_period_start: new Date(),
-      billing_period_end: new Date(),
+      issued_at: new Date(),
+      metadata: {
+        plan,
+        billing_cycle: plan,
+        billing_period_start: new Date(),
+        billing_period_end: new Date(),
+      },
     });
     console.log(
       `[Subscription Webhook] Recorded failed invoice for salon ${salon_uuid}: ${failureReason}`,
@@ -927,41 +959,60 @@ exports.upgradeSubscription = async (payload) => {
     `TXN_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
   const existingPending = transaction_id
-    ? await subscriptionInvoiceRepository.findOne({
+    ? await invoiceRepository.findOne({
         stripe_payment_intent_id: transaction_id,
+        invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
       })
     : null;
 
   let invoice;
   if (existingPending) {
-    await subscriptionInvoiceRepository.update({
+    await invoiceRepository.update({
       payload: {
         invoice_number: invoiceNumber,
-        status: SubscriptionInvoiceStatus.ENUM.PAID,
-        billing_period_start: baseDate,
-        billing_period_end: expiresAt,
+        payment_status: InvoicePaymentStatus.ENUM.PAID,
+        amount_paid: amount,
+        balance_due: 0,
         payment_method,
         payment_details: payment_details || existingPending.payment_details,
+        metadata: {
+          plan,
+          billing_cycle: billing_cycle || plan,
+          billing_period_start: baseDate,
+          billing_period_end: expiresAt,
+        },
       },
       criteria: { id: existingPending.id },
     });
-    invoice = await subscriptionInvoiceRepository.findOne({ id: existingPending.id });
+    invoice = await invoiceRepository.findOne({ id: existingPending.id });
   } else {
-    invoice = await subscriptionInvoiceRepository.create({
-      salon_id: currentSalon.id,
+    invoice = await invoiceRepository.create({
       invoice_number: invoiceNumber,
-      plan,
-      billing_cycle: billing_cycle || plan,
-      amount,
+      invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+      salon_id: currentSalon.id,
+      grand_total: amount,
+      amount_paid: amount,
+      balance_due: 0,
       currency: "INR",
-      status: SubscriptionInvoiceStatus.ENUM.PAID,
+      payment_status: InvoicePaymentStatus.ENUM.PAID,
       payment_method,
       payment_details: payment_details || null,
       transaction_id: effectiveTxId,
       stripe_payment_intent_id: transaction_id || null,
-      billing_period_start: baseDate,
-      billing_period_end: expiresAt,
+      issued_at: new Date(),
+      metadata: {
+        plan,
+        billing_cycle: billing_cycle || plan,
+        billing_period_start: baseDate,
+        billing_period_end: expiresAt,
+      },
     });
+  }
+
+  if (invoice?.id) {
+    enqueueInvoiceJob(invoice.id).catch((err) =>
+      console.error(`[Upgrade Subscription] Failed to enqueue invoice job:`, err.message)
+    );
   }
 
   return {
@@ -971,17 +1022,3 @@ exports.upgradeSubscription = async (payload) => {
   };
 };
 
-exports.getSubscriptionInvoices = async (payload) => {
-  const { uuid } = payload.salon;
-  const currentSalon = await salonRepository.findOne({ uuid }, [], {}, {});
-  if (!currentSalon) {
-    throw new error.BadRequest("Salon not found");
-  }
-
-  const invoices = await subscriptionInvoiceRepository.findAll({
-    criteria: { salon_id: currentSalon.id },
-    order: [["created_at", "DESC"]],
-  });
-
-  return { invoices: invoices || [] };
-};

@@ -24,4 +24,5 @@ module.exports = {
   notificationController: require("./notification.controller"),
   publicController: require("./public.controller"),
   themeController: require("./theme.controller"),
+  invoiceController: require("./invoice.controller"),
 };

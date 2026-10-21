@@ -4,12 +4,13 @@ const error = require("../libs/error");
 const {
   salonRepository,
   storefrontThemeRepository,
-  themeInvoiceRepository,
+  invoiceRepository,
 } = require("../repository");
 const {
-  ThemeInvoiceStatus,
-  ThemePaymentMethod,
-} = require("../models/theme-invoice/theme-invoice-types");
+  InvoiceType,
+  InvoicePaymentStatus,
+} = require("../models/invoice/invoice-types");
+const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 
 exports.getThemesForSalon = async (payload) => {
   const { uuid } = payload.salon;
@@ -23,10 +24,11 @@ exports.getThemesForSalon = async (payload) => {
     order: [["id", "ASC"]],
   });
 
-  const paidInvoices = await themeInvoiceRepository.findAll({
+  const paidInvoices = await invoiceRepository.findAll({
     criteria: {
       salon_id: currentSalon.id,
-      status: ThemeInvoiceStatus.ENUM.PAID,
+      invoice_type: InvoiceType.ENUM.THEME,
+      payment_status: InvoicePaymentStatus.ENUM.PAID,
     },
   });
 
@@ -73,13 +75,14 @@ exports.createThemePaymentIntent = async (payload) => {
     throw new error.BadRequest("This theme is free and does not require purchase");
   }
 
-  const existingInvoice = await themeInvoiceRepository.findOne({
+  const existingInvoice = await invoiceRepository.findOne({
     salon_id: currentSalon.id,
     theme_id: theme.id,
+    invoice_type: InvoiceType.ENUM.THEME,
   });
 
   if (existingInvoice) {
-    if (existingInvoice.status === ThemeInvoiceStatus.ENUM.PAID) {
+    if (existingInvoice.payment_status === InvoicePaymentStatus.ENUM.PAID) {
       throw new error.BadRequest("You have already purchased this theme for lifetime");
     }
 
@@ -142,9 +145,9 @@ exports.createThemePaymentIntent = async (payload) => {
       { idempotencyKey }
     );
 
-    await themeInvoiceRepository.update({
+    await invoiceRepository.update({
       payload: {
-        status: ThemeInvoiceStatus.ENUM.PENDING,
+        payment_status: InvoicePaymentStatus.ENUM.PENDING,
         stripe_payment_intent_id: paymentIntent.id,
         stripe_client_secret: paymentIntent.client_secret,
         transaction_id: paymentIntent.id,
@@ -185,17 +188,25 @@ exports.createThemePaymentIntent = async (payload) => {
 
   const pendingInvoiceNumber = `THM-INV-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
 
-  await themeInvoiceRepository.create({
+  await invoiceRepository.create({
+    invoice_number: pendingInvoiceNumber,
+    invoice_type: InvoiceType.ENUM.THEME,
     salon_id: currentSalon.id,
     theme_id: theme.id,
-    invoice_number: pendingInvoiceNumber,
-    amount: theme.price,
+    grand_total: theme.price,
+    amount_paid: 0,
+    balance_due: theme.price,
     currency: theme.currency || "INR",
-    status: ThemeInvoiceStatus.ENUM.PENDING,
-    payment_method: ThemePaymentMethod.ENUM.CARD,
+    payment_status: InvoicePaymentStatus.ENUM.PENDING,
+    payment_method: "card",
     transaction_id: paymentIntent.id,
     stripe_payment_intent_id: paymentIntent.id,
     stripe_client_secret: paymentIntent.client_secret,
+    issued_at: new Date(),
+    metadata: {
+      theme_name: theme.name,
+      theme_code: theme.code,
+    },
   });
 
   return {
@@ -224,17 +235,19 @@ exports.validateThemeOwnership = async (salonId, themeUuid) => {
   }
 
   if (!targetTheme.is_free) {
-    let isPaid = await themeInvoiceRepository.findOne({
+    let isPaid = await invoiceRepository.findOne({
       salon_id: salonId,
       theme_id: targetTheme.id,
-      status: ThemeInvoiceStatus.ENUM.PAID,
+      invoice_type: InvoiceType.ENUM.THEME,
+      payment_status: InvoicePaymentStatus.ENUM.PAID,
     });
 
     if (!isPaid) {
-      const pendingInvoice = await themeInvoiceRepository.findOne({
+      const pendingInvoice = await invoiceRepository.findOne({
         salon_id: salonId,
         theme_id: targetTheme.id,
-        status: ThemeInvoiceStatus.ENUM.PENDING,
+        invoice_type: InvoiceType.ENUM.THEME,
+        payment_status: InvoicePaymentStatus.ENUM.PENDING,
       });
 
       if (pendingInvoice && pendingInvoice.stripe_payment_intent_id) {
@@ -300,15 +313,16 @@ exports.activateTheme = async (payload) => {
 exports.handleThemePaymentSucceeded = async (paymentIntent) => {
   const { salon_id, salon_uuid, theme_id, theme_code } = paymentIntent.metadata || {};
 
-  return await themeInvoiceRepository.handleManagedTransaction(
+  await invoiceRepository.handleManagedTransaction(
     async (transaction) => {
-      const existing = await themeInvoiceRepository.findOne(
-        { stripe_payment_intent_id: paymentIntent.id },
+      const existing = await invoiceRepository.findOne(
+        { stripe_payment_intent_id: paymentIntent.id, invoice_type: InvoiceType.ENUM.THEME },
         [],
+        {},
         { transaction }
       );
 
-      if (existing && existing.status === ThemeInvoiceStatus.ENUM.PAID) {
+      if (existing && existing.payment_status === InvoicePaymentStatus.ENUM.PAID) {
         console.log(
           `[Theme Webhook] PaymentIntent ${paymentIntent.id} already processed. Skipping.`
         );
@@ -319,10 +333,14 @@ exports.handleThemePaymentSucceeded = async (paymentIntent) => {
         existing?.invoice_number ||
         `THM-INV-${Date.now().toString().slice(-6)}-${salon_id || "0"}`;
 
-      if (existing && existing.status === ThemeInvoiceStatus.ENUM.PENDING) {
-        await themeInvoiceRepository.update({
+      const totalAmount = paymentIntent.amount / 100;
+
+      if (existing && existing.payment_status === InvoicePaymentStatus.ENUM.PENDING) {
+        await invoiceRepository.update({
           payload: {
-            status: ThemeInvoiceStatus.ENUM.PAID,
+            payment_status: InvoicePaymentStatus.ENUM.PAID,
+            amount_paid: totalAmount,
+            balance_due: 0,
             transaction_id: paymentIntent.id,
             payment_details: {
               charges: paymentIntent.charges?.data?.[0]?.payment_method_details || null,
@@ -330,22 +348,26 @@ exports.handleThemePaymentSucceeded = async (paymentIntent) => {
             },
           },
           criteria: { id: existing.id },
-          transaction,
+          options: { transaction },
         });
       } else if (!existing) {
         try {
-          await themeInvoiceRepository.create(
+          await invoiceRepository.create(
             {
+              invoice_number: invoiceNumber,
+              invoice_type: InvoiceType.ENUM.THEME,
               salon_id: Number(salon_id),
               theme_id: Number(theme_id),
-              invoice_number: invoiceNumber,
-              amount: paymentIntent.amount / 100,
+              grand_total: totalAmount,
+              amount_paid: totalAmount,
+              balance_due: 0,
               currency: (paymentIntent.currency || "INR").toUpperCase(),
-              status: ThemeInvoiceStatus.ENUM.PAID,
-              payment_method: ThemePaymentMethod.ENUM.CARD,
+              payment_status: InvoicePaymentStatus.ENUM.PAID,
+              payment_method: "card",
               transaction_id: paymentIntent.id,
               stripe_payment_intent_id: paymentIntent.id,
               stripe_client_secret: paymentIntent.client_secret,
+              issued_at: new Date(),
               payment_details: {
                 charges: paymentIntent.charges?.data?.[0]?.payment_method_details || null,
                 receipt_url: paymentIntent.charges?.data?.[0]?.receipt_url || null,
@@ -369,20 +391,31 @@ exports.handleThemePaymentSucceeded = async (paymentIntent) => {
       );
     }
   );
+
+  const paidInvoice = await invoiceRepository.findOne({
+    stripe_payment_intent_id: paymentIntent.id,
+    invoice_type: InvoiceType.ENUM.THEME,
+  });
+  if (paidInvoice) {
+    enqueueInvoiceJob(paidInvoice.id).catch((err) =>
+      console.error(`[Theme Webhook] Failed to enqueue invoice job:`, err.message)
+    );
+  }
 };
 
 exports.handleThemePaymentFailed = async (paymentIntent) => {
   const failureReason =
     paymentIntent.last_payment_error?.message || "Theme payment failed";
 
-  const existing = await themeInvoiceRepository.findOne({
+  const existing = await invoiceRepository.findOne({
     stripe_payment_intent_id: paymentIntent.id,
+    invoice_type: InvoiceType.ENUM.THEME,
   });
 
   if (existing) {
-    await themeInvoiceRepository.update({
+    await invoiceRepository.update({
       payload: {
-        status: ThemeInvoiceStatus.ENUM.FAILED,
+        payment_status: InvoicePaymentStatus.ENUM.FAILED,
         payment_details: {
           last_payment_error: paymentIntent.last_payment_error || null,
           failure_reason: failureReason,

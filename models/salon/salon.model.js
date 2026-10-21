@@ -54,17 +54,13 @@ module.exports = (sequelize, DataTypes) => {
         foreignKey: "salon_id",
         as: "inventoryTransactions",
       });
-      this.hasMany(models.SubscriptionInvoice, {
+      this.hasMany(models.Invoice, {
         foreignKey: "salon_id",
-        as: "subscriptionInvoices",
+        as: "invoices",
       });
       this.hasMany(models.Notification, {
         foreignKey: "salon_id",
         as: "notifications",
-      });
-      this.hasMany(models.ThemeInvoice, {
-        foreignKey: "salon_id",
-        as: "themeInvoices",
       });
       this.belongsTo(models.StorefrontTheme, {
         foreignKey: "storefront_theme_id",

@@ -1,7 +1,7 @@
 const { z } = require("zod");
 const {
   SubscriptionDiscountType,
-} = require("../../models/subscription-invoice/subscription-invoice-types");
+} = require("../../models/invoice/invoice-types");
 
 const discountDetailsObject = z
   .object(
