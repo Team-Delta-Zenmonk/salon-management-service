@@ -11,6 +11,8 @@ const {
   InvoicePaymentStatus,
 } = require("../models/invoice/invoice-types");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
+const { enqueueNotificationJob } = require("../jobs/notification.worker");
+const socketManager = require("../libs/socket.manager");
 
 exports.getThemesForSalon = async (payload) => {
   const { uuid } = payload.salon;
@@ -400,6 +402,39 @@ exports.handleThemePaymentSucceeded = async (paymentIntent) => {
     enqueueInvoiceJob(paidInvoice.id).catch((err) =>
       console.error(`[Theme Webhook] Failed to enqueue invoice job:`, err.message)
     );
+  }
+
+  const parsedSalonId = Number(salon_id);
+  if (parsedSalonId) {
+    const themeData = {
+      theme_id: Number(theme_id),
+      theme_code: theme_code || null,
+      salon_id: parsedSalonId,
+      salon_uuid: salon_uuid || null,
+    };
+
+    try {
+      socketManager.sendToSalon(parsedSalonId, {
+        event: "THEME_PURCHASED",
+        data: themeData,
+      });
+    } catch (err) {
+      console.error(`[Theme Webhook] Failed to emit THEME_PURCHASED socket event:`, err.message);
+    }
+
+    try {
+      enqueueNotificationJob({
+        salonId: parsedSalonId,
+        type: "THEME_PURCHASED",
+        title: "Theme Purchased Successfully!",
+        message: `Your storefront theme has been unlocked. You can now apply it directly to your storefront.`,
+        data: themeData,
+      }).catch((err) =>
+        console.error(`[Theme Webhook] Failed to enqueue notification job:`, err.message)
+      );
+    } catch (err) {
+      console.error(`[Theme Webhook] Failed to dispatch notification:`, err.message);
+    }
   }
 };
 
