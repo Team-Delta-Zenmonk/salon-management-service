@@ -1,11 +1,13 @@
 const crypto = require("crypto");
 const stripe = require("../config/stripe");
 const { error } = require("../libs");
-const { paymentRepository, bookingRepository, cartRepository, salonRepository } = require("../repository");
+const { paymentRepository, bookingRepository, cartRepository, salonRepository, invoiceRepository } = require("../repository");
 const { PaymentStatus } = require("../models/payment/payment-types");
 const { BookingStatus } = require("../models/booking/booking-types");
 const { PaymentPolicy } = require("../models/salon/salon-types");
 const { enqueueNotificationJob } = require("../jobs/notification.worker");
+const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
+const invoiceService = require("./invoice.service");
 
 exports.createPaymentIntent = async (payload) => {
   const { booking_id } = payload.body;
@@ -181,8 +183,9 @@ exports.handlePaymentSucceeded = async (paymentIntent) => {
       },
     });
 
+    const newPaid = booking.amount_paid_online + (payment.amount / 100);
     const bookingUpdates = {
-      amount_paid_online: booking.amount_paid_online + (payment.amount / 100),
+      amount_paid_online: newPaid,
     };
 
     if (booking.status === BookingStatus.ENUM.PENDING) {
@@ -201,6 +204,25 @@ exports.handlePaymentSucceeded = async (paymentIntent) => {
       },
     });
 
+    const totalAmount = Number(booking.total_price || 0);
+    const isFullyPaid = newPaid >= totalAmount && totalAmount > 0;
+
+    if (isFullyPaid) {
+      const invoice = await invoiceRepository.findOne({ booking_id: booking.id }, [], {}, { transaction });
+      if (invoice) {
+        await invoiceRepository.update({
+          payload: {
+            amount_paid: newPaid,
+            balance_due: 0,
+            payment_status: "PAID",
+            payment_method: "CARD / ONLINE",
+          },
+          criteria: { id: invoice.id },
+          options: { transaction },
+        });
+      }
+    }
+
     const cart = await cartRepository.getActiveCartByCustomerId(booking.customer_id);
 
     if (cart && cart.salon_id === booking.salon_id) {
@@ -213,6 +235,23 @@ exports.handlePaymentSucceeded = async (paymentIntent) => {
       );
     }
   });
+
+  if (payment.booking_id) {
+    const freshBooking = await bookingRepository.findBookingWithDetails({ id: payment.booking_id });
+    if (freshBooking && Number(freshBooking.amount_paid_online) >= Number(freshBooking.total_price) && Number(freshBooking.total_price) > 0) {
+      const inv = await invoiceRepository.findOne({ booking_id: freshBooking.id });
+      if (inv) {
+        enqueueInvoiceJob(inv.id).catch((err) => console.error("[PaymentService] Invoice job error:", err.message));
+      } else {
+        invoiceService
+          .createBookingInvoice(freshBooking, { payment_status: "PAID", payment_method: "CARD / ONLINE" })
+          .then((createdInv) => {
+            if (createdInv?.id) enqueueInvoiceJob(createdInv.id);
+          })
+          .catch((err) => console.error("[PaymentService] Invoice creation error:", err.message));
+      }
+    }
+  }
 
   if (wasPending && targetBooking) {
     enqueueNotificationJob({

@@ -3,6 +3,8 @@ const { error } = require("../libs");
 const pdfGeneratorService = require("./pdf-generator.service");
 const uploadService = require("./upload.service");
 const { InvoiceType } = require("../models/invoice/invoice-types");
+const { BookingSource, BookingStatus } = require("../models/booking/booking-types");
+const { PaymentPolicy } = require("../models/salon/salon-types");
 
 const derivePaymentStatus = (paid, total) => {
   if (paid >= total && total > 0) return "PAID";
@@ -10,9 +12,13 @@ const derivePaymentStatus = (paid, total) => {
   return "UNPAID";
 };
 
-const generateInvoiceNumber = (prefix, id) => {
+const generateInvoiceNumber = (prefix, booking) => {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return `${prefix}-${id}-${dateStr}`;
+  const bookingId = typeof booking === "object" ? booking?.id : booking;
+  const bookingUuid = typeof booking === "object" && booking?.uuid ? booking.uuid.slice(0, 8).toUpperCase() : "";
+  return bookingUuid
+    ? `${prefix}-${bookingId}-${bookingUuid}-${dateStr}`
+    : `${prefix}-${bookingId}-${dateStr}`;
 };
 
 const resolveCustomerName = (booking) =>
@@ -31,24 +37,76 @@ const FOLDER_MAP = {
 };
 
 exports.createBookingInvoice = async (booking, options = {}) => {
+  const totalAmount = Number(booking.total_price || 0);
+
+  const isAdminBooking =
+    booking.created_by === "admin" ||
+    booking.created_by === BookingSource?.ENUM?.ADMIN ||
+    booking.is_walk_in === true ||
+    Boolean(booking.admin_booking);
+
+  const policy = (booking.payment_policy || "").toLowerCase();
+
+  let paidAmount = Number(booking.amount_paid_online || 0);
+
+  const explicitStatus = options.payment_status?.toUpperCase();
+
+  if (explicitStatus === "PAID") {
+    paidAmount = totalAmount;
+  } else if (isAdminBooking) {
+    if (policy === "full_upfront") {
+      paidAmount = totalAmount;
+    } else if (policy === "partial_deposit") {
+      paidAmount = Math.max(paidAmount, Number(booking.deposit_amount || 0));
+    }
+  } else {
+    if (
+      policy === "full_upfront" &&
+      booking.status === BookingStatus?.ENUM?.CONFIRMED &&
+      (paidAmount > 0 || Number(booking.deposit_amount) >= totalAmount)
+    ) {
+      paidAmount = totalAmount;
+    }
+  }
+
+  const balanceDue = Math.max(0, totalAmount - paidAmount);
+  const paymentStatus = explicitStatus || derivePaymentStatus(paidAmount, totalAmount);
+  const paymentMethod = options.payment_method || (policy === "full_upfront" ? "Full Upfront" : booking.payment_policy || "PAY_AT_VENUE");
+
+  if (paymentStatus !== "PAID") {
+    return null;
+  }
+
   const existing = await invoiceRepository.findOne(
     { booking_id: booking.id },
     [],
     {},
     options
   );
-  if (existing) return existing;
 
-  const totalAmount = Number(booking.total_price || 0);
-  const paidAmount = Number(booking.amount_paid_online || 0);
-  const balanceDue = Math.max(0, totalAmount - paidAmount);
-  const paymentStatus = derivePaymentStatus(paidAmount, totalAmount);
-  const paymentMethod = booking.payment_policy || "PAY_AT_VENUE";
+  if (existing) {
+    if (existing.payment_status !== paymentStatus || Number(existing.amount_paid) !== paidAmount) {
+      await invoiceRepository.update({
+        payload: {
+          amount_paid: paidAmount,
+          balance_due: balanceDue,
+          payment_status: paymentStatus,
+          payment_method: paymentMethod,
+        },
+        criteria: { id: existing.id },
+      });
+      existing.amount_paid = paidAmount;
+      existing.balance_due = balanceDue;
+      existing.payment_status = paymentStatus;
+      existing.payment_method = paymentMethod;
+    }
+    return existing;
+  }
 
   const customerName = resolveCustomerName(booking);
   const customerEmail = resolveCustomerEmail(booking);
   const customerPhone = resolveCustomerPhone(booking);
-  const invoiceNumber = generateInvoiceNumber("INV", booking.id);
+  const invoiceNumber = generateInvoiceNumber("INV", booking);
 
   return await invoiceRepository.create(
     {

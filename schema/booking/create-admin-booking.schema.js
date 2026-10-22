@@ -44,6 +44,8 @@ exports.createAdminBookingSchema = z.object({
     ),
     payment_policy: z.enum(Object.values(PaymentPolicy.ENUM)).optional(),
     payment_preference: z.enum(Object.values(PaymentPolicy.ENUM)).optional(),
+    payment_status: z.string().optional(),
+    payment_method: z.string().optional(),
     is_walk_in: z.boolean().optional(),
   }),
 });

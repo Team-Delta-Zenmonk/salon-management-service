@@ -130,6 +130,8 @@ exports.uploadPdfBuffer = async ({ pdfBuffer, filename, folder = "invoices" }) =
     public_id: cleanFilename,
     resource_type: "raw",
     upload_preset: process.env.CLOUDINARY_DOC_PRESET || "doc_preset",
+    overwrite: true,
+    invalidate: true,
   });
 
   return result.secure_url;

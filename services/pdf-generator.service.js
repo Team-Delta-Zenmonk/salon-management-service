@@ -52,6 +52,30 @@ PAGE.contentWidth = PAGE.width - PAGE.marginX * 2;
 
 const RUPEE = fs.existsSync(FONT_REGULAR_PATH) ? "₹" : "Rs.";
 
+const fitText = (doc, text, maxWidth, options = {}) => {
+  if (!text) return "";
+  const str = String(text).replace(/[\r\n]+/g, " ").trim();
+  if (maxWidth <= 0) return "";
+  if (doc.widthOfString(str, options) <= maxWidth) return str;
+  const ellipsis = "...";
+  const ellipsisWidth = doc.widthOfString(ellipsis, options);
+  if (ellipsisWidth >= maxWidth) return "";
+  let low = 0;
+  let high = str.length;
+  let best = "";
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const candidate = str.slice(0, mid);
+    if (doc.widthOfString(candidate, options) + ellipsisWidth <= maxWidth) {
+      best = candidate;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return best ? `${best.trimEnd()}${ellipsis}` : ellipsis;
+};
+
 const formatCurrency = (amount) => {
   const num = Number(amount || 0);
   return `${RUPEE}${num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -84,14 +108,6 @@ const formatDuration = (minutes) => {
   return `Duration: ${remMins} min`;
 };
 
-const humanisePaymentMethod = (method) => {
-  if (!method) return "Card / Online";
-  return method
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-};
-
 const fetchImageBuffer = async (url) => {
   if (!url) return null;
   try {
@@ -118,7 +134,7 @@ const collectPdfBuffer = (doc) =>
     doc.on("error", reject);
   });
 
-const drawHeader = (doc, { salon, type }, logoBuffer) => {
+const drawHeader = (doc, { salon, type, invoice }, logoBuffer) => {
   const y = PAGE.marginY;
   const logoSize = 36;
   let textLeft = PAGE.marginX;
@@ -131,9 +147,23 @@ const drawHeader = (doc, { salon, type }, logoBuffer) => {
 
   if (logoBuffer) {
     try {
+      const img = doc.openImage(logoBuffer);
+      const imgW = img.width || logoSize;
+      const imgH = img.height || logoSize;
+
+      const scale = Math.min(logoSize / imgW, logoSize / imgH);
+      const renderW = Math.round(imgW * scale);
+      const renderH = Math.round(imgH * scale);
+
+      const posX = PAGE.marginX + Math.round((logoSize - renderW) / 2);
+      const posY = y + Math.round((logoSize - renderH) / 2);
+
       doc.save();
-      doc.circle(PAGE.marginX + logoSize / 2, y + logoSize / 2, logoSize / 2).clip();
-      doc.image(logoBuffer, PAGE.marginX, y, { width: logoSize, height: logoSize, fit: [logoSize, logoSize] });
+      const cornerRadius = Math.min(4, Math.floor(renderH / 4), Math.floor(renderW / 4));
+      if (cornerRadius > 0) {
+        doc.roundedRect(posX, posY, renderW, renderH, cornerRadius).clip();
+      }
+      doc.image(img, posX, posY, { width: renderW, height: renderH });
       doc.restore();
       textLeft += logoSize + 12;
     } catch {
@@ -148,37 +178,44 @@ const drawHeader = (doc, { salon, type }, logoBuffer) => {
     textLeft += logoSize + 12;
   }
 
+  const maxHeaderWidth = PAGE.contentWidth - (textLeft - PAGE.marginX);
   doc
     .fillColor(COLORS.darkText)
     .font(FONTS.lora)
-    .fontSize(28)
-    .text(headerTitle, textLeft, y + 3, {
-      width: PAGE.contentWidth - (textLeft - PAGE.marginX),
-      lineBreak: false,
-      ellipsis: true,
-      characterSpacing: 0.5,
-    });
+    .fontSize(28);
+
+  const truncatedHeader = fitText(doc, headerTitle, maxHeaderWidth, { characterSpacing: 0.5 });
+  doc.text(truncatedHeader, textLeft, y + 3, {
+    width: maxHeaderWidth,
+    lineBreak: false,
+    characterSpacing: 0.5,
+  });
 
   const bannerY = y + logoSize + 14;
   const bannerHeight = 50;
   doc.roundedRect(PAGE.marginX, bannerY, PAGE.contentWidth, bannerHeight, 6).fill(COLORS.primaryOrange);
 
+  const isUnpaid = invoice && (invoice.payment_status === "UNPAID" || invoice.payment_status === "FAILED");
   const bannerText =
     type === "SUBSCRIPTION"
       ? "Subscription payment confirmed."
       : type === "THEME"
       ? "Theme purchase confirmed."
+      : isUnpaid
+      ? "Booking appointment confirmed."
       : "Payment has been confirmed.";
 
+  const maxBannerWidth = PAGE.contentWidth - 32;
   doc
     .fillColor(COLORS.white)
     .font(FONTS.bold)
-    .fontSize(22)
-    .text(bannerText, PAGE.marginX + 16, bannerY + 14, {
-      width: PAGE.contentWidth - 32,
-      lineBreak: false,
-      ellipsis: true,
-    });
+    .fontSize(22);
+
+  const truncatedBanner = fitText(doc, bannerText, maxBannerWidth);
+  doc.text(truncatedBanner, PAGE.marginX + 16, bannerY + 14, {
+    width: maxBannerWidth,
+    lineBreak: false,
+  });
 
   return bannerY + bannerHeight + 20;
 };
@@ -205,11 +242,13 @@ const drawFooter = (doc, { salon, customer, type }) => {
   doc
     .fillColor(COLORS.footerDark)
     .font(FONTS.regular)
-    .fontSize(14)
-    .text(line1, PAGE.marginX, footerStartY + 10, {
-      width: PAGE.contentWidth,
-      lineGap: 2,
-    });
+    .fontSize(14);
+
+  const truncatedLine1 = fitText(doc, line1, PAGE.contentWidth);
+  doc.text(truncatedLine1, PAGE.marginX, footerStartY + 10, {
+    width: PAGE.contentWidth,
+    lineBreak: false,
+  });
 
   const recipientEmail =
     type === "BOOKING" ? (customer.email || "") : (salon.email || "");
@@ -220,11 +259,13 @@ const drawFooter = (doc, { salon, customer, type }) => {
   doc
     .fillColor(COLORS.mutedText)
     .font(FONTS.regular)
-    .fontSize(12)
-    .text(line2, PAGE.marginX, doc.y + 6, {
-      width: PAGE.contentWidth,
-      lineGap: 2,
-    });
+    .fontSize(12);
+
+  const truncatedLine2 = fitText(doc, line2, PAGE.contentWidth);
+  doc.text(truncatedLine2, PAGE.marginX, footerStartY + 30, {
+    width: PAGE.contentWidth,
+    lineBreak: false,
+  });
 };
 
 const drawStatusBadge = (doc, startY, { invoice }) => {
@@ -251,15 +292,17 @@ const drawStatusBadge = (doc, startY, { invoice }) => {
     : `Successfully paid: ${formatCurrency(invoice.grand_total || invoice.amount)}.`;
 
   const textX = PAGE.marginX + 16 + iconRadius * 2 + 12;
+  const maxBadgeWidth = PAGE.contentWidth - (textX - PAGE.marginX) - 16;
   doc
     .fillColor(COLORS.darkText)
     .font(FONTS.bold)
-    .fontSize(16)
-    .text(badgeText, textX, startY + 15, {
-      width: PAGE.contentWidth - (textX - PAGE.marginX) - 16,
-      lineBreak: false,
-      ellipsis: true,
-    });
+    .fontSize(16);
+
+  const truncatedBadge = fitText(doc, badgeText, maxBadgeWidth);
+  doc.text(truncatedBadge, textX, startY + 15, {
+    width: maxBadgeWidth,
+    lineBreak: false,
+  });
 
   return startY + cardHeight + 20;
 };
@@ -287,25 +330,27 @@ const drawGreeting = (doc, startY, { customer, salon, type, invoice }) => {
   doc
     .fillColor(COLORS.darkText)
     .font(FONTS.regular)
-    .fontSize(22)
-    .text(title, PAGE.marginX, startY, {
-      width: PAGE.contentWidth,
-      lineBreak: false,
-      ellipsis: true,
-    });
+    .fontSize(22);
+
+  const truncatedTitle = fitText(doc, title, PAGE.contentWidth);
+  doc.text(truncatedTitle, PAGE.marginX, startY, {
+    width: PAGE.contentWidth,
+    lineBreak: false,
+  });
 
   const subtitleY = startY + 24 + 14;
 
   doc
     .fillColor(COLORS.bodyText)
     .font(FONTS.regular)
-    .fontSize(16)
-    .text(subtitle, PAGE.marginX, subtitleY, {
-      width: PAGE.contentWidth,
-      lineBreak: false,
-      ellipsis: true,
-      characterSpacing: 0.2,
-    });
+    .fontSize(16);
+
+  const truncatedSubtitle = fitText(doc, subtitle, PAGE.contentWidth, { characterSpacing: 0.2 });
+  doc.text(truncatedSubtitle, PAGE.marginX, subtitleY, {
+    width: PAGE.contentWidth,
+    lineBreak: false,
+    characterSpacing: 0.2,
+  });
 
   return subtitleY + 20 + 20;
 };
@@ -320,8 +365,13 @@ const drawInvoiceMeta = (doc, startY, { invoice }) => {
 
   y += 16;
 
-  doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14).text(invoice.invoice_number, PAGE.marginX, y, { width: colWidth, ellipsis: true });
-  doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14).text(formatDate(invoice.issued_at || invoice.created_at), rightX, y, { align: "right", width: colWidth, ellipsis: true });
+  doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
+  const truncatedNum = fitText(doc, invoice.invoice_number || "", colWidth);
+  doc.text(truncatedNum, PAGE.marginX, y, { width: colWidth, lineBreak: false });
+
+  const dateStr = formatDate(invoice.issued_at || invoice.created_at);
+  const truncatedDate = fitText(doc, dateStr, colWidth);
+  doc.text(truncatedDate, rightX, y, { align: "right", width: colWidth, lineBreak: false });
 
   y += 20;
 
@@ -345,53 +395,57 @@ const drawPartiesInfo = (doc, startY, { salon = {}, customer = {}, type }) => {
   let cy = startY + 16;
 
   if (type === "BOOKING") {
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(salon.name || "Salon", leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14);
+    doc.text(fitText(doc, salon.name || "Salon", colWidth), leftX, sy, { width: colWidth, lineBreak: false });
     sy += 16;
     doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
     if (salon.address) {
-      doc.text(salon.address, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+      doc.text(fitText(doc, salon.address, colWidth), leftX, sy, { width: colWidth, lineBreak: false });
       sy += 16;
     }
     const cityState = [salon.city, salon.state, salon.zip_code].filter(Boolean).join(", ");
     if (cityState) {
-      doc.text(cityState, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+      doc.text(fitText(doc, cityState, colWidth), leftX, sy, { width: colWidth, lineBreak: false });
       sy += 16;
     }
 
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(customer.name || "Customer", rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14);
+    doc.text(fitText(doc, customer.name || "Customer", colWidth), rightX, cy, { align: "right", width: colWidth, lineBreak: false });
     cy += 16;
     doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
     if (customer.email) {
-      doc.text(customer.email, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      doc.text(fitText(doc, customer.email, colWidth), rightX, cy, { align: "right", width: colWidth, lineBreak: false });
       cy += 16;
     }
     if (customer.phone) {
-      doc.text(customer.phone, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      doc.text(fitText(doc, customer.phone, colWidth), rightX, cy, { align: "right", width: colWidth, lineBreak: false });
       cy += 16;
     }
   } else {
     const brandName = process.env.BRAND_NAME || "Vellora";
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(brandName, leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14);
+    doc.text(fitText(doc, brandName, colWidth), leftX, sy, { width: colWidth, lineBreak: false });
     sy += 16;
     doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
-    doc.text("Cloud Salon Software Suite", leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+    doc.text("Cloud Salon Software Suite", leftX, sy, { width: colWidth, lineBreak: false });
     sy += 16;
-    doc.text(process.env.SUPPORT_EMAIL || "support@zenmonk.tech", leftX, sy, { width: colWidth, lineBreak: false, ellipsis: true });
+    doc.text(fitText(doc, process.env.SUPPORT_EMAIL || "support@zenmonk.tech", colWidth), leftX, sy, { width: colWidth, lineBreak: false });
     sy += 16;
 
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(salon.name || "Salon Partner", rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14);
+    doc.text(fitText(doc, salon.name || "Salon Partner", colWidth), rightX, cy, { align: "right", width: colWidth, lineBreak: false });
     cy += 16;
     doc.fillColor(COLORS.darkText).font(FONTS.regular).fontSize(14);
     if (salon.email) {
-      doc.text(salon.email, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      doc.text(fitText(doc, salon.email, colWidth), rightX, cy, { align: "right", width: colWidth, lineBreak: false });
       cy += 16;
     }
     if (salon.phone || salon.phone_number) {
-      doc.text(salon.phone || salon.phone_number, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      doc.text(fitText(doc, salon.phone || salon.phone_number, colWidth), rightX, cy, { align: "right", width: colWidth, lineBreak: false });
       cy += 16;
     }
     if (salon.address) {
-      doc.text(salon.address, rightX, cy, { align: "right", width: colWidth, lineBreak: false, ellipsis: true });
+      doc.text(fitText(doc, salon.address, colWidth), rightX, cy, { align: "right", width: colWidth, lineBreak: false });
       cy += 16;
     }
   }
@@ -430,20 +484,24 @@ const drawServicesTable = (doc, startY, { items = [], invoice, type }) => {
     const sPrice = formatCurrency(item.price || item.rate || 0);
     const rowHeight = 32;
 
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(sName, tableLeft, y + 7, {
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14);
+    const truncatedName = fitText(doc, sName, descColWidth);
+    doc.text(truncatedName, tableLeft, y + 7, {
       width: descColWidth,
       lineBreak: false,
-      ellipsis: true,
     });
 
-    doc.fillColor(COLORS.bodyText).font(FONTS.regular).fontSize(14).text(sQty, qtyColX, y + 7, {
+    doc.fillColor(COLORS.bodyText).font(FONTS.regular).fontSize(14);
+    const truncatedQty = fitText(doc, sQty, qtyColWidth);
+    doc.text(truncatedQty, qtyColX, y + 7, {
       width: qtyColWidth,
       align: "center",
       lineBreak: false,
-      ellipsis: true,
     });
 
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(sPrice, priceColX, y + 7, {
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14);
+    const truncatedPrice = fitText(doc, sPrice, priceColWidth);
+    doc.text(truncatedPrice, priceColX, y + 7, {
       width: priceColWidth,
       align: "right",
       lineBreak: false,
@@ -465,7 +523,9 @@ const drawServicesTable = (doc, startY, { items = [], invoice, type }) => {
     width: totalsLabelWidth,
     align: "right",
   });
-  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14).text(formatCurrency(grandTotal), totalsPriceX, totalsY, {
+  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(14);
+  const truncatedSubtotal = fitText(doc, formatCurrency(grandTotal), totalsPriceWidth);
+  doc.text(truncatedSubtotal, totalsPriceX, totalsY, {
     width: totalsPriceWidth,
     align: "right",
     lineBreak: false,
@@ -481,7 +541,9 @@ const drawServicesTable = (doc, startY, { items = [], invoice, type }) => {
     width: totalsLabelWidth,
     align: "right",
   });
-  doc.fillColor(totalColor).font(FONTS.bold).fontSize(18).text(formatCurrency(grandTotal), totalsPriceX, totalsY, {
+  doc.fillColor(totalColor).font(FONTS.bold).fontSize(18);
+  const truncatedGrandTotal = fitText(doc, formatCurrency(grandTotal), totalsPriceWidth);
+  doc.text(truncatedGrandTotal, totalsPriceX, totalsY, {
     width: totalsPriceWidth,
     align: "right",
     lineBreak: false,
@@ -498,26 +560,27 @@ const drawInfoCards = (doc, startY, { invoice, booking = {}, type, metadata = {}
   const leftX = PAGE.marginX;
   const rightX = PAGE.marginX + cardWidth + 12;
   const cardHeight = 76;
+  const maxInnerWidth = cardWidth - 32;
 
   const isUnpaid = invoice.payment_status === "UNPAID" || invoice.payment_status === "FAILED";
 
   doc.roundedRect(leftX, startY, cardWidth, cardHeight, 6).fill(COLORS.peachBg);
-  doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(11).text("PAYMENT METHOD:", leftX + 16, startY + 12, { characterSpacing: 0.6 });
+  doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(11).text("PAYMENT STATUS:", leftX + 16, startY + 12, { characterSpacing: 0.6 });
 
-  const methodTitle = isUnpaid ? "Payment Pending" : humanisePaymentMethod(invoice.payment_method);
-  const methodSub = isUnpaid ? "Complete checkout" : `Paid on ${formatDate(invoice.issued_at || invoice.created_at)}.`;
+  const statusTitle = isUnpaid ? "Payment Pending" : "Paid";
+  const statusSub = isUnpaid ? "Payment due" : `Paid on ${formatDate(invoice.issued_at || invoice.created_at)}.`;
   const subColor = isUnpaid ? COLORS.mutedText : COLORS.successText;
 
-  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13).text(methodTitle, leftX + 16, startY + 28, {
-    width: cardWidth - 32,
+  doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13);
+  doc.text(fitText(doc, statusTitle, maxInnerWidth), leftX + 16, startY + 28, {
+    width: maxInnerWidth,
     lineBreak: false,
-    ellipsis: true,
   });
 
-  doc.fillColor(subColor).font(FONTS.regular).fontSize(12).text(methodSub, leftX + 16, startY + 48, {
-    width: cardWidth - 32,
+  doc.fillColor(subColor).font(FONTS.regular).fontSize(12);
+  doc.text(fitText(doc, statusSub, maxInnerWidth), leftX + 16, startY + 48, {
+    width: maxInnerWidth,
     lineBreak: false,
-    ellipsis: true,
   });
 
   doc.roundedRect(rightX, startY, cardWidth, cardHeight, 6).fill(COLORS.peachBg);
@@ -527,16 +590,16 @@ const drawInfoCards = (doc, startY, { invoice, booking = {}, type, metadata = {}
     const apptTime = formatAppointmentTime(booking.booking_start_time || booking.booking_date);
     const durationStr = formatDuration(booking.total_duration);
 
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13).text(apptTime, rightX + 16, startY + 28, {
-      width: cardWidth - 32,
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13);
+    doc.text(fitText(doc, apptTime, maxInnerWidth), rightX + 16, startY + 28, {
+      width: maxInnerWidth,
       lineBreak: false,
-      ellipsis: true,
     });
     if (durationStr) {
-      doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12).text(durationStr, rightX + 16, startY + 48, {
-        width: cardWidth - 32,
+      doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12);
+      doc.text(fitText(doc, durationStr, maxInnerWidth), rightX + 16, startY + 48, {
+        width: maxInnerWidth,
         lineBreak: false,
-        ellipsis: true,
       });
     }
   } else if (type === "SUBSCRIPTION") {
@@ -545,27 +608,27 @@ const drawInfoCards = (doc, startY, { invoice, booking = {}, type, metadata = {}
     const end = metadata.billing_period_end ? formatDate(metadata.billing_period_end) : "Active";
     const formattedCycle = cycle ? cycle.charAt(0).toUpperCase() + cycle.slice(1) : "Monthly";
 
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(12.5).text(`Valid to: ${end}`, rightX + 16, startY + 28, {
-      width: cardWidth - 32,
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(12.5);
+    doc.text(fitText(doc, `Valid to: ${end}`, maxInnerWidth), rightX + 16, startY + 28, {
+      width: maxInnerWidth,
       lineBreak: false,
-      ellipsis: true,
     });
-    doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12).text(`Billing Cycle: ${formattedCycle}`, rightX + 16, startY + 48, {
-      width: cardWidth - 32,
+    doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12);
+    doc.text(fitText(doc, `Billing Cycle: ${formattedCycle}`, maxInnerWidth), rightX + 16, startY + 48, {
+      width: maxInnerWidth,
       lineBreak: false,
-      ellipsis: true,
     });
   } else {
     doc.fillColor(COLORS.mutedText).font(FONTS.bold).fontSize(11).text("LICENSE TYPE:", rightX + 16, startY + 12, { characterSpacing: 0.6 });
-    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13).text("Lifetime Access", rightX + 16, startY + 28, {
-      width: cardWidth - 32,
+    doc.fillColor(COLORS.darkText).font(FONTS.bold).fontSize(13);
+    doc.text(fitText(doc, "Lifetime Access", maxInnerWidth), rightX + 16, startY + 28, {
+      width: maxInnerWidth,
       lineBreak: false,
-      ellipsis: true,
     });
-    doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12).text("Unlimited storefront usage", rightX + 16, startY + 48, {
-      width: cardWidth - 32,
+    doc.fillColor(COLORS.mutedText).font(FONTS.regular).fontSize(12);
+    doc.text(fitText(doc, "Unlimited storefront usage", maxInnerWidth), rightX + 16, startY + 48, {
+      width: maxInnerWidth,
       lineBreak: false,
-      ellipsis: true,
     });
   }
 
@@ -645,7 +708,7 @@ exports.generateInvoicePDF = async ({
 
   const bufferPromise = collectPdfBuffer(doc);
 
-  let y = drawHeader(doc, { salon, type: resolvedType }, logoBuffer);
+  let y = drawHeader(doc, { salon, type: resolvedType, invoice }, logoBuffer);
 
   y = drawStatusBadge(doc, y, { invoice });
 

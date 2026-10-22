@@ -308,15 +308,6 @@ exports.createBooking = async (payload) => {
   );
 
   if (result.action === "BOOKING_CREATED") {
-    invoiceService
-      .createBookingInvoice(result.booking)
-      .then((inv) => {
-        if (inv?.id) enqueueInvoiceJob(inv.id);
-      })
-      .catch((err) =>
-        console.error(`[CreateBooking] Failed to create/enqueue invoice for Booking #${result.booking?.id}:`, err.message)
-      );
-
     enqueueNotificationJob({
       salonId: result.booking.salon_id,
       bookingId: result.booking.id,
@@ -463,6 +454,8 @@ exports.createAdminBooking = async (payload) => {
     services,
     payment_preference,
     payment_policy,
+    payment_status,
+    payment_method,
     is_walk_in,
   } = payload.body;
 
@@ -479,7 +472,20 @@ exports.createAdminBooking = async (payload) => {
     async (transaction) => {
       let total_price = 0;
       let total_duration = 0;
-      let current_start_time = new Date(booking_start_time);
+      const initial_start_time = new Date(booking_start_time);
+      if (
+        booking_date &&
+        !isNaN(new Date(booking_date).getTime()) &&
+        !isNaN(initial_start_time.getTime())
+      ) {
+        const bDate = new Date(booking_date);
+        initial_start_time.setFullYear(
+          bDate.getFullYear(),
+          bDate.getMonth(),
+          bDate.getDate(),
+        );
+      }
+      let current_start_time = new Date(initial_start_time);
       const bookingServicesPayload = [];
 
       const sortedServices = services.map((s, index) => ({
@@ -598,7 +604,7 @@ exports.createAdminBooking = async (payload) => {
           booking_type: BookingType.ENUM.SINGLE,
           booking_execution_mode: BookingExecutionMode.ENUM.SEQUENTIAL,
           status: BookingStatus.ENUM.CONFIRMED,
-          booking_start_time: new Date(booking_start_time),
+          booking_start_time: initial_start_time,
           booking_end_time: current_start_time,
           booking_date: new Date(booking_date),
           created_by: BookingSource.ENUM.ADMIN,
@@ -612,6 +618,10 @@ exports.createAdminBooking = async (payload) => {
                     total_price * ((salon.deposit_percentage || 0) / 100),
                   )
                 : 0,
+          amount_paid_online:
+            chosenPolicy === PaymentPolicy.ENUM.FULL_UPFRONT || payment_status?.toLowerCase() === "paid"
+              ? Math.round(total_price)
+              : 0,
           is_walk_in: is_walk_in || false,
         },
         { transaction },
@@ -633,14 +643,23 @@ exports.createAdminBooking = async (payload) => {
     },
   );
 
-  invoiceService
-    .createBookingInvoice(createdBooking)
-    .then((inv) => {
-      if (inv?.id) enqueueInvoiceJob(inv.id);
-    })
-    .catch((err) =>
-      console.error(`[CreateAdminBooking] Failed to create/enqueue invoice for Booking #${createdBooking?.id}:`, err.message)
-    );
+  const isPaidUpfront =
+    chosenPolicy === PaymentPolicy.ENUM.FULL_UPFRONT ||
+    payment_status?.toLowerCase() === "paid";
+
+  if (isPaidUpfront) {
+    invoiceService
+      .createBookingInvoice(createdBooking, {
+        payment_status: "PAID",
+        payment_method: payment_method || "Full Upfront",
+      })
+      .then((inv) => {
+        if (inv?.id) enqueueInvoiceJob(inv.id);
+      })
+      .catch((err) =>
+        console.error(`[CreateAdminBooking] Failed to create/enqueue invoice for Booking #${createdBooking?.id}:`, err.message)
+      );
+  }
 
   const clientName = createdBooking.admin_booking?.name || createdBooking.customer?.name || "Client";
   enqueueNotificationJob({
@@ -701,19 +720,49 @@ exports.updateAdminBooking = async (payload) => {
       previousStartTime = new Date(booking.booking_start_time).getTime();
 
       if (status === BookingStatus.ENUM.COMPLETED) {
-        const startTimeToCheck = new Date(booking_start_time || booking.booking_start_time);
-        if (startTimeToCheck > new Date()) {
-          throw new error.BadRequest("Cannot mark a future booking as completed before its start time");
+        const now = new Date();
+        const bDate = new Date(booking_date || booking.booking_date);
+
+        const bookingDayUtc = bDate.toISOString().slice(0, 10);
+        const todayUtc = now.toISOString().slice(0, 10);
+
+        const bookingDayLocal = `${bDate.getFullYear()}-${String(bDate.getMonth() + 1).padStart(2, "0")}-${String(bDate.getDate()).padStart(2, "0")}`;
+        const todayLocal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+        if (bookingDayUtc > todayUtc && bookingDayLocal > todayLocal) {
+          throw new error.BadRequest(
+            "Cannot mark a future booking as completed before its start time",
+          );
         }
       }
 
       let total_price = booking.total_price;
       let total_duration = booking.total_duration;
-      let current_start_time = new Date(
+      const new_booking_date = booking_date || booking.booking_date;
+      let updated_start_time = new Date(
         booking_start_time || booking.booking_start_time,
       );
-      let final_booking_end_time = booking.booking_end_time;
-      const new_booking_date = booking_date || booking.booking_date;
+      if (
+        new_booking_date &&
+        !isNaN(new Date(new_booking_date).getTime()) &&
+        !isNaN(updated_start_time.getTime())
+      ) {
+        const bDate = new Date(new_booking_date);
+        updated_start_time.setFullYear(
+          bDate.getFullYear(),
+          bDate.getMonth(),
+          bDate.getDate(),
+        );
+      }
+      let current_start_time = new Date(updated_start_time);
+      let final_booking_end_time = booking.booking_end_time
+        ? new Date(booking.booking_end_time)
+        : current_start_time;
+      if (!(services && services.length > 0) && total_duration) {
+        final_booking_end_time = new Date(
+          updated_start_time.getTime() + total_duration * 60 * 1000,
+        );
+      }
       const bookingServicesPayload = [];
 
       if (services && services.length > 0) {
@@ -840,9 +889,7 @@ exports.updateAdminBooking = async (payload) => {
           total_price: Math.round(total_price),
           total_duration,
           status: status || booking.status,
-          booking_start_time: new Date(
-            booking_start_time || booking.booking_start_time,
-          ),
+          booking_start_time: updated_start_time,
           booking_end_time: final_booking_end_time,
           booking_date: new Date(new_booking_date),
           admin_booking: admin_booking || booking.admin_booking,
@@ -912,6 +959,43 @@ exports.updateAdminBooking = async (payload) => {
         action_by: "ADMIN",
       },
     }).catch((err) => console.error("[UpdateAdminBooking] Notification error:", err.message));
+  }
+
+  const isPaid =
+    updatedBooking.payment_policy === PaymentPolicy.ENUM.FULL_UPFRONT ||
+    payload.body.payment_status?.toLowerCase() === "paid" ||
+    updatedBooking.status === BookingStatus.ENUM.COMPLETED;
+
+  if (isPaid) {
+    const existingInvoice = await invoiceRepository.findOne({ booking_id: updatedBooking.id });
+    if (existingInvoice) {
+      if (existingInvoice.payment_status !== "PAID") {
+        await invoiceRepository.update({
+          payload: {
+            amount_paid: updatedBooking.total_price,
+            balance_due: 0,
+            payment_status: "PAID",
+            payment_method: payload.body.payment_method || existingInvoice.payment_method || "Full Upfront",
+          },
+          criteria: { id: existingInvoice.id },
+        });
+        enqueueInvoiceJob(existingInvoice.id).catch((err) =>
+          console.error(`[UpdateAdminBooking] Failed to enqueue invoice job: ${err.message}`)
+        );
+      }
+    } else {
+      invoiceService
+        .createBookingInvoice(updatedBooking, {
+          payment_status: "PAID",
+          payment_method: payload.body.payment_method || "Full Upfront",
+        })
+        .then((inv) => {
+          if (inv?.id) enqueueInvoiceJob(inv.id);
+        })
+        .catch((err) =>
+          console.error(`[UpdateAdminBooking] Failed to create/enqueue invoice for Booking #${updatedBooking?.id}:`, err.message)
+        );
+    }
   }
 
   return updatedBooking;
@@ -1292,12 +1376,43 @@ exports.collectPayment = async ({ params }) => {
   await bookingRepository.update({
     payload: {
       deposit_amount: booking.total_price,
+      amount_paid_online: booking.total_price,
     },
     criteria: {
       id: booking.id,
     },
   });
-  return await bookingRepository.findBookingWithDetails({ id: booking.id });
+
+  const updatedBooking = await bookingRepository.findBookingWithDetails({ id: booking.id });
+
+  const existingInvoice = await invoiceRepository.findOne({ booking_id: booking.id });
+  if (existingInvoice) {
+    await invoiceRepository.update({
+      payload: {
+        amount_paid: booking.total_price,
+        balance_due: 0,
+        payment_status: "PAID",
+      },
+      criteria: { id: existingInvoice.id },
+    });
+    enqueueInvoiceJob(existingInvoice.id).catch((err) =>
+      console.error(`[CollectPayment] Failed to enqueue invoice job: ${err.message}`)
+    );
+  } else {
+    invoiceService
+      .createBookingInvoice(
+        updatedBooking,
+        { payment_status: "PAID", payment_method: booking.payment_policy === "pay_at_venue" ? "Pay At Venue" : "Full Upfront" }
+      )
+      .then((inv) => {
+        if (inv?.id) enqueueInvoiceJob(inv.id);
+      })
+      .catch((err) =>
+        console.error(`[CollectPayment] Failed to create invoice: ${err.message}`)
+      );
+  }
+
+  return updatedBooking;
 };
 
 const toISODateTime = (dateStr, minutes) => {
