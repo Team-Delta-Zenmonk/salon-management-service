@@ -41,27 +41,23 @@ exports.listServices = async (payload) => {
 
     let criteria = {
       salon_id: salon.id,
-      [Op.and]: [
-        {
-          [Op.or]: [
-            { parent_id: null },
-            {
-              parent_id: {
-                [Op.in]: sequelize.literal(
-                  '(SELECT id FROM services WHERE deleted_at IS NULL)'
-                ),
-              },
-            },
-          ],
-        },
-      ],
+      parent_id: null,
+      [Op.and]: [],
     };
 
     if (search) {
+      const sanitizedSearch = search.replace(/'/g, "''");
       criteria[Op.and].push({
         [Op.or]: [
           { name: { [Op.iLike]: `%${search}%` } },
           { description: { [Op.iLike]: `%${search}%` } },
+          {
+            id: {
+              [Op.in]: sequelize.literal(
+                `(SELECT parent_id FROM services WHERE parent_id IS NOT NULL AND deleted_at IS NULL AND (name ILIKE '%${sanitizedSearch}%' OR (description IS NOT NULL AND description ILIKE '%${sanitizedSearch}%')))`
+              ),
+            },
+          },
         ],
       });
     }
@@ -95,7 +91,8 @@ exports.listStaff = async (payload) => {
     if (!service) throw new error.NotFound("Service not found");
 
     let serviceIds = [service.id];
-    if (service.parent_id) {
+    const shouldIncludeParent = query.include_parent !== undefined ? Boolean(query.include_parent) : false;
+    if (service.parent_id && shouldIncludeParent) {
         serviceIds.push(service.parent_id);
     }
 

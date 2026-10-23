@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const { error } = require("../libs");
 const { staffServiceRepository, staffRepository, serviceRepository } = require("../repository");
 const { assertStaffActive } = require("../utils/staff-status.util");
@@ -101,6 +102,73 @@ exports.bulkUnassignStaffService = async (payload) => {
   }
 
   await staffServiceRepository.softDelete({ id: idsToDelete });
+
+  const servicesOfDeleted = await serviceRepository.findAll({
+    criteria: { id: existing.map(e => e.service_id) },
+    attributes: ["id", "parent_id"],
+  });
+
+  const parentChildMap = new Map();
+  for (const s of servicesOfDeleted) {
+    if (s.parent_id) {
+      if (!parentChildMap.has(s.parent_id)) {
+        parentChildMap.set(s.parent_id, []);
+      }
+      parentChildMap.get(s.parent_id).push(s.id);
+    }
+  }
+
+  if (parentChildMap.size > 0) {
+    const parentIds = Array.from(parentChildMap.keys());
+    const staffIds = [...new Set(existing.map(e => e.staff_id))];
+
+    const allSiblings = await serviceRepository.findAll({
+      criteria: { parent_id: parentIds },
+      attributes: ["id", "parent_id"],
+    });
+
+    const parentToAllSubIds = new Map();
+    for (const sib of allSiblings) {
+      if (!parentToAllSubIds.has(sib.parent_id)) {
+        parentToAllSubIds.set(sib.parent_id, []);
+      }
+      parentToAllSubIds.get(sib.parent_id).push(sib.id);
+    }
+
+    const remainingStaffServices = await staffServiceRepository.findAll({
+      criteria: {
+        service_id: allSiblings.map(s => s.id),
+        staff_id: staffIds,
+      },
+      attributes: ["id", "service_id", "staff_id"],
+    });
+
+    const parentStaffToDelete = [];
+    for (const parentId of parentIds) {
+      const subIds = new Set(parentToAllSubIds.get(parentId) || []);
+      for (const staffId of staffIds) {
+        const hasActiveSub = remainingStaffServices.some(
+          rss => rss.staff_id === staffId && subIds.has(rss.service_id)
+        );
+        if (!hasActiveSub) {
+          parentStaffToDelete.push({ service_id: parentId, staff_id: staffId });
+        }
+      }
+    }
+
+    if (parentStaffToDelete.length > 0) {
+      const parentStaffRecords = await staffServiceRepository.findAll({
+        criteria: {
+          [Op.or]: parentStaffToDelete,
+        },
+        attributes: ["id"],
+      });
+
+      if (parentStaffRecords.length > 0) {
+        await staffServiceRepository.softDelete({ id: parentStaffRecords.map(p => p.id) });
+      }
+    }
+  }
 
   return { message: "Staff unassigned from services successfully" };
 };

@@ -261,6 +261,7 @@ exports.deleteCart = async (payload) => {
   const cart = await cartRepository.findOne({ uuid });
   if (!cart) throw new error.NotFound("Cart not found");
 
+  await cartItemRepository.softDelete({ cart_id: cart.id });
   await cartRepository.softDelete({ id: cart.id });
 
   return { message: "Cart deleted successfully" };

@@ -11,6 +11,9 @@ exports.listServiceStaffSchema = z.object({
       page: z.coerce.number().int().min(1).optional(),
       limit: z.coerce.number().int().min(1).optional(),
       offset: z.coerce.number().int().min(0).optional(),
+      include_parent: z
+        .preprocess((val) => (val === "true" || val === true ? true : val === "false" || val === false ? false : val), z.boolean())
+        .optional(),
     })
     .optional(),
 });
