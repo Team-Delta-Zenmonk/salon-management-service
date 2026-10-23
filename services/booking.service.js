@@ -225,15 +225,33 @@ exports.createBooking = async (payload) => {
         }
       }
 
-      const allowedPolicies =
+      let allowedPolicies =
         Array.isArray(cart.salon.allowed_payment_policies) &&
         cart.salon.allowed_payment_policies.length > 0
-          ? cart.salon.allowed_payment_policies
+          ? [...cart.salon.allowed_payment_policies]
           : [PaymentPolicy.ENUM.PAY_AT_VENUE];
+
+      if (!salon?.stripe_account_id) {
+        allowedPolicies = allowedPolicies.filter(
+          (p) => p === PaymentPolicy.ENUM.PAY_AT_VENUE
+        );
+        if (allowedPolicies.length === 0) {
+          allowedPolicies = [PaymentPolicy.ENUM.PAY_AT_VENUE];
+        }
+      }
 
       const preference = payment_preference || allowedPolicies[0];
 
       if (!allowedPolicies.includes(preference)) {
+        if (
+          !salon?.stripe_account_id &&
+          (preference === PaymentPolicy.ENUM.PARTIAL_DEPOSIT ||
+            preference === PaymentPolicy.ENUM.FULL_UPFRONT)
+        ) {
+          throw new error.BadRequest(
+            "Online payment is not available for this salon because Stripe is not connected. Please choose 'Pay at Venue'."
+          );
+        }
         throw new error.BadRequest(
           `Selected payment option '${preference}' is not enabled by this salon. Enabled options: ${allowedPolicies.join(", ")}`,
         );

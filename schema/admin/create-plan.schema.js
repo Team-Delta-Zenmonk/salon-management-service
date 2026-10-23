@@ -20,6 +20,9 @@ exports.createPlanSchema = z.object({
         .string()
         .trim()
         .max(FIELD_LIMITS.CODE, { message: `Code cannot exceed ${FIELD_LIMITS.CODE} characters` })
+        .refine((val) => !val || val.toLowerCase().trim() !== "trial", {
+          message: "Cannot create a plan with reserved code 'trial'",
+        })
         .optional()
         .nullable(),
       billing_cycle: z
@@ -42,12 +45,20 @@ exports.createPlanSchema = z.object({
         .nullable(),
     })
     .superRefine((data, ctx) => {
-      const isFreeTier = data.code?.toLowerCase().trim() === "trial";
-      if (!isFreeTier && data.amount <= 0) {
+      const normalizedCode = data.code?.toLowerCase().trim();
+      const normalizedName = data.name?.toLowerCase().trim();
+      if (normalizedCode === "trial" || (!data.code && normalizedName === "trial")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["code"],
+          message: "Plan code 'trial' is a reserved system tier and cannot be created",
+        });
+      }
+      if (data.amount <= 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["amount"],
-          message: "Price amount 0 is only allowed for the free trial tier (code: trial)",
+          message: "Price amount must be greater than 0 for new custom plans",
         });
       }
     }),

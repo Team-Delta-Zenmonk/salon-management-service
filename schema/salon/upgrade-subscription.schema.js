@@ -2,11 +2,9 @@ const { z } = require("zod");
 
 exports.upgradeSubscriptionSchema = z.object({
   body: z.object({
-    plan: z.enum(["monthly", "yearly"], {
-      message: "Plan must be either 'monthly' or 'yearly'",
-    }),
-    billing_cycle: z.enum(["monthly", "yearly"]).optional(),
-    payment_method: z.enum(["card", "upi", "netbanking"]).optional(),
+    plan: z.string({ required_error: "Plan code is required" }).min(1, { message: "Plan code is required" }),
+    billing_cycle: z.string().optional(),
+    payment_method: z.string().optional(),
     payment_details: z.record(z.any()).optional(),
     transaction_id: z.string().optional(),
   }),

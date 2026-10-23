@@ -60,6 +60,6 @@ exports.updateSalonSchema = z.object({
         sunday: businessDaySchema,
       })
       .optional(),
-    subscription_plan: z.enum(SubscriptionPlan.getValues()).optional(),
+    subscription_plan: z.string().optional(),
   }),
 });

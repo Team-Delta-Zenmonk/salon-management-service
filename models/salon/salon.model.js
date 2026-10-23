@@ -189,8 +189,8 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
       subscription_plan: {
-        type: DataTypes.ENUM(SubscriptionPlan.getValues()),
-        defaultValue: SubscriptionPlan.ENUM.TRIAL,
+        type: DataTypes.STRING,
+        defaultValue: "trial",
         allowNull: false,
       },
       subscription_status: {

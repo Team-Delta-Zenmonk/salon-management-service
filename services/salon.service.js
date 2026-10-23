@@ -68,6 +68,23 @@ exports.updateSalon = async (payload) => {
   let isNewlyOnboarded = false;
   let currentSalon = null;
 
+  if (Array.isArray(payload?.body?.allowed_payment_policies)) {
+    const onlinePolicies = ["partial_deposit", "full_upfront"];
+    const includesOnline = payload.body.allowed_payment_policies.some((p) =>
+      onlinePolicies.includes(p)
+    );
+    if (includesOnline) {
+      if (!currentSalon) {
+        currentSalon = await salonRepository.findOne({ uuid }, [], {}, {});
+      }
+      if (!currentSalon?.stripe_account_id) {
+        throw new error.BadRequest(
+          "Connecting your Stripe account is required before enabling online booking payment options."
+        );
+      }
+    }
+  }
+
   if (payload?.body?.theme_uuid) {
     currentSalon = await salonRepository.findOne({ uuid }, [], {}, {});
     if (!currentSalon) {
@@ -194,10 +211,28 @@ exports.getAvailableSlots = async (payload) => {
     days,
   );
 
-  const staffByService = await staffServiceRepository.getStaffByService({
-    service_ids: cartItems.map((i) => i.service_id),
+  const directServiceIds = cartItems.map((i) => i.service_id);
+  const parentServiceIds = cartItems
+    .map((i) => i.service?.parent_id)
+    .filter(Boolean);
+  const allServiceIds = Array.from(new Set([...directServiceIds, ...parentServiceIds]));
+
+  const rawStaffByService = await staffServiceRepository.getStaffByService({
+    service_ids: allServiceIds,
     salon_id: salon.id,
   });
+
+  const staffByService = {};
+  for (const item of cartItems) {
+    const directStaff = rawStaffByService[item.service_id];
+    if (directStaff && directStaff.length > 0) {
+      staffByService[item.service_id] = directStaff;
+    } else if (item.service?.parent_id && rawStaffByService[item.service.parent_id]) {
+      staffByService[item.service_id] = rawStaffByService[item.service.parent_id];
+    } else {
+      staffByService[item.service_id] = [];
+    }
+  }
 
   const bookingsByStaff = await bookingServiceRepository.getBookingsByStaff({
     salon_id: salon.id,

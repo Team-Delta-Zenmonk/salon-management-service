@@ -422,6 +422,10 @@ exports.createSubscriptionPlan = async (payload) => {
     ? inputCode.toLowerCase().trim().replace(/[^a-z0-9_]/g, "_")
     : name.toLowerCase().trim().replace(/[^a-z0-9\s_-]/g, "").replace(/[\s_-]+/g, "_");
 
+  if (code === "trial") {
+    throw new BadRequest("Cannot create a plan with reserved code 'trial'");
+  }
+
   const existingPlan = await subscriptionPlanRepository.findOne({ code });
   if (existingPlan) {
     code = `${code}_${Date.now().toString().slice(-4)}`;

@@ -40,6 +40,7 @@ exports.getStorefrontProfile = async (payload) => {
       map_link: salon.map_link,
       allowed_payment_policies: salon.allowed_payment_policies,
       deposit_percentage: salon.deposit_percentage,
+      has_stripe_account: Boolean(salon.stripe_account_id),
       theme: salon.storefrontTheme
         ? {
             id: salon.storefrontTheme.id,

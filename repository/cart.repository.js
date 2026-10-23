@@ -15,7 +15,7 @@ class CartRepository extends BaseRepository {
         include: [
           {
             association: "service",
-            attributes: ["id", "uuid", "name", "logo", "gender", "duration", "price"],
+            attributes: ["id", "uuid", "name", "logo", "gender", "duration", "price", "parent_id"],
           },
           {
             association: "staff",
@@ -27,7 +27,18 @@ class CartRepository extends BaseRepository {
       },
       {
         association: "salon",
-        attributes: ["id", "uuid", "name", "logo", "address", "type", "business_hours", "allowed_payment_policies", "deposit_percentage"],
+        attributes: [
+          "id",
+          "uuid",
+          "name",
+          "logo",
+          "address",
+          "type",
+          "business_hours",
+          "allowed_payment_policies",
+          "deposit_percentage",
+          "stripe_account_id",
+        ],
       },
     ];
   }
