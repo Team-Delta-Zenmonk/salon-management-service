@@ -1,6 +1,6 @@
 const FIELD_LIMITS = {
   NAME: 255,
-  EMAIL: 100,
+  EMAIL: 254,
   PHONE: 10,
   TITLE: 100,
   ADDRESS: 255,

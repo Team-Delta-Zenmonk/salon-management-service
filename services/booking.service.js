@@ -307,7 +307,7 @@ exports.createBooking = async (payload) => {
     },
   );
 
-  if (result.action === "BOOKING_CREATED") {
+  if (result.action === "BOOKING_CREATED" && result.booking.status === BookingStatus.ENUM.CONFIRMED) {
     enqueueNotificationJob({
       salonId: result.booking.salon_id,
       bookingId: result.booking.id,
@@ -1355,13 +1355,42 @@ exports.cancelBooking = async (payload) => {
 };
 
 exports.getBookingByUuid = async ({ uuid, customer }) => {
-  const booking = await bookingRepository.findBookingWithDetails({
+  let booking = await bookingRepository.findBookingWithDetails({
     uuid,
     customer_id: customer.id,
   });
 
   if (!booking) {
     throw new error.BadRequest("Booking not found");
+  }
+
+  if (booking.status === BookingStatus.ENUM.PENDING) {
+    try {
+      const { paymentRepository } = require("../repository");
+      const { PaymentStatus } = require("../models/payment/payment-types");
+      const stripe = require("../config/stripe");
+      const paymentService = require("./payment.service");
+
+      const pendingPayment = await paymentRepository.findOne({
+        booking_id: booking.id,
+        status: PaymentStatus.ENUM.PENDING,
+      });
+
+      if (pendingPayment?.stripe_payment_intent_id) {
+        const intent = await stripe.paymentIntents.retrieve(
+          pendingPayment.stripe_payment_intent_id
+        );
+        if (intent.status === "succeeded") {
+          await paymentService.handlePaymentSucceeded(intent);
+          booking = await bookingRepository.findBookingWithDetails({
+            uuid,
+            customer_id: customer.id,
+          });
+        }
+      }
+    } catch (syncErr) {
+      console.warn("[GetBookingByUuid] Could not sync Stripe payment intent:", syncErr.message);
+    }
   }
 
   return booking;

@@ -11,7 +11,7 @@ exports.createInventoryItemSchema = z.object({
     logo: z.string().nullable().optional(),
     variant_name: z.string().max(FIELD_LIMITS.CODE, { message: `Variant name cannot exceed ${FIELD_LIMITS.CODE} characters` }).nullable().optional(),
     unit: z.string().nullable().optional(),
-    unit_price: z.number().nonnegative({ message: "Unit price cannot be negative" }).max(100000, { message: "Unit price cannot exceed 100,000" }).optional(),
-    min_stock_level: z.number().min(0).max(10000, { message: "Minimum stock level cannot exceed 10,000" }).optional(),
+    unit_price: z.number().min(0, { message: "Unit price cannot be negative" }).max(100000, { message: "Unit price cannot exceed 100,000" }).nullable().optional(),
+    min_stock_level: z.number().min(0, { message: "Minimum stock level cannot be negative" }).max(10000, { message: "Minimum stock level cannot exceed 10,000" }).nullable().optional(),
   }),
 });

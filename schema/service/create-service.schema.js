@@ -19,11 +19,16 @@ const serviceBodySchema = z.object({
     .number()
     .min(0, "Price cannot be negative")
     .max(100000, "Price cannot exceed 1,00,000"),
-  discount: z.number().optional(),
+  discount: z
+    .number()
+    .min(0, "Discount cannot be negative")
+    .max(100000, "Discount cannot exceed 1,00,000")
+    .nullable()
+    .optional(),
   discount_type: z
-    .enum(DiscountType.getValues(), {
-      required_error: "Discount type is required",
-    })
+    .enum(DiscountType.getValues())
+    .or(z.literal(""))
+    .nullable()
     .optional(),
   duration: z
     .number()
@@ -33,9 +38,18 @@ const serviceBodySchema = z.object({
 });
 
 const validateServiceDiscount = (data, ctx) => {
-  if (data.discount && data.discount > 0) {
+  const discount = Number(data.discount || 0);
+  if (discount > 0) {
+    if (!data.discount_type) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["discount_type"],
+        message: "Discount type is required when discount is greater than 0",
+      });
+      return;
+    }
     if (data.discount_type === DiscountType.ENUM.PERCENTAGE) {
-      if (data.discount > 100) {
+      if (discount > 100) {
         ctx.addIssue({
           code: "custom",
           path: ["discount"],
@@ -43,7 +57,7 @@ const validateServiceDiscount = (data, ctx) => {
         });
       }
     } else if (data.discount_type === DiscountType.ENUM.AMOUNT) {
-      if (data.price && data.discount > data.price) {
+      if (data.price !== undefined && data.price !== null && discount > data.price) {
         ctx.addIssue({
           code: "custom",
           path: ["discount"],

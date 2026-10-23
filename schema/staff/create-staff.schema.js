@@ -27,7 +27,7 @@ exports.createStaffSchema = z.object({
   body: z.object({
     first_name: z.string().min(1, "First name is required").max(FIELD_LIMITS.NAME, `First name cannot exceed ${FIELD_LIMITS.NAME} characters`),
     last_name: z.string().max(FIELD_LIMITS.NAME, `Last name cannot exceed ${FIELD_LIMITS.NAME} characters`).optional(),
-    email: z.email("Invalid email address").max(FIELD_LIMITS.EMAIL, `Email cannot exceed ${FIELD_LIMITS.EMAIL} characters`),
+    email: z.string().email("Invalid email address").max(FIELD_LIMITS.EMAIL, `Email cannot exceed ${FIELD_LIMITS.EMAIL} characters`),
     phone_number: z.string().min(8, "Phone number must be valid").max(FIELD_LIMITS.PHONE, `Phone number cannot exceed ${FIELD_LIMITS.PHONE} digits`),
     additional_phone_number: z.string().min(8).max(FIELD_LIMITS.PHONE, `Phone number cannot exceed ${FIELD_LIMITS.PHONE} digits`).optional(),
     dob: z.string().regex(/^\d{2}-\d{2}-\d{4}$/, "DOB must be in DD-MM-YYYY format"),
