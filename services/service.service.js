@@ -32,18 +32,27 @@ exports.createService = async (payload) => {
 
 exports.listServices = async (payload) => {
     const { query, salon } = payload;
-    const { category_uuid } = query || {};
+    const { category_uuid, include_sub_services } = query || {};
 
     const page = Number(query?.page) || 1;
     const limit = Number(query?.limit) || 10;
     const offset = query?.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
-    const search = query.search;
+    const search = query?.search;
+
+    const shouldIncludeSubServices =
+      include_sub_services === true ||
+      include_sub_services === "true" ||
+      include_sub_services === 1 ||
+      include_sub_services === "1";
 
     let criteria = {
       salon_id: salon.id,
-      parent_id: null,
       [Op.and]: [],
     };
+
+    if (!shouldIncludeSubServices) {
+      criteria.parent_id = null;
+    }
 
     if (search) {
       const sanitizedSearch = search.replace(/'/g, "''");
