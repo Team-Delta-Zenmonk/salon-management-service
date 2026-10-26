@@ -761,9 +761,16 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
         currentSalon.subscription_expires_at &&
         new Date(currentSalon.subscription_expires_at) > now;
 
-      const baseDate = hasActiveUnexpiredPlan
-        ? new Date(currentSalon.subscription_expires_at)
-        : now;
+      const hasActiveTrial =
+        currentSalon.trial_ends_at &&
+        new Date(currentSalon.trial_ends_at) > now;
+
+      let baseDate = now;
+      if (hasActiveUnexpiredPlan) {
+        baseDate = new Date(currentSalon.subscription_expires_at);
+      } else if (hasActiveTrial) {
+        baseDate = new Date(currentSalon.trial_ends_at);
+      }
       const expiresAt = new Date(baseDate.getTime());
       expiresAt.setDate(expiresAt.getDate() + durationDays);
 
@@ -969,9 +976,16 @@ exports.upgradeSubscription = async (payload) => {
     currentSalon.subscription_expires_at &&
     new Date(currentSalon.subscription_expires_at) > now;
 
-  const baseDate = hasActiveUnexpiredPlan
-    ? new Date(currentSalon.subscription_expires_at)
-    : now;
+  const hasActiveTrial =
+    currentSalon.trial_ends_at &&
+    new Date(currentSalon.trial_ends_at) > now;
+
+  let baseDate = now;
+  if (hasActiveUnexpiredPlan) {
+    baseDate = new Date(currentSalon.subscription_expires_at);
+  } else if (hasActiveTrial) {
+    baseDate = new Date(currentSalon.trial_ends_at);
+  }
 
   const expiresAt = new Date(baseDate.getTime());
   expiresAt.setDate(expiresAt.getDate() + durationDays);

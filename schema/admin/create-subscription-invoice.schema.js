@@ -47,9 +47,9 @@ exports.createSubscriptionInvoiceSchema = z.object({
     salon_id: z.union([z.number(), z.string()], {
       required_error: "salon_id is required",
     }),
-    plan: z.enum(["monthly", "yearly"], {
-      required_error: "plan is required and must be either 'monthly' or 'yearly'",
-    }),
+    plan: z.string({
+      required_error: "plan is required",
+    }).min(1, "plan code cannot be empty"),
     amount: z
       .number({
         required_error: "amount is required",

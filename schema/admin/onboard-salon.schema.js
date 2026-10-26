@@ -19,7 +19,7 @@ exports.onboardSalonSchema = z.object({
     slug: z.string().trim().optional().nullable(),
     trial_days: z.number().min(0).optional().nullable(),
     subscription_plan: z.string().optional().nullable(),
-    plan: z.enum(["monthly", "yearly"]).optional().nullable(),
+    plan: z.string().optional().nullable(),
     amount: z
       .number({
         invalid_type_error: "amount must be a number",
