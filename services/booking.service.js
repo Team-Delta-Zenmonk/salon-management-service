@@ -515,8 +515,13 @@ exports.createAdminBooking = async (payload) => {
         let duration = 0;
         let price = 0;
 
+        const serviceObj = await serviceRepository.findOne({ id: service.service_id });
+        if (!serviceObj) {
+          throw new error.BadRequest(`Service ID ${service.service_id} not found`);
+        }
+
         if (service.staff_id) {
-          const staffService = await staffServiceRepository.findOne({
+          let staffService = await staffServiceRepository.findOne({
             service_id: service.service_id,
             staff_id: service.staff_id,
           }, [
@@ -525,6 +530,18 @@ exports.createAdminBooking = async (payload) => {
               attributes: ["id", "end_date"],
             },
           ]);
+
+          if (!staffService && serviceObj.parent_id) {
+            staffService = await staffServiceRepository.findOne({
+              service_id: serviceObj.parent_id,
+              staff_id: service.staff_id,
+            }, [
+              {
+                association: "staff",
+                attributes: ["id", "end_date"],
+              },
+            ]);
+          }
 
           if (!staffService) {
             throw new error.BadRequest(
@@ -536,13 +553,9 @@ exports.createAdminBooking = async (payload) => {
             assertStaffActive(staffService.staff, error);
           }
 
-          duration = staffService.duration;
-          price = staffService.price;
+          duration = staffService.duration || serviceObj.duration;
+          price = staffService.price !== undefined && staffService.price !== null ? staffService.price : serviceObj.price;
         } else {
-          const serviceObj = await serviceRepository.findOne({ id: service.service_id });
-          if (!serviceObj) {
-            throw new error.BadRequest(`Service ID ${service.service_id} not found`);
-          }
           duration = serviceObj.duration;
           price = serviceObj.price;
         }
@@ -796,8 +809,13 @@ exports.updateAdminBooking = async (payload) => {
           let duration = 0;
           let price = 0;
 
+          const serviceObj = await serviceRepository.findOne({ id: service.service_id });
+          if (!serviceObj) {
+            throw new error.BadRequest(`Service ID ${service.service_id} not found`);
+          }
+
           if (service.staff_id) {
-            const staffService = await staffServiceRepository.findOne({
+            let staffService = await staffServiceRepository.findOne({
               service_id: service.service_id,
               staff_id: service.staff_id,
             }, [
@@ -806,6 +824,18 @@ exports.updateAdminBooking = async (payload) => {
                 attributes: ["id", "end_date"],
               },
             ]);
+
+            if (!staffService && serviceObj.parent_id) {
+              staffService = await staffServiceRepository.findOne({
+                service_id: serviceObj.parent_id,
+                staff_id: service.staff_id,
+              }, [
+                {
+                  association: "staff",
+                  attributes: ["id", "end_date"],
+                },
+              ]);
+            }
 
             if (!staffService) {
               throw new error.BadRequest(
@@ -817,13 +847,9 @@ exports.updateAdminBooking = async (payload) => {
               assertStaffActive(staffService.staff, error);
             }
 
-            duration = staffService.duration;
-            price = staffService.price;
+            duration = staffService.duration || serviceObj.duration;
+            price = staffService.price !== undefined && staffService.price !== null ? staffService.price : serviceObj.price;
           } else {
-            const serviceObj = await serviceRepository.findOne({ id: service.service_id });
-            if (!serviceObj) {
-              throw new error.BadRequest(`Service ID ${service.service_id} not found`);
-            }
             duration = serviceObj.duration;
             price = serviceObj.price;
           }
@@ -1085,10 +1111,20 @@ exports.rescheduleBooking = async (payload) => {
       );
 
       for (const service of sortedServices) {
-        const staffService = await staffServiceRepository.findOne({
+        let staffService = await staffServiceRepository.findOne({
           service_id: service.service_id,
           staff_id: service.staff_id,
         });
+
+        if (!staffService) {
+          const serviceObj = await serviceRepository.findOne({ id: service.service_id });
+          if (serviceObj && serviceObj.parent_id) {
+            staffService = await staffServiceRepository.findOne({
+              service_id: serviceObj.parent_id,
+              staff_id: service.staff_id,
+            });
+          }
+        }
 
         if (!staffService) {
           throw new error.BadRequest(
