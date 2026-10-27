@@ -61,7 +61,7 @@ const validateServiceDiscount = (data, ctx) => {
         ctx.addIssue({
           code: "custom",
           path: ["discount"],
-          message: "Discount amount cannot greater than the price (100%)",
+          message: "Discount amount cannot exceed the service price",
         });
       }
     }
