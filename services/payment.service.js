@@ -222,18 +222,6 @@ exports.handlePaymentSucceeded = async (paymentIntent) => {
         });
       }
     }
-
-    const cart = await cartRepository.getActiveCartByCustomerId(booking.customer_id);
-
-    if (cart && cart.salon_id === booking.salon_id) {
-      await cartRepository.softDelete(
-        {
-          id: cart.id,
-        },
-
-        { transaction },
-      );
-    }
   });
 
   if (payment.booking_id) {

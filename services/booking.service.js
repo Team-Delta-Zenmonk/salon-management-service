@@ -16,6 +16,7 @@ const {
   acquireTransactionAdvisoryLock,
 } = require("../utils/advisory-lock.util");
 const { assertStaffActive } = require("../utils/staff-status.util");
+const { calculateFinalPrice } = require("../utils/pricing.util");
 const {
   BookingStatus,
   BookingType,
@@ -560,6 +561,12 @@ exports.createAdminBooking = async (payload) => {
           price = serviceObj.price;
         }
 
+        price = calculateFinalPrice({
+          basePrice: price,
+          discount: serviceObj.discount,
+          discountType: serviceObj.discount_type,
+        });
+
         const service_end_time = new Date(
           current_start_time.getTime() + duration * 60 * 1000,
         );
@@ -853,6 +860,12 @@ exports.updateAdminBooking = async (payload) => {
             duration = serviceObj.duration;
             price = serviceObj.price;
           }
+
+          price = calculateFinalPrice({
+            basePrice: price,
+            discount: serviceObj.discount,
+            discountType: serviceObj.discount_type,
+          });
 
           const service_end_time = new Date(
             current_start_time.getTime() + duration * 60 * 1000,
