@@ -1,6 +1,7 @@
 const { z } = require("zod");
 const { ServiceGender, PriceType, DiscountType } = require("../../models/service/service-types");
 const { FIELD_LIMITS } = require("../../common/field-limits");
+const { CURRENCY_CONFIG, DEFAULT_CURRENCY } = require("../../common/currencies.config");
 
 const serviceBodySchema = z.object({
   name: z.string().min(1, "Name is required").max(FIELD_LIMITS.ITEM_NAME, `Name cannot exceed ${FIELD_LIMITS.ITEM_NAME} characters`),
@@ -37,7 +38,28 @@ const serviceBodySchema = z.object({
     .max(600, { message: "Duration cannot exceed 10 hours (600 minutes)" }),
 });
 
-const validateServiceDiscount = (data, ctx) => {
+const validateServicePricing = (data, ctx) => {
+  const minPrice = CURRENCY_CONFIG[DEFAULT_CURRENCY].minServicePrice;
+  const symbol = CURRENCY_CONFIG[DEFAULT_CURRENCY].symbol;
+
+  if (data.price_type === PriceType.ENUM.FIXED || data.price_type === PriceType.ENUM.FROM) {
+    if (data.price !== undefined && data.price !== null && data.price < minPrice) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["price"],
+        message: `Price must be at least ${symbol}${minPrice} for paid services (minimum payment requirement)`,
+      });
+    }
+  } else if (data.price_type === PriceType.ENUM.FREE) {
+    if (data.price !== undefined && data.price !== null && data.price !== 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["price"],
+        message: "Price must be 0 for free service",
+      });
+    }
+  }
+
   const discount = Number(data.discount || 0);
   if (discount > 0) {
     if (!data.discount_type) {
@@ -69,8 +91,9 @@ const validateServiceDiscount = (data, ctx) => {
 };
 
 exports.serviceBodySchema = serviceBodySchema;
-exports.validateServiceDiscount = validateServiceDiscount;
+exports.validateServicePricing = validateServicePricing;
+exports.validateServiceDiscount = validateServicePricing;
 
 exports.createServiceSchema = z.object({
-  body: serviceBodySchema.superRefine(validateServiceDiscount),
+  body: serviceBodySchema.superRefine(validateServicePricing),
 });

@@ -33,6 +33,7 @@ const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 const { enqueueNotificationJob } = require("../jobs/notification.worker");
 const invoiceService = require("./invoice.service");
 const paymentService = require("./payment.service");
+const { getCurrencyConfig } = require("../common/currencies.config");
 const { syncCartState } = require("./cart.service");
 
 function buildBookingSnapshot({ cart, slot }) {
@@ -283,12 +284,20 @@ exports.createBooking = async (payload) => {
         );
       }
 
+      const currencyConfig = getCurrencyConfig(salon.currency || "INR");
       let depositAmount = 0;
       if (preference === PaymentPolicy.ENUM.FULL_UPFRONT) {
         depositAmount = cart.total_price;
       } else if (preference === PaymentPolicy.ENUM.PARTIAL_DEPOSIT) {
-        depositAmount = Math.round(
+        const calculatedDeposit = Math.round(
           cart.total_price * ((cart.salon.deposit_percentage || 0) / 100),
+        );
+        depositAmount = Math.min(cart.total_price, Math.max(calculatedDeposit, currencyConfig.minChargeAmount));
+      }
+
+      if (preference !== PaymentPolicy.ENUM.PAY_AT_VENUE && depositAmount < currencyConfig.minChargeAmount) {
+        throw new error.BadRequest(
+          `Minimum online payment amount is ${currencyConfig.symbol}${currencyConfig.minChargeAmount}. Please choose 'Pay at Venue' or add more services.`
         );
       }
 
@@ -393,7 +402,7 @@ exports.createBooking = async (payload) => {
 exports.listBookings = async (payload) => {
   const { query, salon } = payload;
   const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 12;
+  const limit = Math.min(10, Number(query.limit) || 10);
   const {
     filter,
     view,

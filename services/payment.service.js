@@ -7,11 +7,20 @@ const { BookingStatus } = require("../models/booking/booking-types");
 const { PaymentPolicy } = require("../models/salon/salon-types");
 const { enqueueNotificationJob } = require("../jobs/notification.worker");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
+const { getCurrencyConfig, toStripeAmount } = require("../common/currencies.config");
 const invoiceService = require("./invoice.service");
 
 exports.generatePaymentIntentForBooking = async ({ booking, salon, attemptNo = 1, transaction }) => {
   if (!salon || !salon.stripe_account_id) {
     throw new error.BadRequest("Salon is not ready to accept payments");
+  }
+
+  const currencyConfig = getCurrencyConfig(salon.currency || "INR");
+
+  if (booking.deposit_amount < currencyConfig.minChargeAmount) {
+    throw new error.BadRequest(
+      `Payment amount of ${currencyConfig.symbol}${booking.deposit_amount} is less than the required minimum of ${currencyConfig.symbol}${currencyConfig.minChargeAmount}`
+    );
   }
 
   const existingPayment = await paymentRepository.findOne(
@@ -34,14 +43,14 @@ exports.generatePaymentIntentForBooking = async ({ booking, salon, attemptNo = 1
   }
 
   const idempotencyKey = crypto.randomUUID();
-  const amount = booking.deposit_amount * 100;
+  const amount = toStripeAmount(booking.deposit_amount, currencyConfig.code);
 
   let paymentIntent;
   try {
     paymentIntent = await stripe.paymentIntents.create(
       {
         amount,
-        currency: "inr",
+        currency: currencyConfig.stripeCode,
         automatic_payment_methods: {
           enabled: true,
         },
@@ -69,7 +78,7 @@ exports.generatePaymentIntentForBooking = async ({ booking, salon, attemptNo = 1
     {
       booking_id: booking.id,
       amount,
-      currency: "inr",
+      currency: currencyConfig.stripeCode,
       stripe_payment_intent_id: paymentIntent.id,
       stripe_client_secret: paymentIntent.client_secret,
       status: PaymentStatus.ENUM.PENDING,

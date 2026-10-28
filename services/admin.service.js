@@ -16,6 +16,7 @@ const {
 const {
   SubscriptionStatus,
 } = require("../models/salon/salon-types");
+const { getCurrencyConfig } = require("../common/currencies.config");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 
 exports.loginAdmin = async (payload) => {
@@ -93,12 +94,13 @@ exports.refreshAdminToken = async (refreshToken) => {
 exports.listSalons = async (payload) => {
   const {
     page = 1,
-    limit = 20,
+    limit = 10,
     status,
     is_active,
     search,
   } = payload.query || {};
-  const offset = (Number(page) - 1) * Number(limit);
+  const safeLimit = Math.min(10, Math.max(1, Number(limit) || 10));
+  const offset = (Number(page) - 1) * safeLimit;
 
   const where = {};
 
@@ -121,7 +123,7 @@ exports.listSalons = async (payload) => {
   const { rows: salons, count: total } =
     await salonRepository.model.findAndCountAll({
       where,
-      limit: Number(limit),
+      limit: safeLimit,
       offset,
       order: [["created_at", "DESC"]],
       attributes: {
@@ -134,8 +136,8 @@ exports.listSalons = async (payload) => {
     pagination: {
       total,
       page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(total / Number(limit)),
+      limit: safeLimit,
+      totalPages: Math.ceil(total / safeLimit),
     },
   };
 };
@@ -396,8 +398,11 @@ exports.updateSubscriptionPlan = async (payload) => {
     if (isNaN(Number(amount)) || Number(amount) < 0) {
       throw new BadRequest("Amount must be a non-negative number");
     }
-    if (plan.code !== "trial" && Number(amount) <= 0) {
-      throw new BadRequest("Price amount 0 is only allowed for the free trial tier (code: trial)");
+    const currencyConfig = getCurrencyConfig(plan.currency || "INR");
+    if (plan.code !== "trial" && Number(amount) < currencyConfig.minChargeAmount) {
+      throw new BadRequest(
+        `Price amount must be at least ${currencyConfig.symbol}${currencyConfig.minChargeAmount} for paid plans`
+      );
     }
     updates.amount = Number(amount);
   }

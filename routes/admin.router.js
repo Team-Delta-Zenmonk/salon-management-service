@@ -7,6 +7,7 @@ const {
 } = require("../schema/admin/onboard-salon.schema");
 const {
   createPlanSchema,
+  updatePlanSchema,
 } = require("../schema/admin/create-plan.schema");
 
 router.post("/auth/login", adminController.loginAdmin);
@@ -18,8 +19,8 @@ router.get("/salons", adminController.listSalons);
 router.post("/salons/onboard",validate(onboardSalonSchema),adminController.onboardSalon);
 router.patch("/salons/:uuid/status", adminController.updateSalonStatus);
 router.patch("/salons/:uuid/plan", adminController.updateSalonPlan);
-router.patch("/plans/:code", adminController.updateSubscriptionPlan);
-router.put("/plans/:code", adminController.updateSubscriptionPlan);
+router.patch("/plans/:code", validate(updatePlanSchema), adminController.updateSubscriptionPlan);
+router.put("/plans/:code", validate(updatePlanSchema), adminController.updateSubscriptionPlan);
 router.delete("/plans/:code", adminController.deleteSubscriptionPlan);
 
 module.exports = router;
