@@ -9,6 +9,82 @@ const { enqueueNotificationJob } = require("../jobs/notification.worker");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 const invoiceService = require("./invoice.service");
 
+exports.generatePaymentIntentForBooking = async ({ booking, salon, attemptNo = 1, transaction }) => {
+  if (!salon || !salon.stripe_account_id) {
+    throw new error.BadRequest("Salon is not ready to accept payments");
+  }
+
+  const existingPayment = await paymentRepository.findOne(
+    {
+      booking_id: booking.id,
+      status: PaymentStatus.ENUM.PENDING,
+    },
+    [],
+    {},
+    {
+      transaction,
+    },
+  );
+
+  if (existingPayment) {
+    return {
+      clientSecret: existingPayment.stripe_client_secret,
+      paymentId: existingPayment.id,
+    };
+  }
+
+  const idempotencyKey = crypto.randomUUID();
+  const amount = booking.deposit_amount * 100;
+
+  let paymentIntent;
+  try {
+    paymentIntent = await stripe.paymentIntents.create(
+      {
+        amount,
+        currency: "inr",
+        automatic_payment_methods: {
+          enabled: true,
+        },
+        transfer_data: {
+          destination: salon.stripe_account_id,
+        },
+        application_fee_amount: Math.round(amount * 0.10),
+        metadata: {
+          booking_id: booking.id.toString(),
+          booking_uuid: booking.uuid,
+          attempt_no: attemptNo.toString(),
+        },
+      },
+      {
+        idempotencyKey,
+      },
+    );
+  } catch (stripeErr) {
+    throw new error.BadRequest(
+      stripeErr?.message || "Failed to initialize payment with payment provider"
+    );
+  }
+
+  const payment = await paymentRepository.create(
+    {
+      booking_id: booking.id,
+      amount,
+      currency: "inr",
+      stripe_payment_intent_id: paymentIntent.id,
+      stripe_client_secret: paymentIntent.client_secret,
+      status: PaymentStatus.ENUM.PENDING,
+      attempt_no: attemptNo,
+      idempotency_key: idempotencyKey,
+    },
+    { transaction },
+  );
+
+  return {
+    clientSecret: paymentIntent.client_secret,
+    paymentId: payment.id,
+  };
+};
+
 exports.createPaymentIntent = async (payload) => {
   const { booking_id } = payload.body;
 
@@ -50,26 +126,6 @@ exports.createPaymentIntent = async (payload) => {
       throw new error.BadRequest("Salon is not ready to accept payments");
     }
 
-    const existingPayment = await paymentRepository.findOne(
-      {
-        booking_id: booking.id,
-        status: PaymentStatus.ENUM.PENDING,
-      },
-      [],
-      {},
-      {
-        transaction,
-      },
-    );
-
-    if (existingPayment) {
-      return {
-        clientSecret: existingPayment.stripe_client_secret,
-
-        paymentId: existingPayment.id,
-      };
-    }
-
     const lastAttempt = await paymentRepository.findOne(
       {
         booking_id: booking.id,
@@ -92,50 +148,12 @@ exports.createPaymentIntent = async (payload) => {
       throw new error.BadRequest("Online payment is not required for this booking policy");
     }
 
-    const idempotencyKey = crypto.randomUUID();
-    const amount = booking.deposit_amount * 100;
-    const paymentIntent = await stripe.paymentIntents.create(
-      {
-        amount,
-        currency: "inr",
-        automatic_payment_methods: {
-          enabled: true,
-        },
-        transfer_data: {
-          destination: salon.stripe_account_id,
-        },
-        application_fee_amount: Math.round(amount * 0.10),
-        metadata: {
-          booking_id: booking.id.toString(),
-          booking_uuid: booking.uuid,
-          attempt_no: attemptNo.toString(),
-        },
-      },
-
-      {
-        idempotencyKey,
-      },
-    );
-
-    const payment = await paymentRepository.create(
-      {
-        booking_id: booking.id,
-        amount,
-        currency: "inr",
-        stripe_payment_intent_id: paymentIntent.id,
-        stripe_client_secret: paymentIntent.client_secret,
-        status: PaymentStatus.ENUM.PENDING,
-        attempt_no: attemptNo,
-        idempotency_key: idempotencyKey,
-      },
-
-      { transaction },
-    );
-
-    return {
-      clientSecret: paymentIntent.client_secret,
-      paymentId: payment.id,
-    };
+    return await exports.generatePaymentIntentForBooking({
+      booking,
+      salon,
+      attemptNo,
+      transaction,
+    });
   });
 };
 

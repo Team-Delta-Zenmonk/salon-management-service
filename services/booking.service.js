@@ -1,4 +1,6 @@
+const crypto = require("crypto");
 const { Op } = require("sequelize");
+const stripe = require("../config/stripe");
 const { error } = require("../libs");
 const {
   cartRepository,
@@ -11,6 +13,7 @@ const {
   cartItemRepository,
   staffRepository,
   holidayRepository,
+  paymentRepository,
 } = require("../repository");
 const {
   acquireTransactionAdvisoryLock,
@@ -25,9 +28,11 @@ const {
   BookingSource,
 } = require("../models/booking/booking-types");
 const { PaymentPolicy } = require("../models/salon/salon-types");
+const { PaymentStatus } = require("../models/payment/payment-types");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 const { enqueueNotificationJob } = require("../jobs/notification.worker");
 const invoiceService = require("./invoice.service");
+const paymentService = require("./payment.service");
 const { syncCartState } = require("./cart.service");
 
 function buildBookingSnapshot({ cart, slot }) {
@@ -330,6 +335,20 @@ exports.createBooking = async (payload) => {
         transaction,
       });
 
+      let clientSecret = null;
+      let paymentId = null;
+
+      if (preference !== PaymentPolicy.ENUM.PAY_AT_VENUE) {
+        const paymentResult = await paymentService.generatePaymentIntentForBooking({
+          booking,
+          salon,
+          attemptNo: 1,
+          transaction,
+        });
+        clientSecret = paymentResult.clientSecret;
+        paymentId = paymentResult.paymentId;
+      }
+
       await cartItemRepository.softDelete(
         { cart_id: cart.id },
         { transaction }
@@ -342,6 +361,8 @@ exports.createBooking = async (payload) => {
       return {
         action: "BOOKING_CREATED",
         booking,
+        clientSecret,
+        paymentId,
       };
     },
   );
