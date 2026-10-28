@@ -6,7 +6,7 @@ exports.createAdminBookingSchema = z.object({
   body: z.object({
     admin_booking: z.object({
       name: z.string().max(FIELD_LIMITS.NAME, `Name cannot exceed ${FIELD_LIMITS.NAME} characters`),
-      phone: z.string().max(FIELD_LIMITS.PHONE, `Phone cannot exceed ${FIELD_LIMITS.PHONE} digits`),
+      phone: z.string().max(FIELD_LIMITS.PHONE, `Phone cannot exceed ${FIELD_LIMITS.PHONE} digits`).nullable().optional().or(z.literal("")),
     }),
     customer_id: z.number().optional().nullable(),
     booking_start_time: z.coerce.date().refine((val) => val.getTime() >= Date.now() - 60 * 1000, {

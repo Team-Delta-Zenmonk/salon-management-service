@@ -5,8 +5,8 @@ exports.updateAdminBookingSchema = z.object({
   body: z.object({
     admin_booking: z
       .object({
-        name: z.string(),
-        phone: z.string(),
+        name: z.string().optional(),
+        phone: z.string().nullable().optional().or(z.literal("")),
       })
       .optional(),
     customer_id: z.number().optional().nullable(),

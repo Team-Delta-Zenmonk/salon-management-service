@@ -33,7 +33,7 @@ exports.listStaff = async (req, res, next) => {
 
 exports.listSubServices = async (req, res, next) => {
   try {
-    const response = await serviceService.listSubServices({ params: req.params, salon: req.salon });
+    const response = await serviceService.listSubServices({ params: req.params, salon: req.salon, query: req.query });
     return res.status(SUCCESS).json(response);
   } catch (error) {
     console.log("Error in listSubServices controller", error);

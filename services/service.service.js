@@ -183,7 +183,7 @@ exports.getService = async (payload) => {
 }
 
 exports.listSubServices = async (payload) => {
-    const { params, salon } = payload;
+    const { params, salon, query } = payload;
 
     const service = await serviceRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
 
@@ -191,7 +191,20 @@ exports.listSubServices = async (payload) => {
         throw new error.NotFound("Service not found");
     }
 
-    return await serviceRepository.findAndCountAll({ criteria: { parent_id: service.id } });
+    const options = {
+        criteria: { parent_id: service.id },
+        order: [["created_at", "DESC"]],
+    };
+
+    if (query?.page || query?.limit || query?.offset !== undefined) {
+        const page = Number(query.page) > 0 ? Number(query.page) : 1;
+        const limit = Number(query.limit) > 0 ? Number(query.limit) : 10;
+        const offset = query.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
+        options.limit = limit;
+        options.offset = offset;
+    }
+
+    return await serviceRepository.findAndCountAll(options);
 }
 
 exports.updateService = async (payload) => {

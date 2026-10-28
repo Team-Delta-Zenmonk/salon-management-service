@@ -17,6 +17,7 @@ const {
 } = require("../utils/advisory-lock.util");
 const { assertStaffActive } = require("../utils/staff-status.util");
 const { calculateFinalPrice } = require("../utils/pricing.util");
+const { assertServiceBookable, assertServicesBookable } = require("../utils/service-validation.util");
 const {
   BookingStatus,
   BookingType,
@@ -27,6 +28,7 @@ const { PaymentPolicy } = require("../models/salon/salon-types");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
 const { enqueueNotificationJob } = require("../jobs/notification.worker");
 const invoiceService = require("./invoice.service");
+const { syncCartState } = require("./cart.service");
 
 function buildBookingSnapshot({ cart, slot }) {
   return {
@@ -59,7 +61,25 @@ exports.createBooking = async (payload) => {
 
   const result = await bookingRepository.handleManagedTransaction(
     async (transaction) => {
-      const cart = await cartRepository.getCartByUuid(cart_id);
+      let cart = await cartRepository.findOne(
+        { uuid: cart_id, deleted_at: null },
+        [],
+        {},
+        { transaction },
+      );
+
+      if (!cart) {
+        throw new error.BadRequest("Cart not found");
+      }
+
+      await syncCartState(cart, transaction);
+
+      cart = await cartRepository.findOne(
+        { id: cart.id, deleted_at: null },
+        cartRepository.cartIncludes(),
+        {},
+        { transaction },
+      );
 
       if (!cart) {
         throw new error.BadRequest("Cart not found");
@@ -512,14 +532,25 @@ exports.createAdminBooking = async (payload) => {
         sequence: s.sequence || index + 1,
       }));
 
+      const serviceIds = sortedServices.map((s) => s.service_id);
+      const fetchedServices = await serviceRepository.findAll({
+        criteria: { id: { [Op.in]: serviceIds } },
+      });
+      const serviceMap = new Map(fetchedServices.map((s) => [s.id, s]));
+
+      for (const service of sortedServices) {
+        if (!serviceMap.has(service.service_id)) {
+          throw new error.BadRequest(`Service ID ${service.service_id} not found`);
+        }
+      }
+
+      await assertServicesBookable(fetchedServices, "booked");
+
       for (const service of sortedServices) {
         let duration = 0;
         let price = 0;
 
-        const serviceObj = await serviceRepository.findOne({ id: service.service_id });
-        if (!serviceObj) {
-          throw new error.BadRequest(`Service ID ${service.service_id} not found`);
-        }
+        const serviceObj = serviceMap.get(service.service_id);
 
         if (service.staff_id) {
           let staffService = await staffServiceRepository.findOne({
@@ -812,14 +843,25 @@ exports.updateAdminBooking = async (payload) => {
         total_price = 0;
         total_duration = 0;
 
+        const serviceIds = services.map((s) => s.service_id);
+        const fetchedServices = await serviceRepository.findAll({
+          criteria: { id: { [Op.in]: serviceIds } },
+        });
+        const serviceMap = new Map(fetchedServices.map((s) => [s.id, s]));
+
+        for (const service of services) {
+          if (!serviceMap.has(service.service_id)) {
+            throw new error.BadRequest(`Service ID ${service.service_id} not found`);
+          }
+        }
+
+        await assertServicesBookable(fetchedServices, "booked");
+
         for (const service of services) {
           let duration = 0;
           let price = 0;
 
-          const serviceObj = await serviceRepository.findOne({ id: service.service_id });
-          if (!serviceObj) {
-            throw new error.BadRequest(`Service ID ${service.service_id} not found`);
-          }
+          const serviceObj = serviceMap.get(service.service_id);
 
           if (service.staff_id) {
             let staffService = await staffServiceRepository.findOne({

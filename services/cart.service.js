@@ -10,8 +10,123 @@ const {
   serviceRepository,
   staffRepository,
 } = require("../repository");
-const { assertStaffActive } = require("../utils/staff-status.util");
+const { assertStaffActive, isStaffInactive } = require("../utils/staff-status.util");
 const { calculateFinalPrice } = require("../utils/pricing.util");
+const { assertServiceBookable, assertServicesBookable } = require("../utils/service-validation.util");
+
+const syncCartState = async (cart, transaction = null) => {
+  if (!cart) return null;
+
+  const cartItems = await cartItemRepository.findAll({
+    criteria: { cart_id: cart.id, deleted_at: null },
+    transaction,
+  });
+
+  if (!cartItems || cartItems.length === 0) {
+    if (cart.total_price !== 0 || cart.total_duration !== 0) {
+      await cartRepository.update({
+        payload: { total_price: 0, total_duration: 0 },
+        criteria: { id: cart.id },
+        options: { transaction },
+      });
+    }
+    return;
+  }
+
+  const serviceIds = cartItems.map((item) => item.service_id);
+  const services = await serviceRepository.findAll({
+    criteria: { id: { [Op.in]: serviceIds } },
+    transaction,
+  });
+  const serviceMap = new Map(services.map((s) => [s.id, s]));
+
+  const staffIds = cartItems.map((item) => item.staff_id).filter(Boolean);
+  const staffMembers = staffIds.length > 0
+    ? await staffRepository.findAll({
+        criteria: { id: { [Op.in]: staffIds } },
+        transaction,
+      })
+    : [];
+  const staffMap = new Map(staffMembers.map((st) => [st.id, st]));
+
+  const staffServices = staffIds.length > 0
+    ? await staffServiceRepository.findAll({
+        criteria: {
+          staff_id: { [Op.in]: staffIds },
+          deleted_at: null,
+        },
+        transaction,
+      })
+    : [];
+
+  let newTotalPrice = 0;
+  let newTotalDuration = 0;
+
+  for (const item of cartItems) {
+    const service = serviceMap.get(item.service_id);
+
+    if (!service || service.deleted_at || !service.is_active) {
+      await cartItemRepository.softDelete({ id: item.id }, { transaction });
+      continue;
+    }
+
+    let staffId = item.staff_id;
+    let basePrice = service.price;
+    let duration = service.duration;
+    let finalPrice = calculateFinalPrice({
+      basePrice,
+      discount: service.discount,
+      discountType: service.discount_type,
+    });
+
+    if (staffId) {
+      const staff = staffMap.get(staffId);
+      const isInactive = !staff || staff.deleted_at || isStaffInactive(staff);
+
+      if (isInactive) {
+        staffId = null;
+      } else {
+        const staffService = staffServices.find(
+          (ss) => ss.staff_id === staffId && (ss.service_id === service.id || (service.parent_id && ss.service_id === service.parent_id))
+        );
+
+        if (!staffService) {
+          staffId = null;
+        } else {
+          duration = staffService.duration || service.duration;
+          if (staffService.price) {
+            finalPrice = parseFloat(staffService.price);
+          }
+        }
+      }
+    }
+
+    const updates = {};
+    if (item.staff_id !== staffId) updates.staff_id = staffId;
+    if (item.base_price !== basePrice) updates.base_price = basePrice;
+    if (item.final_price !== finalPrice) updates.final_price = finalPrice;
+    if (item.duration !== duration) updates.duration = duration;
+
+    if (Object.keys(updates).length > 0) {
+      await cartItemRepository.update({
+        payload: updates,
+        criteria: { id: item.id },
+        options: { transaction },
+      });
+    }
+
+    newTotalPrice += finalPrice;
+    newTotalDuration += duration;
+  }
+
+  if (cart.total_price !== newTotalPrice || cart.total_duration !== newTotalDuration) {
+    await cartRepository.update({
+      payload: { total_price: newTotalPrice, total_duration: newTotalDuration },
+      criteria: { id: cart.id },
+      options: { transaction },
+    });
+  }
+};
 
 const updateCartTotals = async (cartId, transaction = null) => {
   const items = await cartItemRepository.findAll({ criteria: { cart_id: cartId }, transaction });
@@ -43,6 +158,38 @@ exports.createCart = async (payload) => {
   const transaction = await cartRepository.startTransaction();
 
   try {
+    const serviceUuids = items.map((i) => i.service_id);
+    const services = await serviceRepository.findAll({
+      criteria: { uuid: { [Op.in]: serviceUuids } },
+    });
+
+    const serviceByUuid = new Map(services.map((s) => [s.uuid, s]));
+
+    for (const itemData of items) {
+      if (!serviceByUuid.has(itemData.service_id)) {
+        throw new error.NotFound(`Service with UUID ${itemData.service_id} not found`);
+      }
+    }
+
+    await assertServicesBookable(services, "added");
+
+    const staffUuids = [...new Set(items.map((i) => i.staff_id).filter(Boolean))];
+    const staffMembers = staffUuids.length > 0
+      ? await staffRepository.findAll({ criteria: { uuid: { [Op.in]: staffUuids } } })
+      : [];
+
+    const staffByUuid = new Map(staffMembers.map((st) => [st.uuid, st]));
+
+    const staffIds = staffMembers.map((st) => st.id);
+    const staffServices = staffIds.length > 0
+      ? await staffServiceRepository.findAll({
+          criteria: {
+            staff_id: { [Op.in]: staffIds },
+            deleted_at: null,
+          },
+        })
+      : [];
+
     const cart = await cartRepository.create(
       {
         customer_id: user.id,
@@ -51,41 +198,48 @@ exports.createCart = async (payload) => {
       { transaction },
     );
 
-    for (const itemData of items) {
-      const service = await serviceRepository.findOne({ uuid: itemData.service_id });
-      if (!service) throw new error.NotFound(`Service with UUID ${itemData.service_id} not found`);
+    const cartItemsPayload = items.map((itemData) => {
+      const service = serviceByUuid.get(itemData.service_id);
+      let staff = itemData.staff_id ? staffByUuid.get(itemData.staff_id) : null;
 
-      const childServices = await serviceRepository.findAll({ criteria: { parent_id: service.id } });
-      if (childServices && childServices.length > 0) {
-        throw new error.BadRequest(`Parent service '${service.name}' cannot be added directly. Please select a specific sub-service.`);
+      if (staff && isStaffInactive(staff)) {
+        staff = null;
       }
 
-      let staff = null;
-      if (itemData.staff_id) {
-        staff = await staffRepository.findOne({ uuid: itemData.staff_id });
-        if (staff) assertStaffActive(staff, error);
-      }
-
-      const basePrice = itemData.base_price ?? service.price;
-
-      const finalPrice = calculateFinalPrice({
+      let basePrice = service.price;
+      let duration = service.duration;
+      let finalPrice = calculateFinalPrice({
         basePrice,
         discount: service.discount,
         discountType: service.discount_type,
       });
 
-      await cartItemRepository.create(
-        {
-          cart_id: cart.id,
-          service_id: service.id,
-          staff_id: staff?.id ?? null,
-          base_price: basePrice,
-          final_price: finalPrice,
-          duration: itemData.duration !== undefined ? itemData.duration : service.duration,
-        },
-        { transaction },
-      );
-    }
+      if (staff) {
+        const staffService = staffServices.find(
+          (ss) => ss.staff_id === staff.id && (ss.service_id === service.id || (service.parent_id && ss.service_id === service.parent_id))
+        );
+
+        if (!staffService) {
+          staff = null;
+        } else {
+          duration = staffService.duration || service.duration;
+          if (staffService.price) {
+            finalPrice = parseFloat(staffService.price);
+          }
+        }
+      }
+
+      return {
+        cart_id: cart.id,
+        service_id: service.id,
+        staff_id: staff?.id ?? null,
+        base_price: basePrice,
+        final_price: finalPrice,
+        duration: duration,
+      };
+    });
+
+    await cartItemRepository.createBulk(cartItemsPayload, { transaction });
 
     await updateCartTotals(cart.id, transaction);
 
@@ -117,10 +271,7 @@ exports.addItem = async (payload) => {
   const service = await serviceRepository.findOne({ uuid: service_id });
   if (!service) throw new error.NotFound("Service not found");
 
-  const childServices = await serviceRepository.findAll({ criteria: { parent_id: service.id } });
-  if (childServices && childServices.length > 0) {
-    throw new error.BadRequest(`Parent service '${service.name}' cannot be added directly. Please select a specific sub-service.`);
-  }
+  await assertServiceBookable(service, "added");
 
   const basePrice = base_price ?? service.price;
 
@@ -228,15 +379,19 @@ exports.removeItem = async (payload) => {
   return { message: "Cart item removed successfully" };
 };
 
+exports.syncCartState = syncCartState;
+
 exports.getCart = async (payload) => {
   const { params } = payload;
   const { uuid } = params;
 
-  const cart = await cartRepository.findOne({ uuid }, ["cart_items"]);
+  const cart = await cartRepository.findOne({ uuid });
 
   if (!cart) throw new error.NotFound("Cart not found");
 
-  return cart;
+  await syncCartState(cart);
+
+  return await cartRepository.getCartById(cart.id);
 };
 
 exports.deleteCart = async (payload) => {

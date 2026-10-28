@@ -24,5 +24,6 @@ function assertStaffActive(staffOrEndDate, errorLib) {
 }
 
 module.exports = {
+  isStaffInactive,
   assertStaffActive,
 };

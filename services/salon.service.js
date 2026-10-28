@@ -28,6 +28,7 @@ const {
 const { Op } = require("sequelize");
 const { Category, sequelize } = require("../models");
 const { formatStaffListTiming } = require("../utils/staff-timing.util");
+const { syncCartState } = require("./cart.service");
 
 exports.updateSalon = async (payload) => {
   const { uuid } = payload.salon;
@@ -179,7 +180,12 @@ exports.updateSalon = async (payload) => {
 exports.getAvailableSlots = async (payload) => {
   const { cart_id, start_date, days } = payload.query;
 
-  let cart = await cartRepository.getCartByUuid(cart_id);
+  let cart = await cartRepository.findOne({ uuid: cart_id, deleted_at: null });
+  if (!cart) throw new error.BadRequest("Cart not found");
+
+  await syncCartState(cart);
+
+  cart = await cartRepository.getCartById(cart.id);
   if (!cart) throw new error.BadRequest("Cart not found");
 
   cart = cart.toJSON();
@@ -646,14 +652,13 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
       invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
       payment_status: InvoicePaymentStatus.ENUM.PENDING,
     },
+    attributes: ["id"],
   });
   if (otherPendingInvoices && otherPendingInvoices.length > 0) {
-    for (const inv of otherPendingInvoices) {
-      await invoiceRepository.update({
-        payload: { payment_status: InvoicePaymentStatus.ENUM.FAILED },
-        criteria: { id: inv.id },
-      });
-    }
+    await invoiceRepository.update({
+      payload: { payment_status: InvoicePaymentStatus.ENUM.FAILED },
+      criteria: { id: { [Op.in]: otherPendingInvoices.map((inv) => inv.id) } },
+    });
   }
 
   const idempotencyKey = `sub_pi_${currentSalon.id}_${plan}_${crypto.randomUUID()}`;
