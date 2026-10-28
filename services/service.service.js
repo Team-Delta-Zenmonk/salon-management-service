@@ -79,7 +79,23 @@ exports.listServices = async (payload) => {
         criteria.category_id = category.id;
     }
 
-    const { count, rows } = await serviceRepository.findAndCountAll({ criteria, include: ["category"], limit, offset ,order: [["created_at", "DESC"]]});
+    const { count, rows } = await serviceRepository.findAndCountAll({
+        criteria,
+        attributes: {
+            include: [
+                [
+                    sequelize.literal(
+                        `(SELECT COUNT(*)::int FROM services AS child WHERE child.parent_id = "Service".id AND child.deleted_at IS NULL)`
+                    ),
+                    "sub_services_count",
+                ],
+            ],
+        },
+        include: ["category"],
+        limit,
+        offset,
+        order: [["created_at", "DESC"]],
+    });
 
     return {
         total: count,
