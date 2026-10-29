@@ -315,7 +315,19 @@ exports.updateItem = async (payload) => {
 
   const targetServiceId = updateData.service_id || item.service_id;
 
-  if (staff_id) {
+  if (staff_id === null) {
+    const itemService = await serviceRepository.findOne({ id: targetServiceId });
+    updateData.staff_id = null;
+    if (itemService) {
+      updateData.base_price = itemService.price;
+      updateData.duration = itemService.duration;
+      updateData.final_price = calculateFinalPrice({
+        basePrice: itemService.price,
+        discount: itemService.discount,
+        discountType: itemService.discount_type,
+      });
+    }
+  } else if (staff_id) {
     const staff = await staffRepository.findOne({ uuid: staff_id });
     if (!staff) throw new error.NotFound("Staff not found");
 

@@ -487,6 +487,7 @@ exports.createSubscriptionPlan = async (payload) => {
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
       description: plan.description,
+      duration_days: plan.duration_days,
       is_active: plan.is_active,
     },
   };
