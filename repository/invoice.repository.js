@@ -55,7 +55,6 @@ class InvoiceRepository extends BaseRepository {
         total: count,
         page,
         limit,
-        totalPages: Math.ceil(count / limit),
       },
     };
   }

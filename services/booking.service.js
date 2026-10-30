@@ -468,7 +468,6 @@ exports.listBookings = async (payload) => {
       total: count,
       page,
       limit,
-      totalPages: Math.ceil(count / limit),
     },
   };
 };
@@ -484,12 +483,44 @@ const getMaxRescheduleAttempts = (bookingRecord) => {
 exports.listCustomerBookings = async (payload) => {
   const { query, customer } = payload;
   const { page, limit, status } = query;
+  const salonIdentifier = query.salon_id;
+
+  let targetSalonId = undefined;
+  if (salonIdentifier) {
+    const isNumeric = !isNaN(salonIdentifier) && Number.isInteger(Number(salonIdentifier));
+    const isUuid =
+      typeof salonIdentifier === "string" &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(salonIdentifier);
+
+    let salon = null;
+    if (isNumeric) {
+      salon = await salonRepository.findOne({ id: Number(salonIdentifier) });
+    } else if (isUuid) {
+      salon = await salonRepository.findOne({ uuid: salonIdentifier });
+    } else {
+      salon = await salonRepository.findOne({ slug: salonIdentifier });
+    }
+
+    if (salon) {
+      targetSalonId = salon.id;
+    } else {
+      return {
+        bookings: [],
+        pagination: {
+          total: 0,
+          page: Number(page) || 1,
+          limit: Number(limit) || 10,
+        },
+      };
+    }
+  }
 
   const { rows: bookings, count } =
     await bookingRepository.findAllCustomerBookings({
       page: page ?? 1,
       limit: limit ?? 12,
       customer_id: customer.id,
+      salon_id: targetSalonId,
       status,
     });
 

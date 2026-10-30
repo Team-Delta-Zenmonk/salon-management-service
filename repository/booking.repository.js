@@ -130,10 +130,14 @@ class BookingRepository extends BaseRepository {
     return await this.model.findAndCountAll(queryOptions);
   }
 
-  async findAllCustomerBookings({ page, limit, customer_id, status }) {
+  async findAllCustomerBookings({ page, limit, customer_id, salon_id, status }) {
     const offset = (page - 1) * limit;
 
     const queryCriteria = { customer_id };
+
+    if (salon_id) {
+      queryCriteria.salon_id = salon_id;
+    }
 
     if (status === BookingStatus.ENUM.EXPIRED) {
       queryCriteria[Op.or] = [

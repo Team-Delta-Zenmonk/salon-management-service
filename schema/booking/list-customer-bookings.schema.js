@@ -6,5 +6,6 @@ exports.listCustomerBookingsSchema = z.object({
     page: z.coerce.number().int().min(1).default(1).optional(),
     limit: z.coerce.number().int().min(1).default(10).optional(),
     status: z.enum(BookingStatus.getValues()).optional(),
+    salon_id: z.string().optional(),
   }),
 });

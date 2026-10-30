@@ -493,7 +493,6 @@ exports.listSalons = async (payload) => {
     total: count,
     page: pageNum,
     limit: limitNum,
-    totalPages: Math.ceil(count / limitNum),
     data: rows,
   };
 };

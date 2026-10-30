@@ -137,7 +137,6 @@ exports.listSalons = async (payload) => {
       total,
       page: Number(page),
       limit: safeLimit,
-      totalPages: Math.ceil(total / safeLimit),
     },
   };
 };

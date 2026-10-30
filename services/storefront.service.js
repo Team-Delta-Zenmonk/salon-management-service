@@ -96,8 +96,6 @@ exports.getStorefrontServices = async (payload) => {
       total,
       page: pageNum,
       limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
-      hasMore: offset + services.length < total,
     },
   };
 };
@@ -132,8 +130,6 @@ exports.getStorefrontStaff = async (payload) => {
       total,
       page: pageNum,
       limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
-      hasMore: offset + staffList.length < total,
     },
   };
 };
@@ -223,7 +219,6 @@ exports.getStorefrontServiceStaff = async (payload) => {
       total,
       page,
       limit,
-      hasMore: false,
       data: [],
     };
   }
@@ -258,7 +253,57 @@ exports.getStorefrontServiceStaff = async (payload) => {
     total,
     page,
     limit,
-    hasMore: offset + data.length < total,
     data,
+  };
+};
+
+exports.getStorefrontSubServices = async (payload) => {
+  const { slug, serviceUuid } = payload.params;
+  const { page = 1, limit = 10 } = payload.query || {};
+
+  let salon = null;
+  if (slug) {
+    salon = await salonRepository.findBySlug(slug.toLowerCase().trim());
+    if (!salon) {
+      salon = await salonRepository.findOne({ uuid: slug });
+    }
+  }
+
+  if (!salon) {
+    throw new NotFound(`Salon '${slug}' not found or inactive`);
+  }
+
+  const parentService = await serviceRepository.findOne({
+    uuid: serviceUuid,
+    salon_id: salon.id,
+    is_active: true,
+  });
+
+  if (!parentService) {
+    throw new NotFound("Service not found");
+  }
+
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, Math.min(50, parseInt(limit, 10) || 10));
+  const offset = (pageNum - 1) * limitNum;
+
+  const { rows: subServices, count: total } = await serviceRepository.findAndCountAll({
+    criteria: {
+      parent_id: parentService.id,
+      salon_id: salon.id,
+      is_active: true,
+    },
+    offset,
+    limit: limitNum,
+    order: [["created_at", "DESC"]],
+  });
+
+  return {
+    subServices,
+    pagination: {
+      total,
+      page: pageNum,
+      limit: limitNum,
+    },
   };
 };

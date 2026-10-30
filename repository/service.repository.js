@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { Service } = require("../models");
+const { Service, sequelize } = require("../models");
 const BaseRepository = require("./base.repository");
 
 class ServiceRepository extends BaseRepository {
@@ -28,15 +28,20 @@ class ServiceRepository extends BaseRepository {
 
     return await this.model.findAndCountAll({
       where: criteria,
+      attributes: {
+        include: [
+          [
+            sequelize.literal(
+              `(SELECT COUNT(*)::int FROM services AS child WHERE child.parent_id = "Service".id AND child.deleted_at IS NULL AND child.is_active = true)`
+            ),
+            "sub_services_count",
+          ],
+        ],
+      },
       include: [
         {
           association: "category",
           attributes: ["id", "uuid", "name"],
-        },
-        {
-          association: "children",
-          where: { is_active: true },
-          required: false,
         },
       ],
       offset,

@@ -51,3 +51,16 @@ exports.getStorefrontServiceStaff = async (req, res, next) => {
     return next(error);
   }
 };
+
+exports.getStorefrontSubServices = async (req, res, next) => {
+  try {
+    const response = await storefrontService.getStorefrontSubServices({
+      params: req.params,
+      query: req.query,
+    });
+    return res.status(SUCCESS).json(response);
+  } catch (error) {
+    console.log("Error in controller getStorefrontSubServices", error);
+    return next(error);
+  }
+};
