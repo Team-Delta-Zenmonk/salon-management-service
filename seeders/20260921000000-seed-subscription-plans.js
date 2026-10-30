@@ -1,10 +1,12 @@
 "use strict";
+const crypto = require("crypto");
 
 module.exports = {
   async up(queryInterface, Sequelize) {
     const now = new Date();
     const plans = [
       {
+        uuid: crypto.randomUUID(),
         code: "trial",
         name: "Free Trial",
         amount: 0,
@@ -17,6 +19,7 @@ module.exports = {
         updated_at: now,
       },
       {
+        uuid: crypto.randomUUID(),
         code: "monthly",
         name: "Monthly Plan",
         amount: 2499,
@@ -29,6 +32,7 @@ module.exports = {
         updated_at: now,
       },
       {
+        uuid: crypto.randomUUID(),
         code: "yearly",
         name: "Yearly Plan",
         amount: 24990,

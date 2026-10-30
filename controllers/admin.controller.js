@@ -133,3 +133,15 @@ exports.deleteSubscriptionPlan = async (req, res, next) => {
   }
 };
 
+exports.toggleSubscriptionPlanStatus = async (req, res, next) => {
+  try {
+    const response = await adminService.toggleSubscriptionPlanStatus({
+      params: req.params,
+    });
+    return res.status(SUCCESS).json(response);
+  } catch (error) {
+    console.log("Error in controller toggleSubscriptionPlanStatus", error);
+    return next(error);
+  }
+};
+

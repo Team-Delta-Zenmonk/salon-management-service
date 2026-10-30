@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const {
   adminUserRepository,
   salonRepository,
@@ -15,6 +16,7 @@ const {
 } = require("../models/invoice/invoice-types");
 const {
   SubscriptionStatus,
+  SubscriptionPlan,
 } = require("../models/salon/salon-types");
 const { getCurrencyConfig } = require("../common/currencies.config");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
@@ -91,11 +93,26 @@ exports.refreshAdminToken = async (refreshToken) => {
   }
 };
 
+const resolveEnumFilter = (input, EnumClass) => {
+  if (!input || input === "all") return null;
+
+  if (typeof input === "string" && !input.includes(",")) {
+    return EnumClass.isValidValue(input) ? input : null;
+  }
+
+  const list = (Array.isArray(input) ? input : input.split(","))
+    .filter((val) => EnumClass.isValidValue(val));
+
+  if (list.length === 0) return null;
+  return list.length === 1 ? list[0] : { [Op.in]: list };
+};
+
 exports.listSalons = async (payload) => {
   const {
     page = 1,
     limit = 10,
     status,
+    plan,
     is_active,
     search,
   } = payload.query || {};
@@ -104,9 +121,11 @@ exports.listSalons = async (payload) => {
 
   const where = {};
 
-  if (status) {
-    where.subscription_status = status;
-  }
+  const statusFilter = resolveEnumFilter(status, SubscriptionStatus);
+  if (statusFilter) where.subscription_status = statusFilter;
+
+  const planFilter = resolveEnumFilter(plan, SubscriptionPlan);
+  if (planFilter) where.subscription_plan = planFilter;
 
   if (is_active !== undefined) {
     where.is_active = is_active === "true" || is_active === true;
@@ -189,13 +208,16 @@ exports.onboardSalon = async (payload) => {
     );
 
     const effectivePlan = plan || subscription_plan;
-    const isPaidTier = effectivePlan && effectivePlan !== "trial";
+    let dbPlan = null;
+    if (effectivePlan) {
+      dbPlan = await subscriptionPlanRepository.findByUuid(effectivePlan, options);
+    }
+    const isPaidTier = dbPlan ? dbPlan.code !== "trial" : (effectivePlan && effectivePlan !== "trial");
     const hasSubscription = Boolean(isPaidTier || plan || amount !== undefined);
     const effectiveStatus = hasSubscription ? SubscriptionStatus.ENUM.ACTIVE : subscription_status;
 
     let expiresAt = null;
     if (hasSubscription) {
-      const dbPlan = await subscriptionPlanRepository.findOne({ code: effectivePlan }, [], {}, options);
       const planDurationDays = dbPlan?.duration_days || 0;
       const totalDays = Number(trial_days || 0) + Number(planDurationDays);
       expiresAt = new Date(Date.now() + totalDays * 24 * 60 * 60 * 1000);
@@ -210,7 +232,7 @@ exports.onboardSalon = async (payload) => {
         slug: finalSlug,
         is_active: true,
         registered_by: "admin",
-        subscription_plan: effectivePlan,
+        subscription_plan: dbPlan.code ,
         subscription_status: effectiveStatus,
         trial_ends_at: trialEndsAt,
         subscription_expires_at: expiresAt,
@@ -224,7 +246,7 @@ exports.onboardSalon = async (payload) => {
         {
           body: {
             salon_id: newSalon.id,
-            plan: effectivePlan,
+            plan: dbPlan.code,
             amount,
             discount_details,
           },
@@ -294,7 +316,10 @@ exports.updateSalonPlan = async (payload) => {
   }
 
   const updates = {};
-  if (subscription_plan) updates.subscription_plan = subscription_plan;
+  if (subscription_plan) {
+    const dbPlan = await subscriptionPlanRepository.findByUuid(subscription_plan);
+    updates.subscription_plan = dbPlan ? dbPlan.code : subscription_plan;
+  }
   if (subscription_status) updates.subscription_status = subscription_status;
 
   if (extend_trial_days) {
@@ -368,28 +393,28 @@ exports.getSubscriptionPlans = async () => {
         : `₹${numAmount.toLocaleString("en-IN")}`;
 
     return {
-      id: plan.code,
-      db_id: plan.id,
+      id: plan.id,
       code: plan.code,
+      uuid: plan.uuid,
       name: plan.name,
       amount: numAmount,
       formatted_price,
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
       description: plan.description,
-      duration_days: plan.duration_days ?? 30,
+      duration_days: plan.duration_days,
       is_active: plan.is_active,
     };
   });
 };
 
 exports.updateSubscriptionPlan = async (payload) => {
-  const { code } = payload.params;
+  const { uuid } = payload.params;
   const { amount, name, description, billing_cycle, duration_days } = payload.body;
 
-  const plan = await subscriptionPlanRepository.findOne({ code });
+  const plan = await subscriptionPlanRepository.findByUuid(uuid);
   if (!plan) {
-    throw new NotFound(`Subscription plan '${code}' not found`);
+    throw new NotFound(`Subscription plan '${uuid}' not found`);
   }
 
   const updates = {};
@@ -426,8 +451,8 @@ exports.updateSubscriptionPlan = async (payload) => {
   return {
     message: "Subscription plan updated successfully",
     plan: {
-      id: plan.code,
-      db_id: plan.id,
+      id: plan.id,
+      uuid: plan.uuid,
       code: plan.code,
       name: plan.name,
       amount: numAmount,
@@ -461,6 +486,7 @@ exports.createSubscriptionPlan = async (payload) => {
   const numDuration = Number(duration_days);
 
   const plan = await subscriptionPlanRepository.create({
+    uuid: crypto.randomUUID(),
     code,
     name: name.trim(),
     amount: numAmount,
@@ -477,8 +503,8 @@ exports.createSubscriptionPlan = async (payload) => {
   return {
     message: "Subscription plan created successfully",
     plan: {
-      id: plan.code,
-      db_id: plan.id,
+      id: plan.id,
+      uuid: plan.uuid,
       code: plan.code,
       name: plan.name,
       amount: numAmount,
@@ -493,27 +519,49 @@ exports.createSubscriptionPlan = async (payload) => {
 };
 
 exports.deleteSubscriptionPlan = async (payload) => {
-  const { code } = payload.params;
-  const plan = await subscriptionPlanRepository.findOne({ code });
+  const { uuid } = payload.params;
+
+  const plan = await subscriptionPlanRepository.findByUuid(uuid);
   if (!plan) {
-    throw new NotFound(`Subscription plan '${code}' not found`);
+    throw new NotFound(`Subscription plan '${uuid}' not found`);
   }
 
   await subscriptionPlanRepository.destroy({
-    criteria: { code },
+    criteria: { id: plan.id },
     options: { force: true },
   });
 
   return {
-    message: `Subscription plan '${code}' deleted successfully`,
-    code,
+    message: `Subscription plan '${plan.name}' deleted successfully`,
+    uuid: plan.uuid,
+  };
+};
+
+exports.toggleSubscriptionPlanStatus = async (payload) => {
+  const { uuid } = payload.params;
+
+  const plan = await subscriptionPlanRepository.findByUuid(uuid);
+  if (!plan) {
+    throw new NotFound(`Subscription plan '${uuid}' not found`);
+  }
+
+  await plan.update({ is_active: !plan.is_active });
+
+  return {
+    message: "Plan status updated successfully",
+    plan: {
+      id: plan.id,
+      uuid: plan.uuid,
+      code: plan.code,
+      is_active: plan.is_active,
+    },
   };
 };
 
 exports.createSubscriptionInvoice = async (payload, options = {}) => {
   const { salon_id, plan, amount, discount_details } = payload.body;
 
-  const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
+  const dbPlan = await subscriptionPlanRepository.findByUuid(plan);
   if (!dbPlan) {
     throw new error.BadRequest("Plan not found");
   }

@@ -112,6 +112,6 @@ exports.updatePlanSchema = z.object({
       }
     }),
   params: z.object({
-    code: z.string().min(1, "Plan code is required"),
+    uuid: z.string().uuid("Valid plan UUID is required"),
   }),
 });

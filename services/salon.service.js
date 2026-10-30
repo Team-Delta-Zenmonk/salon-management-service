@@ -561,11 +561,16 @@ exports.checkSlugAvailability = async (payload) => {
 
 exports.createSubscriptionPaymentIntent = async (payload) => {
   const { uuid } = payload.salon;
-  const { plan } = payload.body;
+  const { plan_uuid } = payload.body;
 
   const currentSalon = await salonRepository.findOne({ uuid }, [], {}, {});
   if (!currentSalon) {
     throw new error.BadRequest("Salon not found");
+  }
+
+  const dbPlan = await subscriptionPlanRepository.findByUuid(plan_uuid);
+  if (!dbPlan || !dbPlan.is_active) {
+    throw new error.BadRequest("Invalid plan selected");
   }
 
   const now = new Date();
@@ -575,7 +580,7 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
     currentSalon.subscription_expires_at &&
     new Date(currentSalon.subscription_expires_at) > now;
 
-  if (isActiveYearly && plan === "monthly") {
+  if (isActiveYearly && dbPlan.code === "monthly") {
     const expiryDate = new Date(
       currentSalon.subscription_expires_at,
     ).toLocaleDateString("en-IN", {
@@ -586,12 +591,6 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
     );
   }
 
-  const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
-  if (!dbPlan){
-    throw new error.BadRequest(
-      `Invalid plan selected`,
-    );
-  }
   const amountInPaise = Math.round(Number(dbPlan.amount) * 100);
   const amountInRupees = Number(dbPlan.amount);
 
@@ -625,7 +624,8 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
             clientSecret: existingPendingInvoice.stripe_client_secret || intent.client_secret,
             paymentIntentId: intent.id,
             amount: amountInRupees,
-            plan,
+            plan: dbPlan.code,
+            plan_uuid: dbPlan.uuid,
           };
         } else if (intent.status === "succeeded") {
           await exports.activateSubscriptionFromWebhook(intent);
@@ -663,7 +663,7 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
     });
   }
 
-  const idempotencyKey = `sub_pi_${currentSalon.id}_${plan}_${crypto.randomUUID()}`;
+  const idempotencyKey = `sub_pi_${currentSalon.id}_${dbPlan.uuid}_${crypto.randomUUID()}`;
 
   const paymentIntent = await stripe.paymentIntents.create(
     {
@@ -674,7 +674,8 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
         type: "subscription",
         salon_uuid: uuid,
         salon_id: currentSalon.id.toString(),
-        plan,
+        plan: dbPlan.uuid,
+        plan_code: dbPlan.code,
       },
     },
     {
@@ -702,8 +703,9 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
     stripe_client_secret: paymentIntent.client_secret,
     issued_at: now,
     metadata: {
-      plan,
-      billing_cycle: plan,
+      plan: dbPlan.code,
+      plan_uuid: dbPlan.uuid,
+      billing_cycle: dbPlan.billing_cycle || dbPlan.code,
       billing_period_start: now,
       billing_period_end: expiresAt,
     },
@@ -713,14 +715,16 @@ exports.createSubscriptionPaymentIntent = async (payload) => {
     clientSecret: paymentIntent.client_secret,
     paymentIntentId: paymentIntent.id,
     amount: amountInRupees,
-    plan,
+    plan: dbPlan.code,
+    plan_uuid: dbPlan.uuid,
+    plan_code: dbPlan.code,
   };
 };
 
 exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
-  const { salon_uuid, plan } = paymentIntent.metadata || {};
+  const { salon_uuid, plan, plan_code } = paymentIntent.metadata || {};
 
-  if (!salon_uuid || !plan) {
+  if (!salon_uuid || (!plan && !plan_code)) {
     return;
   }
 
@@ -756,7 +760,13 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
         return;
       }
 
-      const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
+      let dbPlan = null;
+      if (plan) {
+        dbPlan = await subscriptionPlanRepository.findByUuid(plan);
+      }
+      if (!dbPlan && plan_code) {
+        dbPlan = await subscriptionPlanRepository.findOne({ code: plan_code });
+      }
       if (!dbPlan) {
         throw new error.BadRequest("Plan not found");
       }
@@ -783,7 +793,7 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
 
       await salonRepository.update({
         payload: {
-          subscription_plan: plan,
+          subscription_plan: dbPlan.code,
           subscription_status: SubscriptionStatus.ENUM.ACTIVE,
           subscription_expires_at: expiresAt,
         },
@@ -815,8 +825,9 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
             payment_method: paymentMethod,
             payment_details: paymentDetails,
             metadata: {
-              plan,
-              billing_cycle: plan,
+              plan: dbPlan.code,
+              plan_uuid: dbPlan.uuid,
+              billing_cycle: dbPlan.billing_cycle || dbPlan.code,
               billing_period_start: baseDate,
               billing_period_end: expiresAt,
             },
@@ -843,8 +854,9 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
               stripe_client_secret: paymentIntent.client_secret,
               issued_at: new Date(),
               metadata: {
-                plan,
-                billing_cycle: plan,
+                plan: dbPlan.code,
+                plan_uuid: dbPlan.uuid,
+                billing_cycle: dbPlan.billing_cycle || dbPlan.code,
                 billing_period_start: baseDate,
                 billing_period_end: expiresAt,
               },
@@ -863,7 +875,7 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
       }
 
       console.log(
-        `[Subscription Webhook] Activated ${plan} plan for salon ${salon_uuid} until ${expiresAt.toISOString()}`,
+        `[Subscription Webhook] Activated ${dbPlan.code} plan for salon ${salon_uuid} until ${expiresAt.toISOString()}`,
       );
     },
   );
@@ -959,7 +971,7 @@ exports.handleSubscriptionPaymentFailed = async (paymentIntent) => {
 exports.upgradeSubscription = async (payload) => {
   const { uuid } = payload.salon;
   const {
-    plan,
+    plan_uuid,
     billing_cycle,
     payment_method = SubscriptionPaymentMethod.ENUM.CARD,
     payment_details,
@@ -971,7 +983,7 @@ exports.upgradeSubscription = async (payload) => {
     throw new error.BadRequest("Salon not found");
   }
 
-  const dbPlan = await subscriptionPlanRepository.findOne({ code: plan });
+  const dbPlan = await subscriptionPlanRepository.findByUuid(plan_uuid);
   if (!dbPlan) {
     throw new error.BadRequest("Plan not found");
   }
@@ -999,7 +1011,7 @@ exports.upgradeSubscription = async (payload) => {
 
   await salonRepository.update({
     payload: {
-      subscription_plan: plan,
+      subscription_plan: dbPlan.code,
       subscription_status: SubscriptionStatus.ENUM.ACTIVE,
       subscription_expires_at: expiresAt,
     },
@@ -1008,7 +1020,7 @@ exports.upgradeSubscription = async (payload) => {
 
   const updatedSalon = await salonRepository.findOne({ uuid }, [], {}, {});
 
-  const amount = dbPlan ? Number(dbPlan.amount) : (plan === SubscriptionPlan.ENUM.YEARLY ? 24990 : 2499);
+  const amount = Number(dbPlan.amount);
   const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${currentSalon.id}`;
   const effectiveTxId =
     transaction_id ||
@@ -1032,8 +1044,9 @@ exports.upgradeSubscription = async (payload) => {
         payment_method,
         payment_details: payment_details || existingPending.payment_details,
         metadata: {
-          plan,
-          billing_cycle: billing_cycle || plan,
+          plan: dbPlan.code,
+          plan_uuid: dbPlan.uuid,
+          billing_cycle: billing_cycle || dbPlan.billing_cycle || dbPlan.code,
           billing_period_start: baseDate,
           billing_period_end: expiresAt,
         },
@@ -1057,8 +1070,9 @@ exports.upgradeSubscription = async (payload) => {
       stripe_payment_intent_id: transaction_id || null,
       issued_at: new Date(),
       metadata: {
-        plan,
-        billing_cycle: billing_cycle || plan,
+        plan: dbPlan.code,
+        plan_uuid: dbPlan.uuid,
+        billing_cycle: billing_cycle || dbPlan.billing_cycle || dbPlan.code,
         billing_period_start: baseDate,
         billing_period_end: expiresAt,
       },
@@ -1072,7 +1086,7 @@ exports.upgradeSubscription = async (payload) => {
   }
 
   return {
-    message: `Subscription successfully activated on ${plan} plan`,
+    message: `Subscription successfully activated on ${dbPlan.name || dbPlan.code} plan`,
     salon: updatedSalon,
     invoice,
   };
