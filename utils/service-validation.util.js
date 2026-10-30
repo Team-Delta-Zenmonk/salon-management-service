@@ -1,6 +1,6 @@
-const { serviceRepository } = require("../repository");
+const { serviceRepository, staffServiceRepository } = require("../repository");
 const { error } = require("../libs");
-const { Op } = require("sequelize");
+const { Op, Sequelize } = require("sequelize");
 
 const hasSubServices = async (serviceId) => {
   if (!serviceId) return false;
@@ -50,8 +50,110 @@ const assertServicesBookable = async (services, action = "booked") => {
   }
 };
 
+const applySubServicePricingRules = (parent, targetPayload) => {
+  if (!parent || !targetPayload) return targetPayload;
+
+  if (parent.price_type === "free") {
+    targetPayload.price_type = "free";
+    targetPayload.price = 0;
+    targetPayload.discount = 0;
+    targetPayload.discount_type = null;
+  } else if (parent.price_type === "fixed") {
+    targetPayload.price_type = "fixed";
+    targetPayload.price = parent.price;
+  } else if (parent.price_type === "from") {
+    targetPayload.price_type = "from";
+    if (
+      targetPayload.price !== undefined &&
+      Number(targetPayload.price) < Number(parent.price)
+    ) {
+      throw new error.BadRequest(
+        `Sub-service price must be at least ${parent.price} (parent minimum price)`
+      );
+    }
+  }
+
+  return targetPayload;
+};
+
+const syncSubServicesPricingFromParent = async (parentService, options = {}) => {
+  if (!parentService || !parentService.id) return;
+
+  const subServices = await serviceRepository.findAll({
+    criteria: { parent_id: parentService.id },
+    attributes: ["id"],
+    transaction: options.transaction,
+  });
+
+  if (!subServices || subServices.length === 0) return;
+
+  const subServiceIds = subServices.map((s) => s.id);
+  const parentPriceType = parentService.price_type;
+  const parentPrice = Number(parentService.price) || 0;
+
+  if (parentPriceType === "free") {
+    await serviceRepository.update({
+      payload: {
+        price_type: "free",
+        price: 0,
+        discount: 0,
+        discount_type: null,
+      },
+      criteria: { id: { [Op.in]: subServiceIds } },
+      options: { transaction: options.transaction },
+    });
+
+    await staffServiceRepository.update({
+      payload: {
+        price_type: "free",
+        price: 0,
+      },
+      criteria: { service_id: { [Op.in]: subServiceIds } },
+      options: { transaction: options.transaction },
+    });
+  } else if (parentPriceType === "fixed") {
+    await serviceRepository.update({
+      payload: {
+        price_type: "fixed",
+        price: parentPrice,
+      },
+      criteria: { id: { [Op.in]: subServiceIds } },
+      options: { transaction: options.transaction },
+    });
+
+    await staffServiceRepository.update({
+      payload: {
+        price_type: "fixed",
+        price: parentPrice,
+      },
+      criteria: { service_id: { [Op.in]: subServiceIds } },
+      options: { transaction: options.transaction },
+    });
+  } else if (parentPriceType === "from") {
+    await serviceRepository.update({
+      payload: {
+        price_type: "from",
+        price: Sequelize.literal(`GREATEST(COALESCE(price, 0), ${parentPrice})`),
+      },
+      criteria: { id: { [Op.in]: subServiceIds } },
+      options: { transaction: options.transaction },
+    });
+
+    await staffServiceRepository.update({
+      payload: {
+        price_type: "from",
+        price: Sequelize.literal(`GREATEST(COALESCE(price, 0), ${parentPrice})`),
+      },
+      criteria: { service_id: { [Op.in]: subServiceIds } },
+      options: { transaction: options.transaction },
+    });
+  }
+};
+
 module.exports = {
   hasSubServices,
   assertServiceBookable,
   assertServicesBookable,
+  applySubServicePricingRules,
+  syncSubServicesPricingFromParent,
 };

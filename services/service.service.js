@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const { sequelize } = require("../config/db/db-connection");
 const { salonRepository, categoryRepository, serviceRepository, staffServiceRepository } = require("../repository");
 const { isStaffInactive } = require("../utils/staff-status.util");
+const { applySubServicePricingRules, syncSubServicesPricingFromParent } = require("../utils/service-validation.util");
 
 exports.createService = async (payload) => {
     const { body, salon } = payload;
@@ -17,9 +18,9 @@ exports.createService = async (payload) => {
         }
 
         body.parent_id = parent.id;
+        applySubServicePricingRules(parent, body);
 
         return await serviceRepository.create({ ...body, salon_id: salon.id, category_id: null });
-
     }
 
     const category = await categoryRepository.findOne({ uuid: category_id, salon_id: salon.id });
@@ -260,14 +261,35 @@ exports.updateService = async (payload) => {
         delete updatePayload.category_id;
     }
 
-    const response = await serviceRepository.update({
-        payload: updatePayload,
-        criteria: { uuid: params.uuid, salon_id: salon.id },
+    if (service.parent_id) {
+        const parent = await serviceRepository.findOne({ id: service.parent_id, salon_id: salon.id });
+        if (parent) {
+            applySubServicePricingRules(parent, updatePayload);
+        }
+    }
+
+    return await sequelize.transaction(async (t) => {
+        const response = await serviceRepository.update({
+            payload: updatePayload,
+            criteria: { uuid: params.uuid, salon_id: salon.id },
+            options: { transaction: t },
+        });
+
+        if (response[0] !== 1) {
+            throw new error.BadRequest('Failed to update service');
+        }
+
+        if (!service.parent_id && (updatePayload.price_type !== undefined || updatePayload.price !== undefined)) {
+            const updatedParent = {
+                id: service.id,
+                price_type: updatePayload.price_type !== undefined ? updatePayload.price_type : service.price_type,
+                price: updatePayload.price !== undefined ? updatePayload.price : service.price,
+            };
+            await syncSubServicesPricingFromParent(updatedParent, { transaction: t });
+        }
+
+        return { message: "Successfully updated service" };
     });
-
-    if (response[0] === 1) return { message: "Successfully updated service" }
-
-    throw new error.BadRequest('Failed to update service');
 }
 
 exports.deleteService = async (payload) => {
