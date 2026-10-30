@@ -35,7 +35,7 @@ const serviceBodySchema = z.object({
     .number()
     .int({ message: "Duration must be an integer" })
     .positive({ message: "Duration must be greater than 0" })
-    .max(600, { message: "Duration cannot exceed 10 hours (600 minutes)" }),
+    .max(1440, { message: "Duration cannot exceed 24 hours (1440 minutes)" }),
 });
 
 const validateServicePricing = (data, ctx) => {

@@ -20,7 +20,7 @@ exports.createStaffServicesSchema = z.object({
             .number()
             .int({ message: "duration must be an integer" })
             .positive({ message: "duration must be greater than 0" })
-            .max(600, { message: "duration too long" }),
+            .max(1440, { message: "duration too long" }),
         })
         .superRefine((data, ctx) => {
           const minPrice = CURRENCY_CONFIG[DEFAULT_CURRENCY].minServicePrice;

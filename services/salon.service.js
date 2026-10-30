@@ -28,6 +28,11 @@ const {
 const { Op } = require("sequelize");
 const { Category, sequelize } = require("../models");
 const { formatStaffListTiming } = require("../utils/staff-timing.util");
+const {
+  toMinutes,
+  getMaxDailyOperatingMinutes,
+  formatMinutesToHours,
+} = require("../utils/business-hours.util");
 const themeService = require("./theme.service");
 const { syncCartState } = require("./cart.service");
 
@@ -198,6 +203,13 @@ exports.getAvailableSlots = async (payload) => {
 
   if (totalDuration !== cart.total_duration) {
     throw new error.BadRequest("Cart total duration mismatch");
+  }
+
+  const maxOperatingMinutes = getMaxDailyOperatingMinutes(salon.business_hours);
+  if (maxOperatingMinutes > 0 && totalDuration > maxOperatingMinutes) {
+    throw new error.BadRequest(
+      `Selected services total ${formatMinutesToHours(totalDuration)}, which exceeds the salon's maximum daily operating window (${formatMinutesToHours(maxOperatingMinutes)}). Please book services across separate visits.`
+    );
   }
 
   const salonHolidays = await holidayRepository.getSalonHolidaysByDate(
@@ -401,15 +413,6 @@ const toISODateTime = (dateStr, minutes) => {
   d.setUTCHours(0, 0, 0, 0);
   d.setUTCMinutes(minutes);
   return d.toISOString();
-};
-
-const toMinutes = (dateTime) => {
-  if (typeof dateTime === "string" && /^\d{1,2}:\d{2}$/.test(dateTime)) {
-    const [h, m] = dateTime.split(":").map(Number);
-    return h * 60 + m;
-  }
-  const d = new Date(dateTime);
-  return d.getUTCHours() * 60 + d.getUTCMinutes();
 };
 
 const toTimeString = (minutes) => {
@@ -808,9 +811,9 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
       const paymentDetails =
         paymentMethod === "card" && pmDetails.card
           ? {
-              card_last4: pmDetails.card.last4,
-              card_brand: pmDetails.card.brand,
-            }
+            card_last4: pmDetails.card.last4,
+            card_brand: pmDetails.card.brand,
+          }
           : paymentMethod === "upi" && pmDetails.upi
             ? { upi_id: pmDetails.upi.vpa }
             : {};
@@ -1028,9 +1031,9 @@ exports.upgradeSubscription = async (payload) => {
 
   const existingPending = transaction_id
     ? await invoiceRepository.findOne({
-        stripe_payment_intent_id: transaction_id,
-        invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
-      })
+      stripe_payment_intent_id: transaction_id,
+      invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+    })
     : null;
 
   let invoice;

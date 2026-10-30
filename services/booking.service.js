@@ -719,6 +719,13 @@ exports.createAdminBooking = async (payload) => {
         current_start_time = service_end_time;
       }
 
+      const startMinutes = initial_start_time.getUTCHours() * 60 + initial_start_time.getUTCMinutes();
+      if (startMinutes + total_duration > 1440) {
+        throw new error.BadRequest(
+          "Booking cannot extend past midnight into the next day. Please choose an earlier start time or adjust services."
+        );
+      }
+
     const adminBookingData = {
       ...(admin_booking || {}),
       customer_name: payload.body.customer_name || admin_booking?.customer_name,
@@ -1028,6 +1035,13 @@ exports.updateAdminBooking = async (payload) => {
           current_start_time = service_end_time;
         }
         final_booking_end_time = current_start_time;
+
+        const startMinutes = updated_start_time.getUTCHours() * 60 + updated_start_time.getUTCMinutes();
+        if (startMinutes + total_duration > 1440) {
+          throw new error.BadRequest(
+            "Booking cannot extend past midnight into the next day. Please choose an earlier start time or adjust services."
+          );
+        }
       }
 
       const updatedPolicy =
