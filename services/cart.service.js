@@ -190,58 +190,90 @@ exports.createCart = async (payload) => {
         })
       : [];
 
-    const cart = await cartRepository.create(
-      {
-        customer_id: user.id,
-        salon_id: salon.id,
-      },
-      { transaction },
-    );
+    let cart = await cartRepository.findOne({
+      customer_id: user.id,
+      deleted_at: null,
+    }, null, { transaction });
 
-    const cartItemsPayload = items.map((itemData) => {
-      const service = serviceByUuid.get(itemData.service_id);
-      let staff = itemData.staff_id ? staffByUuid.get(itemData.staff_id) : null;
-
-      if (staff && isStaffInactive(staff)) {
-        staff = null;
-      }
-
-      let basePrice = service.price;
-      let duration = service.duration;
-      let finalPrice = calculateFinalPrice({
-        basePrice,
-        discount: service.discount,
-        discountType: service.discount_type,
-      });
-
-      if (staff) {
-        const staffService = staffServices.find(
-          (ss) => ss.staff_id === staff.id && (ss.service_id === service.id || (service.parent_id && ss.service_id === service.parent_id))
+    let existingServiceIds = new Set();
+    if (cart) {
+      if (cart.salon_id !== salon.id) {
+        await cartItemRepository.softDelete({ cart_id: cart.id }, { transaction });
+        await cartRepository.softDelete({ id: cart.id }, { transaction });
+        cart = await cartRepository.create(
+          {
+            customer_id: user.id,
+            salon_id: salon.id,
+          },
+          { transaction },
         );
-
-        if (!staffService) {
-          staff = null;
-        } else {
-          duration = staffService.duration || service.duration;
-          if (staffService.price) {
-            finalPrice = parseFloat(staffService.price);
-          }
-        }
+      } else {
+        const existingCartItems = await cartItemRepository.findAll({
+          criteria: { cart_id: cart.id, deleted_at: null },
+          transaction,
+        });
+        existingServiceIds = new Set(existingCartItems.map((ci) => ci.service_id));
       }
+    } else {
+      cart = await cartRepository.create(
+        {
+          customer_id: user.id,
+          salon_id: salon.id,
+        },
+        { transaction },
+      );
+    }
 
-      return {
-        cart_id: cart.id,
-        service_id: service.id,
-        staff_id: staff?.id ?? null,
-        base_price: basePrice,
-        final_price: finalPrice,
-        duration: duration,
-      };
+    const itemsToInsert = items.filter((itemData) => {
+      const service = serviceByUuid.get(itemData.service_id);
+      return service && !existingServiceIds.has(service.id);
     });
 
-    await cartItemRepository.createBulk(cartItemsPayload, { transaction });
+    if (itemsToInsert.length > 0) {
+      const cartItemsPayload = itemsToInsert.map((itemData) => {
+        const service = serviceByUuid.get(itemData.service_id);
+        let staff = itemData.staff_id ? staffByUuid.get(itemData.staff_id) : null;
 
-    await updateCartTotals(cart.id, transaction);
+        if (staff && isStaffInactive(staff)) {
+          staff = null;
+        }
+
+        let basePrice = service.price;
+        let duration = service.duration;
+        let finalPrice = calculateFinalPrice({
+          basePrice,
+          discount: service.discount,
+          discountType: service.discount_type,
+        });
+
+        if (staff) {
+          const staffService = staffServices.find(
+            (ss) => ss.staff_id === staff.id && (ss.service_id === service.id || (service.parent_id && ss.service_id === service.parent_id))
+          );
+
+          if (!staffService) {
+            staff = null;
+          } else {
+            duration = staffService.duration || service.duration;
+            if (staffService.price) {
+              finalPrice = parseFloat(staffService.price);
+            }
+          }
+        }
+
+        return {
+          cart_id: cart.id,
+          service_id: service.id,
+          staff_id: staff?.id ?? null,
+          base_price: basePrice,
+          final_price: finalPrice,
+          duration: duration,
+        };
+      });
+
+      await cartItemRepository.createBulk(cartItemsPayload, { transaction });
+      await updateCartTotals(cart.id, transaction);
+    }
 
     await cartRepository.commitTransaction(transaction);
 

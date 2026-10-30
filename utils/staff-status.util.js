@@ -1,3 +1,5 @@
+const { error } = require("../libs");
+
 function isStaffInactive(staffOrEndDate) {
   if (!staffOrEndDate) return false;
 
@@ -18,7 +20,7 @@ function isStaffInactive(staffOrEndDate) {
 
 function assertStaffActive(staffOrEndDate, errorLib) {
   if (isStaffInactive(staffOrEndDate)) {
-    const { BadRequest } = errorLib || require("../libs").error;
+    const { BadRequest } = errorLib || error;
     throw new BadRequest("Cannot assign service to inactive staff member");
   }
 }

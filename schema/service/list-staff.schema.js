@@ -8,9 +8,8 @@ exports.listServiceStaffSchema = z.object({
     .object({
       salon_uuid: z.string().optional(),
       salon_id: z.string().optional(),
-      page: z.coerce.number().int().min(1).optional(),
-      limit: z.coerce.number().int().min(1).optional(),
-      offset: z.coerce.number().int().min(0).optional(),
+      page: z.coerce.number().int().min(1).default(1).optional(),
+      limit: z.coerce.number().int().min(1).max(100).default(10).optional(),
       include_parent: z
         .preprocess((val) => (val === "true" || val === true ? true : val === "false" || val === false ? false : val), z.boolean())
         .optional(),

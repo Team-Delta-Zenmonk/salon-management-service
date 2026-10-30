@@ -28,6 +28,7 @@ const {
 const { Op } = require("sequelize");
 const { Category, sequelize } = require("../models");
 const { formatStaffListTiming } = require("../utils/staff-timing.util");
+const themeService = require("./theme.service");
 const { syncCartState } = require("./cart.service");
 
 exports.updateSalon = async (payload) => {
@@ -91,7 +92,6 @@ exports.updateSalon = async (payload) => {
     if (!currentSalon) {
       throw new error.BadRequest("Salon not found");
     }
-    const themeService = require("./theme.service");
     const targetTheme = await themeService.validateThemeOwnership(
       currentSalon.id,
       payload.body.theme_uuid
@@ -419,9 +419,11 @@ const toTimeString = (minutes) => {
 };
 
 exports.listSalons = async (payload) => {
-  let { page, limit, search, category, latitude, longitude } = payload.query;
+  let { page, limit, search, category, latitude, longitude } = payload.query || {};
 
-  const offset = page && limit ? (page - 1) * limit : 0;
+  const pageNum = Number(page) > 0 ? Number(page) : 1;
+  const limitNum = Number(limit) > 0 ? Number(limit) : 10;
+  const offset = (pageNum - 1) * limitNum;
   const where = {
     stripe_account_id: { [Op.not]: null },
   };
@@ -482,15 +484,16 @@ exports.listSalons = async (payload) => {
     criteria: where,
     include,
     offset,
-    limit,
+    limit: limitNum,
     attributes,
     order,
   });
 
   return {
     total: count,
-    page,
-    limit,
+    page: pageNum,
+    limit: limitNum,
+    totalPages: Math.ceil(count / limitNum),
     data: rows,
   };
 };

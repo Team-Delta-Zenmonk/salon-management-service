@@ -33,27 +33,19 @@ exports.createService = async (payload) => {
 
 exports.listServices = async (payload) => {
     const { query, salon } = payload;
-    const { category_uuid, include_sub_services } = query || {};
+    const { category_uuid } = query || {};
 
-    const page = Number(query?.page) || 1;
-    const limit = Number(query?.limit) || 10;
-    const offset = query?.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
+    const page = Number(query?.page) > 0 ? Number(query.page) : 1;
+    const limit = Number(query?.limit) > 0 ? Math.min(Number(query.limit), 100) : 10;
+    const offset = (page - 1) * limit;
     const search = query?.search;
-
-    const shouldIncludeSubServices =
-      include_sub_services === true ||
-      include_sub_services === "true" ||
-      include_sub_services === 1 ||
-      include_sub_services === "1";
 
     let criteria = {
       salon_id: salon.id,
       [Op.and]: [],
     };
 
-    if (!shouldIncludeSubServices) {
       criteria.parent_id = null;
-    }
 
     if (search) {
       const sanitizedSearch = search.replace(/'/g, "''");
@@ -122,9 +114,9 @@ exports.listStaff = async (payload) => {
         serviceIds.push(service.parent_id);
     }
 
-    const page = Number(query.page) > 0 ? Number(query.page) : 1;
-    const limit = Number(query.limit) > 0 ? Number(query.limit) : 10;
-    const offset = query.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
+    const page = Number(query?.page) > 0 ? Number(query.page) : 1;
+    const limit = Number(query?.limit) > 0 ? Math.min(Number(query.limit), 100) : 10;
+    const offset = (page - 1) * limit;
 
     const serviceIdsList = serviceIds.join(",");
     const todayStr = new Date().toISOString().split("T")[0];
@@ -231,18 +223,16 @@ exports.listSubServices = async (payload) => {
         throw new error.NotFound("Service not found");
     }
 
+    const page = Number(query?.page) > 0 ? Number(query.page) : 1;
+    const limit = Number(query?.limit) > 0 ? Math.min(Number(query.limit), 100) : 10;
+    const offset = (page - 1) * limit;
+
     const options = {
         criteria: { parent_id: service.id },
         order: [["created_at", "DESC"]],
+        limit,
+        offset,
     };
-
-    if (query?.page || query?.limit || query?.offset !== undefined) {
-        const page = Number(query.page) > 0 ? Number(query.page) : 1;
-        const limit = Number(query.limit) > 0 ? Number(query.limit) : 10;
-        const offset = query.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
-        options.limit = limit;
-        options.offset = offset;
-    }
 
     return await serviceRepository.findAndCountAll(options);
 }

@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const { Staff } = require("../models");
 const BaseRepository = require("./base.repository");
 
@@ -7,7 +8,6 @@ class StaffRepository extends BaseRepository {
   }
 
   async findAndCountStorefrontStaff({ salonId, search, offset = 0, limit = 10 }) {
-    const { Op } = require("sequelize");
     const criteria = {
       salon_id: salonId,
     };

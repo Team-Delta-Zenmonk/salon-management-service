@@ -107,10 +107,13 @@ class BookingRepository extends BaseRepository {
         {
           association: "booking_services",
           include: [
-            { association: "service", attributes: ["name", "uuid"] },
+            {
+              association: "service",
+              attributes: ["id", "name", "uuid", "parent_id", "duration", "price"],
+            },
             {
               association: "staff",
-              attributes: ["first_name", "last_name", "uuid"],
+              attributes: ["id", "first_name", "last_name", "uuid"],
             },
           ],
         },
@@ -217,7 +220,10 @@ class BookingRepository extends BaseRepository {
       {
         association: "booking_services",
         include: [
-          { association: "service", attributes: ["id", "name", "uuid"] },
+          {
+            association: "service",
+            attributes: ["id", "name", "uuid", "parent_id", "duration", "price"],
+          },
           {
             association: "staff",
             attributes: ["id", "first_name", "last_name", "uuid"],

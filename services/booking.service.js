@@ -1505,11 +1505,6 @@ exports.getBookingByUuid = async ({ uuid, customer }) => {
 
   if (booking.status === BookingStatus.ENUM.PENDING) {
     try {
-      const { paymentRepository } = require("../repository");
-      const { PaymentStatus } = require("../models/payment/payment-types");
-      const stripe = require("../config/stripe");
-      const paymentService = require("./payment.service");
-
       const pendingPayment = await paymentRepository.findOne({
         booking_id: booking.id,
         status: PaymentStatus.ENUM.PENDING,

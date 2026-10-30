@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const { Service } = require("../models");
 const BaseRepository = require("./base.repository");
 
@@ -7,7 +8,6 @@ class ServiceRepository extends BaseRepository {
   }
 
   async findAndCountStorefrontServices({ salonId, categoryId, search, gender, offset = 0, limit = 10 }) {
-    const { Op } = require("sequelize");
     const criteria = {
       salon_id: salonId,
       parent_id: null,

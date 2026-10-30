@@ -174,7 +174,7 @@ exports.getStorefrontServiceStaff = async (payload) => {
 
   const page = Number(query.page) > 0 ? Number(query.page) : 1;
   const limit = Number(query.limit) > 0 ? Number(query.limit) : 10;
-  const offset = query.offset !== undefined ? Number(query.offset) : (page - 1) * limit;
+  const offset = (page - 1) * limit;
 
   const serviceIdsList = serviceIds.join(",");
   const todayStr = new Date().toISOString().split("T")[0];

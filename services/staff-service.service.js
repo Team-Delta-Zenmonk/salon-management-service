@@ -12,7 +12,7 @@ exports.bulkCreate = async (payload) => {
 
     const services = await serviceRepository.findAll({
       criteria: { uuid: serviceUUIDs },
-      attributes: ["id", "uuid"],
+      attributes: ["id", "uuid", "parent_id", "duration", "price_type", "price"],
       transaction,
     });
 
@@ -26,30 +26,67 @@ exports.bulkCreate = async (payload) => {
       assertStaffActive(s, error);
     }
 
-    const serviceMap = new Map(services.map((s) => [s.uuid, s.id]));
+    const serviceMap = new Map(services.map((s) => [s.uuid, s]));
     const staffMap = new Map(staff.map((s) => [s.uuid, s.id]));
+
+    const parentServiceIds = services.filter((s) => !s.parent_id).map((s) => s.id);
+    let childSubServicesByParent = new Map();
+    if (parentServiceIds.length > 0) {
+      const childSubServices = await serviceRepository.findAll({
+        criteria: { parent_id: parentServiceIds },
+        attributes: ["id", "uuid", "parent_id", "duration", "price_type", "price"],
+        transaction,
+      });
+
+      for (const child of childSubServices) {
+        if (!childSubServicesByParent.has(child.parent_id)) {
+          childSubServicesByParent.set(child.parent_id, []);
+        }
+        childSubServicesByParent.get(child.parent_id).push(child);
+      }
+    }
 
     const finalData = [];
     
     body.staff_services.forEach((item) => {
-      const service_id = serviceMap.get(item.service_uuid);
+      const srv = serviceMap.get(item.service_uuid);
       const staff_id = staffMap.get(item.staff_uuid);
 
-      if (!service_id || !staff_id) {
+      if (!srv || !staff_id) {
         throw new Error(`Invalid service_uuid or staff_uuid in payload`);
       }
 
       finalData.push({
-        service_id,
+        service_id: srv.id,
         staff_id,
-        duration: item.duration,
-        price_type: item.price_type,
-        price: item.price,
+        duration: item.duration ?? srv.duration,
+        price_type: item.price_type ?? srv.price_type,
+        price: item.price ?? srv.price,
         deleted_at: null,
       });
+
+      const children = childSubServicesByParent.get(srv.id);
+      if (children && children.length > 0) {
+        for (const child of children) {
+          finalData.push({
+            service_id: child.id,
+            staff_id,
+            duration: child.duration,
+            price_type: child.price_type,
+            price: child.price,
+            deleted_at: null,
+          });
+        }
+      }
     });
 
-    const staffServices = await staffServiceRepository.createBulk(finalData, {
+    const uniqueAssignments = new Map();
+    for (const item of finalData) {
+      const key = `${item.service_id}_${item.staff_id}`;
+      uniqueAssignments.set(key, item);
+    }
+
+    const staffServices = await staffServiceRepository.createBulk(Array.from(uniqueAssignments.values()), {
       conflictAttributes: ["service_id", "staff_id"],
       updateOnDuplicate: ["duration", "price_type", "price", "deleted_at"],
       transaction,
