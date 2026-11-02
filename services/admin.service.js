@@ -361,15 +361,9 @@ exports.updateSalonPlan = async (payload) => {
       salon.subscription_expires_at &&
       new Date(salon.subscription_expires_at) > now;
 
-    const hasActiveTrial =
-      salon.trial_ends_at &&
-      new Date(salon.trial_ends_at) > now;
-
     let baseDate = now;
     if (hasActiveUnexpiredPlan) {
       baseDate = new Date(salon.subscription_expires_at);
-    } else if (hasActiveTrial) {
-      baseDate = new Date(salon.trial_ends_at);
     }
 
     const expiresAt = new Date(baseDate.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
@@ -410,28 +404,56 @@ exports.updateSalonPlan = async (payload) => {
     }
   } else if (extend_subscription_days) {
     const now = new Date();
-    const currentBase =
-      salon.subscription_expires_at &&
-      new Date(salon.subscription_expires_at) > now
-        ? new Date(salon.subscription_expires_at)
-        : now;
-    updates.subscription_expires_at = new Date(
-      currentBase.getTime() +
-        Number(extend_subscription_days) * 24 * 60 * 60 * 1000,
-    );
-    updates.subscription_status = "active";
+    const isPaidPlan = salon.subscription_plan && salon.subscription_plan !== "trial";
+
+    if (isPaidPlan) {
+      const currentBase =
+        salon.subscription_expires_at &&
+        new Date(salon.subscription_expires_at) > now
+          ? new Date(salon.subscription_expires_at)
+          : now;
+      updates.subscription_expires_at = new Date(
+        currentBase.getTime() +
+          Number(extend_subscription_days) * 24 * 60 * 60 * 1000,
+      );
+      updates.subscription_status = "active";
+    } else {
+      const currentBase =
+        salon.trial_ends_at && new Date(salon.trial_ends_at) > now
+          ? new Date(salon.trial_ends_at)
+          : now;
+      updates.trial_ends_at = new Date(
+        currentBase.getTime() +
+          Number(extend_subscription_days) * 24 * 60 * 60 * 1000,
+      );
+      updates.subscription_status = "trial";
+    }
   } else if (duration_days) {
     const now = new Date();
-    const isCurrentlyActive =
-      salon.subscription_status === SubscriptionStatus.ENUM.ACTIVE &&
-      salon.subscription_expires_at &&
-      new Date(salon.subscription_expires_at) > now;
+    const isPaidPlan = salon.subscription_plan && salon.subscription_plan !== "trial";
 
-    const baseDate = isCurrentlyActive ? new Date(salon.subscription_expires_at) : now;
-    updates.subscription_expires_at = new Date(
-      baseDate.getTime() + Number(duration_days) * 24 * 60 * 60 * 1000,
-    );
-    updates.subscription_status = "active";
+    if (isPaidPlan) {
+      const isCurrentlyActive =
+        salon.subscription_status === SubscriptionStatus.ENUM.ACTIVE &&
+        salon.subscription_expires_at &&
+        new Date(salon.subscription_expires_at) > now;
+
+      const baseDate = isCurrentlyActive ? new Date(salon.subscription_expires_at) : now;
+      updates.subscription_expires_at = new Date(
+        baseDate.getTime() + Number(duration_days) * 24 * 60 * 60 * 1000,
+      );
+      updates.subscription_status = "active";
+    } else {
+      const isTrialActive =
+        salon.trial_ends_at &&
+        new Date(salon.trial_ends_at) > now;
+
+      const baseDate = isTrialActive ? new Date(salon.trial_ends_at) : now;
+      updates.trial_ends_at = new Date(
+        baseDate.getTime() + Number(duration_days) * 24 * 60 * 60 * 1000,
+      );
+      updates.subscription_status = "trial";
+    }
   }
 
   await salon.update(updates);
