@@ -443,7 +443,7 @@ exports.getSubscriptionPlans = async (payload = {}) => {
 
 exports.updateSubscriptionPlan = async (payload) => {
   const { uuid } = payload.params;
-  const { amount, name, description, billing_cycle, duration_days } = payload.body;
+  const { code, amount, name, description, billing_cycle, duration_days } = payload.body;
 
   const plan = await subscriptionPlanRepository.findByUuid(uuid);
   if (!plan) {
@@ -451,27 +451,12 @@ exports.updateSubscriptionPlan = async (payload) => {
   }
 
   const updates = {};
-  if (amount !== undefined) {
-    if (isNaN(Number(amount)) || Number(amount) < 0) {
-      throw new BadRequest("Amount must be a non-negative number");
-    }
-    const currencyConfig = getCurrencyConfig(plan.currency || "INR");
-    if (plan.code !== "trial" && Number(amount) < currencyConfig.minChargeAmount) {
-      throw new BadRequest(
-        `Price amount must be at least ${currencyConfig.symbol}${currencyConfig.minChargeAmount} for paid plans`
-      );
-    }
-    updates.amount = Number(amount);
-  }
+  if (code !== undefined) updates.code = code;
+  if (amount !== undefined) updates.amount = Number(amount);
   if (name !== undefined) updates.name = name;
   if (description !== undefined) updates.description = description;
   if (billing_cycle !== undefined) updates.billing_cycle = billing_cycle;
-  if (duration_days !== undefined) {
-    if (isNaN(Number(duration_days)) || Number(duration_days) <= 0) {
-      throw new BadRequest("Duration days must be a positive integer");
-    }
-    updates.duration_days = Number(duration_days);
-  }
+  if (duration_days !== undefined) updates.duration_days = Number(duration_days);
 
   await plan.update(updates);
 

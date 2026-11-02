@@ -12,7 +12,7 @@ exports.createTransaction = async (payload) => {
   });
   if (!item) throw new error.NotFound("Inventory item not found");
 
-  const netChange = (body.received_quantity || 0) - (body.damaged_quantity || 0) - (body.returned_quantity || 0);
+  const netChange = (body.received_quantity || 0) - (body.returned_quantity || 0);
   const newStock = item.current_stock + netChange;
 
   if (newStock < 0) throw new error.BadRequest("Transaction would result in negative stock level");
@@ -114,9 +114,23 @@ exports.updateTransaction = async (payload) => {
   });
   if (!item) throw new error.NotFound("Inventory item not found");
 
-  const oldNetChange =
-    (transaction.received_quantity || 0) - (transaction.damaged_quantity || 0) - (transaction.returned_quantity || 0);
-  const newNetChange = (body.received_quantity || 0) - (body.damaged_quantity || 0) - (body.returned_quantity || 0);
+  const effectiveReceived = body.received_quantity !== undefined ? body.received_quantity : transaction.received_quantity;
+  const effectiveReturned = body.returned_quantity !== undefined ? body.returned_quantity : transaction.returned_quantity;
+  const effectiveOrdered = body.ordered_quantity !== undefined ? body.ordered_quantity : transaction.ordered_quantity;
+  const effectiveDamaged = body.damaged_quantity !== undefined ? body.damaged_quantity : transaction.damaged_quantity;
+
+  if (effectiveOrdered > 0 && effectiveReceived > effectiveOrdered) {
+    throw new error.BadRequest("Received quantity cannot be greater than ordered quantity");
+  }
+  if (effectiveDamaged > effectiveReceived) {
+    throw new error.BadRequest("Damaged quantity cannot be greater than received quantity");
+  }
+  if (effectiveReturned > effectiveReceived) {
+    throw new error.BadRequest("Returned quantity cannot be greater than received quantity");
+  }
+
+  const oldNetChange = (transaction.received_quantity || 0) - (transaction.returned_quantity || 0);
+  const newNetChange = (effectiveReceived || 0) - (effectiveReturned || 0);
   const newStock = item.current_stock - oldNetChange + newNetChange;
 
   if (newStock < 0) throw new error.BadRequest("Updating transaction would result in negative stock level");

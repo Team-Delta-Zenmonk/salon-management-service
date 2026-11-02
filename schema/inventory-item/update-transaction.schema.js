@@ -17,8 +17,35 @@ exports.updateTransactionSchema = z.object({
       item_uuid: z.string().uuid().optional(),
     })
     .partial()
-    .refine((data) => {
-      return true;
+    .superRefine((data, ctx) => {
+      const ordered = data.ordered_quantity;
+      const received = data.received_quantity;
+      const damaged = data.damaged_quantity;
+      const returned = data.returned_quantity;
+
+      if (ordered !== undefined && received !== undefined && ordered > 0 && received > ordered) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Received quantity cannot be greater than ordered quantity",
+          path: ["received_quantity"],
+        });
+      }
+
+      if (damaged !== undefined && received !== undefined && damaged > received) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Damaged quantity cannot be greater than received quantity",
+          path: ["damaged_quantity"],
+        });
+      }
+
+      if (returned !== undefined && received !== undefined && returned > received) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Returned quantity cannot be greater than received quantity",
+          path: ["returned_quantity"],
+        });
+      }
     }),
   params: z.object({
     uuid: z.string().uuid(),

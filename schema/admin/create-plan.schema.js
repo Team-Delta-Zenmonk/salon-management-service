@@ -70,6 +70,12 @@ exports.createPlanSchema = z.object({
 exports.updatePlanSchema = z.object({
   body: z
     .object({
+      code: z
+        .string()
+        .trim()
+        .max(FIELD_LIMITS.CODE, { message: `Code cannot exceed ${FIELD_LIMITS.CODE} characters` })
+        .optional()
+        .nullable(),
       name: z
         .string()
         .trim()
@@ -99,7 +105,8 @@ exports.updatePlanSchema = z.object({
         .nullable(),
     })
     .superRefine((data, ctx) => {
-      if (data.amount !== undefined) {
+      const isTrial = data.code?.toLowerCase().trim() === "trial";
+      if (!isTrial && data.amount !== undefined && data.amount > 0) {
         const minAmount = CURRENCY_CONFIG[DEFAULT_CURRENCY].minChargeAmount;
         const symbol = CURRENCY_CONFIG[DEFAULT_CURRENCY].symbol;
         if (data.amount < minAmount) {

@@ -16,17 +16,6 @@ const baseFields = {
   }),
 };
 
-const validateQuantities = (data) => {
-  if (data.ordered_quantity > 0 && data.received_quantity > data.ordered_quantity) {
-    return false;
-  }
-  const totalRemoved = (data.damaged_quantity || 0) + (data.returned_quantity || 0);
-  if (totalRemoved > data.received_quantity) {
-    return false;
-  }
-  return true;
-};
-
 exports.createTransactionSchema = z.object({
   body: z
     .object({
@@ -37,8 +26,34 @@ exports.createTransactionSchema = z.object({
       returned_quantity: baseFields.returned_quantity.default(0),
       item_uuid: z.string().uuid({ message: "Valid Item UUID is required" }),
     })
-    .refine(validateQuantities, {
-      message: "Quantities are physically impossible.",
-      path: ["received_quantity"],
+    .superRefine((data, ctx) => {
+      const ordered = data.ordered_quantity ?? 0;
+      const received = data.received_quantity ?? 0;
+      const damaged = data.damaged_quantity ?? 0;
+      const returned = data.returned_quantity ?? 0;
+
+      if (ordered > 0 && received > ordered) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Received quantity cannot be greater than ordered quantity",
+          path: ["received_quantity"],
+        });
+      }
+
+      if (damaged > received) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Damaged quantity cannot be greater than received quantity",
+          path: ["damaged_quantity"],
+        });
+      }
+
+      if (returned > received) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Returned quantity cannot be greater than received quantity",
+          path: ["returned_quantity"],
+        });
+      }
     }),
 });
