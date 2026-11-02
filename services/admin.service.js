@@ -246,7 +246,7 @@ exports.onboardSalon = async (payload) => {
         {
           body: {
             salon_id: newSalon.id,
-            plan: dbPlan.code,
+            plan: dbPlan ? dbPlan.uuid : effectivePlan,
             amount,
             discount_details,
           },
@@ -561,9 +561,16 @@ exports.toggleSubscriptionPlanStatus = async (payload) => {
 exports.createSubscriptionInvoice = async (payload, options = {}) => {
   const { salon_id, plan, amount, discount_details } = payload.body;
 
-  const dbPlan = await subscriptionPlanRepository.findByUuid(plan);
+  let dbPlan = null;
+  if (plan) {
+    dbPlan = await subscriptionPlanRepository.findByUuid(plan);
+    if (!dbPlan) {
+      dbPlan = await subscriptionPlanRepository.findOne({ code: plan }, [], {}, options);
+    }
+  }
+
   if (!dbPlan) {
-    throw new error.BadRequest("Plan not found");
+    throw new BadRequest("Plan not found");
   }
   const durationDays = dbPlan.duration_days;
   const now = new Date();
@@ -613,8 +620,9 @@ exports.createSubscriptionInvoice = async (payload, options = {}) => {
       payment_method: "manual",
       issued_at: now,
       metadata: {
-        plan,
-        billing_cycle: plan,
+        plan: dbPlan.code,
+        plan_uuid: dbPlan.uuid,
+        billing_cycle: dbPlan.billing_cycle || dbPlan.code,
         billing_period_start: now,
         billing_period_end: expiresAt,
         discount_details: discountData,
