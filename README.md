@@ -178,3 +178,110 @@ npm start
 ```
 
 The API service is accessible on `http://localhost:8080`.
+
+---
+
+## 5. Local Stripe Webhook Integration (Stripe CLI)
+
+When developing locally, incoming Stripe events (such as `payment_intent.succeeded` for subscriptions, storefront bookings, and theme purchases) cannot reach your `localhost:8080` server directly from the public internet. Use the official **Stripe CLI** to forward webhook events directly to your local endpoint.
+
+Official documentation: [https://docs.stripe.com/cli](https://docs.stripe.com/cli)
+
+---
+
+### 1. Install the Stripe CLI (If Not Installed)
+
+If you already have the Stripe CLI installed, skip directly to **[2. Authenticate with Stripe CLI](#2-authenticate-with-stripe-cli)**.
+
+#### Ubuntu / Linux (Debian-based)
+
+**Option A — Via Official APT Repository (Recommended):**
+```bash
+# 1. Add the Stripe CLI GPG key
+curl -s https://packages.stripe.dev/api/security/keypair/stripe-cli-gpg/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/stripe.gpg > /dev/null
+
+# 2. Add the Stripe repository to sources.list
+echo "deb [signed-by=/usr/share/keyrings/stripe.gpg] https://packages.stripe.dev/stripe-cli-debian-local stable main" | sudo tee -a /etc/apt/sources.list.d/stripe.list
+
+# 3. Update apt and install Stripe CLI
+sudo apt update
+sudo apt install stripe
+```
+
+**Option B — Via Snap:**
+```bash
+sudo snap install stripe
+```
+
+**Option C — Direct Binary / Tarball:**
+Download the Linux tarball (`stripe_X.X.X_linux_x86_64.tar.gz`) from [Stripe CLI GitHub Releases](https://github.com/stripe/stripe-cli/releases), extract it, and move the `stripe` binary to `/usr/local/bin/`.
+
+#### Windows
+
+**Option A — Via Scoop (Recommended by Stripe):**
+```powershell
+scoop bucket add stripe https://github.com/stripe/stripe-cli-scoop-bucket.git
+scoop install stripe
+```
+
+**Option B — Via Chocolatey:**
+```powershell
+choco install stripe-cli
+```
+
+**Option C — Via Windows Package Manager (winget):**
+```powershell
+winget install Stripe.StripeCLI
+```
+
+**Option D — Manual Zip Download:**
+1. Download the Windows zip archive (`stripe_X.X.X_windows_x86_64.zip`) from [Stripe CLI GitHub Releases](https://github.com/stripe/stripe-cli/releases).
+2. Extract `stripe.exe` to a folder (e.g., `C:\Program Files\Stripe`).
+3. Add that folder to your System `PATH` environment variable.
+
+#### macOS (Optional)
+```bash
+brew install stripe/stripe-cli/stripe
+```
+
+Verify the installation:
+```bash
+stripe --version
+```
+
+---
+
+### 2. Authenticate with Stripe CLI
+
+Run the login command in your terminal:
+
+```bash
+stripe login
+```
+
+> [!IMPORTANT]
+> **Use the Team Member Account Only:**  
+> We use a shared team member Stripe account for local development. Please authenticate using your assigned team member credentials rather than a personal account. This ensures your local webhook listener connects to the same test environment matching our backend `.env` keys (`STRIPE_SECRET_KEY` and `STRIPE_PUBLISHABLE_KEY`).
+
+---
+
+### 3. Forward Webhooks to Local Server
+
+With the backend server running on `http://localhost:8080`, run:
+
+```bash
+stripe listen --all-snapshot --forward-to localhost:8080/stripe/webhook
+```
+
+*(Or standard forwarding: `stripe listen --forward-to localhost:8080/stripe/webhook`)*
+
+#### Webhook Secret Verification
+When `stripe listen` starts, it outputs a webhook signing secret:
+```text
+> Ready! Your webhook signing secret is whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+Copy this `whsec_...` value and set it as `STRIPE_WEBHOOK_SECRET` in your `.env` file to verify signed payloads locally:
+```env
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
