@@ -8,8 +8,9 @@ exports.createCartSchema = z.object({
       .array(
         z.object({
           service_id: z.string().uuid({ message: "Service ID must be a valid UUID" }),
-          staff_id: z.string().uuid().optional(),
+          staff_id: z.string().uuid().nullable().optional(),
           price: z.number().nonnegative().optional(),
+          base_price: z.number().nonnegative().optional(),
           duration: z.number().int().nonnegative().optional(),
         }),
       )

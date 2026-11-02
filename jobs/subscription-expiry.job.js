@@ -6,6 +6,16 @@ const expireSubscriptions = async () => {
   try {
     const now = new Date();
 
+    const [reactivated] = await Salon.update(
+      { subscription_status: "active" },
+      {
+        where: {
+          subscription_status: "expired",
+          subscription_expires_at: { [Op.ne]: null, [Op.gt]: now },
+        },
+      },
+    );
+
     const [expiredTrials] = await Salon.update(
       { subscription_status: "expired" },
       {
@@ -15,6 +25,10 @@ const expireSubscriptions = async () => {
             [Op.ne]: null,
             [Op.lt]: now,
           },
+          [Op.or]: [
+            { subscription_expires_at: null },
+            { subscription_expires_at: { [Op.lt]: now } },
+          ],
         },
       },
     );
@@ -28,13 +42,17 @@ const expireSubscriptions = async () => {
             [Op.ne]: null,
             [Op.lt]: now,
           },
+          [Op.or]: [
+            { trial_ends_at: null },
+            { trial_ends_at: { [Op.lt]: now } },
+          ],
         },
       },
     );
 
-    if (expiredTrials > 0 || expiredPlans > 0) {
+    if (reactivated > 0 || expiredTrials > 0 || expiredPlans > 0) {
       console.log(
-        `[SubscriptionExpiryJob] Automatically expired ${expiredTrials} trial(s) and ${expiredPlans} paid plan(s).`,
+        `[SubscriptionExpiryJob] Reactivated ${reactivated} salon(s). Expired ${expiredTrials} trial(s) and ${expiredPlans} paid plan(s).`,
       );
     }
   } catch (error) {
@@ -45,9 +63,9 @@ const expireSubscriptions = async () => {
   }
 };
 
-cron.schedule("0 0 * * *", async () => {
+cron.schedule("0 * * * *", async () => {
   console.log(
-    "[SubscriptionExpiryJob] Running scheduled midnight subscription expiry check...",
+    "[SubscriptionExpiryJob] Running hourly subscription expiry check...",
   );
   await expireSubscriptions();
 });

@@ -88,8 +88,8 @@ exports.updateSalonPlan = async (req, res, next) => {
 
 exports.getSubscriptionPlans = async (req, res, next) => {
   try {
-    const response = await adminService.getSubscriptionPlans();
-    return res.status(SUCCESS).json({ plans: response });
+    const response = await adminService.getSubscriptionPlans({ query: req.query });
+    return res.status(SUCCESS).json(response);
   } catch (error) {
     console.log("Error in controller getSubscriptionPlans", error);
     return next(error);

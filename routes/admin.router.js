@@ -9,9 +9,10 @@ const {
   createPlanSchema,
   updatePlanSchema,
 } = require("../schema/admin/create-plan.schema");
+const { listPlansSchema } = require("../schema/admin/list-plans.schema");
 
 router.post("/auth/login", adminController.loginAdmin);
-router.get("/plans", adminController.getSubscriptionPlans);
+router.get("/plans", validate(listPlansSchema), adminController.getSubscriptionPlans);
 router.post("/plans", validate(createPlanSchema), adminController.createSubscriptionPlan);
 router.post("/auth/refresh", adminController.refreshAdmin);
 router.use(authMiddleware.authAdminMiddleware);

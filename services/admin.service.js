@@ -232,7 +232,7 @@ exports.onboardSalon = async (payload) => {
         slug: finalSlug,
         is_active: true,
         registered_by: "admin",
-        subscription_plan: dbPlan.code ,
+        subscription_plan: dbPlan ? dbPlan.code : (effectivePlan || "trial"),
         subscription_status: effectiveStatus,
         trial_ends_at: trialEndsAt,
         subscription_expires_at: expiresAt,
@@ -249,6 +249,7 @@ exports.onboardSalon = async (payload) => {
             plan: dbPlan ? dbPlan.uuid : effectivePlan,
             amount,
             discount_details,
+            expires_at: expiresAt,
           },
         },
         options,
@@ -315,6 +316,10 @@ exports.updateSalonPlan = async (payload) => {
     throw new NotFound("Salon not found");
   }
 
+  if (salon.is_active === false || salon.subscription_status === "suspended") {
+    throw new BadRequest("Cannot modify plan, duration, or trial of a suspended salon. Please reactivate the salon first.");
+  }
+
   const updates = {};
   if (subscription_plan) {
     const dbPlan = await subscriptionPlanRepository.findByUuid(subscription_plan);
@@ -379,13 +384,25 @@ exports.updateSalonPlan = async (payload) => {
   };
 };
 
-exports.getSubscriptionPlans = async () => {
-  const plans = await subscriptionPlanRepository.model.findAll({
-    where: { is_active: true },
+exports.getSubscriptionPlans = async (payload = {}) => {
+  const query = payload.query || {};
+  const page = Number(query.page) >= 1 ? Number(query.page) : 1;
+  const limit = Number(query.limit) >= 1 ? Number(query.limit) : 10;
+  const offset = (page - 1) * limit;
+
+  const where = {};
+  if (query.is_active !== undefined) {
+    where.is_active = query.is_active;
+  }
+
+  const { rows: dbPlans, count: total } = await subscriptionPlanRepository.model.findAndCountAll({
+    where,
+    limit,
+    offset,
     order: [["id", "ASC"]],
   });
 
-  return plans.map((plan) => {
+  const plans = dbPlans.map((plan) => {
     const numAmount = Number(plan.amount);
     const formatted_price =
       numAmount === 0
@@ -406,6 +423,15 @@ exports.getSubscriptionPlans = async () => {
       is_active: plan.is_active,
     };
   });
+
+  return {
+    plans,
+    pagination: {
+      total,
+      page,
+      limit,
+    },
+  };
 };
 
 exports.updateSubscriptionPlan = async (payload) => {
@@ -559,7 +585,7 @@ exports.toggleSubscriptionPlanStatus = async (payload) => {
 };
 
 exports.createSubscriptionInvoice = async (payload, options = {}) => {
-  const { salon_id, plan, amount, discount_details } = payload.body;
+  const { salon_id, plan, amount, discount_details, expires_at } = payload.body;
 
   let dbPlan = null;
   if (plan) {
@@ -574,9 +600,9 @@ exports.createSubscriptionInvoice = async (payload, options = {}) => {
   }
   const durationDays = dbPlan.duration_days;
   const now = new Date();
-  const expiresAt = new Date(
-    now.getTime() + durationDays * 24 * 60 * 60 * 1000,
-  );
+  const expiresAt = expires_at
+    ? new Date(expires_at)
+    : new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
 
   let finalAmount = Number(amount);
   let discountData = null;

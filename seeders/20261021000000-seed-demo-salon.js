@@ -23,7 +23,8 @@ module.exports = {
 
     const passwordHash = await bcrypt.hash("Password@123", 10);
     const now = new Date();
-    const oneYearLater = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    const trialEndsAt = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+    const oneYearLater = new Date(trialEndsAt.getTime() + 365 * 24 * 60 * 60 * 1000);
 
     const businessHours = {
       0: { start_time: "09:00", end_time: "21:00" },
@@ -98,7 +99,7 @@ module.exports = {
         subscription_plan: "yearly",
         subscription_status: "active",
         subscription_expires_at: oneYearLater,
-        trial_ends_at: null,
+        trial_ends_at: trialEndsAt,
         business_hours: JSON.stringify(businessHours),
         allowed_payment_policies: JSON.stringify(allowedPaymentPolicies),
         created_at: now,
