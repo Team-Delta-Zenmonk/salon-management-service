@@ -321,8 +321,9 @@ exports.updateSalonPlan = async (payload) => {
   }
 
   const updates = {};
+  let dbPlan = null;
   if (subscription_plan) {
-    const dbPlan = await subscriptionPlanRepository.findByUuid(subscription_plan);
+    dbPlan = await subscriptionPlanRepository.findByUuid(subscription_plan);
     updates.subscription_plan = dbPlan ? dbPlan.code : subscription_plan;
   }
   if (subscription_status) updates.subscription_status = subscription_status;
@@ -349,7 +350,65 @@ exports.updateSalonPlan = async (payload) => {
     }
   }
 
-  if (extend_subscription_days) {
+  let invoice = null;
+
+  if (subscription_plan && dbPlan && dbPlan.code !== "trial") {
+    const now = new Date();
+    const planDurationDays = Number(duration_days) > 0 ? Number(duration_days) : (dbPlan.duration_days || 30);
+
+    const hasActiveUnexpiredPlan =
+      salon.subscription_status === SubscriptionStatus.ENUM.ACTIVE &&
+      salon.subscription_expires_at &&
+      new Date(salon.subscription_expires_at) > now;
+
+    const hasActiveTrial =
+      salon.trial_ends_at &&
+      new Date(salon.trial_ends_at) > now;
+
+    let baseDate = now;
+    if (hasActiveUnexpiredPlan) {
+      baseDate = new Date(salon.subscription_expires_at);
+    } else if (hasActiveTrial) {
+      baseDate = new Date(salon.trial_ends_at);
+    }
+
+    const expiresAt = new Date(baseDate.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
+    updates.subscription_expires_at = expiresAt;
+    updates.subscription_status = SubscriptionStatus.ENUM.ACTIVE;
+
+    // Create subscription invoice with payment_status = PAID and enqueue PDF generation
+    const amount = Number(dbPlan.amount || 0);
+    const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${salon.id}`;
+    const effectiveTxId = `MANUAL_ADMIN_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+    invoice = await invoiceRepository.create({
+      invoice_number: invoiceNumber,
+      invoice_type: InvoiceType.ENUM.SUBSCRIPTION,
+      salon_id: salon.id,
+      grand_total: amount,
+      amount_paid: amount,
+      balance_due: 0,
+      currency: dbPlan.currency || "INR",
+      payment_status: InvoicePaymentStatus.ENUM.PAID,
+      payment_method: "manual",
+      transaction_id: effectiveTxId,
+      issued_at: now,
+      metadata: {
+        plan: dbPlan.code,
+        plan_uuid: dbPlan.uuid,
+        billing_cycle: dbPlan.billing_cycle || dbPlan.code,
+        billing_period_start: baseDate,
+        billing_period_end: expiresAt,
+        activated_by: "admin",
+      },
+    });
+
+    if (invoice?.id) {
+      enqueueInvoiceJob(invoice.id).catch((err) =>
+        console.error(`[Admin Update Plan] Failed to enqueue invoice job:`, err.message)
+      );
+    }
+  } else if (extend_subscription_days) {
     const now = new Date();
     const currentBase =
       salon.subscription_expires_at &&
@@ -362,8 +421,15 @@ exports.updateSalonPlan = async (payload) => {
     );
     updates.subscription_status = "active";
   } else if (duration_days) {
+    const now = new Date();
+    const isCurrentlyActive =
+      salon.subscription_status === SubscriptionStatus.ENUM.ACTIVE &&
+      salon.subscription_expires_at &&
+      new Date(salon.subscription_expires_at) > now;
+
+    const baseDate = isCurrentlyActive ? new Date(salon.subscription_expires_at) : now;
     updates.subscription_expires_at = new Date(
-      Date.now() + Number(duration_days) * 24 * 60 * 60 * 1000,
+      baseDate.getTime() + Number(duration_days) * 24 * 60 * 60 * 1000,
     );
     updates.subscription_status = "active";
   }
@@ -381,6 +447,7 @@ exports.updateSalonPlan = async (payload) => {
       trial_ends_at: salon.trial_ends_at,
       subscription_expires_at: salon.subscription_expires_at,
     },
+    ...(invoice ? { invoice } : {}),
   };
 };
 
