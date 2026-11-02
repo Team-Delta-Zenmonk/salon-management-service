@@ -12,6 +12,13 @@ exports.listPlansSchema = z.object({
           return undefined;
         }, z.boolean().optional())
         .optional(),
+      include_inactive: z
+        .preprocess((val) => {
+          if (val === "true" || val === true) return true;
+          if (val === "false" || val === false) return false;
+          return undefined;
+        }, z.boolean().optional())
+        .optional(),
     })
     .default({ page: 1, limit: 10 }),
 });

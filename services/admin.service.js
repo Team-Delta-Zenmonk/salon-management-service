@@ -386,13 +386,20 @@ exports.updateSalonPlan = async (payload) => {
 
 exports.getSubscriptionPlans = async (payload = {}) => {
   const query = payload.query || {};
+  const isAdmin = Boolean(payload.isAdmin);
   const page = Number(query.page) >= 1 ? Number(query.page) : 1;
   const limit = Number(query.limit) >= 1 ? Number(query.limit) : 10;
   const offset = (page - 1) * limit;
 
   const where = {};
-  if (query.is_active !== undefined) {
+  if (isAdmin && query.include_inactive) {
+    if (query.is_active !== undefined) {
+      where.is_active = query.is_active;
+    }
+  } else if (isAdmin && query.is_active !== undefined) {
     where.is_active = query.is_active;
+  } else {
+    where.is_active = true;
   }
 
   const { rows: dbPlans, count: total } = await subscriptionPlanRepository.model.findAndCountAll({

@@ -215,3 +215,43 @@ exports.optionalAuthSalonMiddleware = async (req, res, next) => {
     return next();
   }
 };
+
+exports.optionalAuthAdminMiddleware = async (req, res, next) => {
+  try {
+    const token = extractToken(req, "admin_jwt");
+    if (!token) {
+      req.isAdmin = false;
+      return next();
+    }
+
+    JWT.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+      if (!err && decoded?.uuid) {
+        try {
+          const { uuid, role } = decoded;
+          if (role === "super_admin" || role === "support" || role === "admin") {
+            const adminUser = await adminUserRepository.findOne({
+              uuid,
+              is_active: true,
+            });
+            if (adminUser) {
+              checkAndRefreshToken(
+                res,
+                decoded,
+                { email: adminUser.email, uuid: adminUser.uuid, role: adminUser.role, type: "admin" },
+                "admin_jwt",
+              );
+              req.admin = adminUser;
+              req.isAdmin = true;
+              return next();
+            }
+          }
+        } catch (_) {}
+      }
+      req.isAdmin = false;
+      return next();
+    });
+  } catch (err) {
+    req.isAdmin = false;
+    return next();
+  }
+};
