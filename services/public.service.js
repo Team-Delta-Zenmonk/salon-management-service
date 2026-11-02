@@ -4,7 +4,13 @@ const { BadRequest } = require("../libs/error");
 const { buildLeadEmailHtml } = require("../templates");
 
 exports.submitLead = async (payload) => {
-  const { name, email, phone, salonName, city, message } = payload.body || {};
+  const body = payload.body || {};
+  const name = body.name;
+  const email = body.email;
+  const phone = body.phone;
+  const salonName = body.salonName || body.salon_name;
+  const city = body.city;
+  const message = body.message || body.notes;
 
   if (!name || (!email && !phone)) {
     throw new BadRequest("Name and at least email or phone number are required.");
