@@ -4,11 +4,8 @@ const {
   staffRepository,
   staffServiceRepository,
 } = require("../repository");
-const { Op } = require("sequelize");
-const { sequelize } = require("../config/db/db-connection");
 const { NotFound } = require("../libs/error");
 const { formatStaffListTiming, formatStaffTiming } = require("../utils/staff-timing.util");
-const { isStaffInactive } = require("../utils/staff-status.util");
 
 exports.getStorefrontProfile = async (payload) => {
   const { slug } = payload.params;
@@ -163,98 +160,21 @@ exports.getStorefrontServiceStaff = async (payload) => {
     throw new NotFound("Service not found");
   }
 
-  const serviceIds = [service.id];
-  if (service.parent_id) {
-    serviceIds.push(service.parent_id);
-  }
-
-  const page = Number(query.page) > 0 ? Number(query.page) : 1;
-  const limit = Number(query.limit) > 0 ? Number(query.limit) : 10;
-  const offset = (page - 1) * limit;
-
-  const serviceIdsList = serviceIds.join(",");
-  const todayStr = new Date().toISOString().split("T")[0];
-  const activeStaffFilter = `
-    JOIN staffs st ON st.id = staff_services.staff_id 
-      AND st.deleted_at IS NULL 
-      AND (
-        st.end_date IS NULL 
-        OR st.end_date = '' 
-        OR (
-          CASE 
-            WHEN st.end_date ~ '^\\d{2}-\\d{2}-\\d{4}$' 
-            THEN TO_DATE(st.end_date, 'DD-MM-YYYY') > '${todayStr}'::date
-            ELSE st.end_date::date > '${todayStr}'::date
-          END
-        )
-      )
-  `;
-
-  const countQuery = `
-    SELECT COUNT(DISTINCT staff_services.staff_id) AS total
-    FROM staff_services
-    ${activeStaffFilter}
-    WHERE staff_services.service_id IN (${serviceIdsList}) AND staff_services.deleted_at IS NULL
-  `;
-  const [countResult] = await sequelize.query(countQuery);
-  const total = Number(countResult?.[0]?.total || 0);
-
-  const idsQuery = `
-    SELECT staff_services.staff_id, MAX(staff_services.created_at) AS latest_created_at
-    FROM staff_services
-    ${activeStaffFilter}
-    WHERE staff_services.service_id IN (${serviceIdsList}) AND staff_services.deleted_at IS NULL
-    GROUP BY staff_services.staff_id
-    ORDER BY latest_created_at DESC
-    LIMIT :limit OFFSET :offset
-  `;
-  const [paginatedRows] = await sequelize.query(idsQuery, {
-    replacements: { limit, offset },
+  const result = await staffServiceRepository.findStaffForServiceWithParentFallback({
+    service,
+    shouldIncludeParent: true,
+    page: query?.page,
+    limit: query?.limit,
   });
 
-  const paginatedStaffIds = paginatedRows.map((r) => r.staff_id);
-
-  if (paginatedStaffIds.length === 0) {
-    return {
-      total,
-      page,
-      limit,
-      data: [],
-    };
-  }
-
-  const rows = await staffServiceRepository.findAll({
-    criteria: {
-      service_id: { [Op.in]: serviceIds },
-      staff_id: { [Op.in]: paginatedStaffIds },
-    },
-    include: ["staff"],
-    order: [["created_at", "DESC"]],
+  result.data = result.data.map((item) => {
+    if (item.staff) {
+      item.staff = formatStaffTiming(item.staff);
+    }
+    return item;
   });
 
-  const uniqueMap = new Map();
-  for (const item of rows) {
-    const raw = typeof item.toJSON === "function" ? item.toJSON() : { ...item };
-    if (!raw.staff || raw.staff.deleted_at || isStaffInactive(raw.staff)) {
-      continue;
-    }
-    raw.staff = formatStaffTiming(raw.staff);
-    const existing = uniqueMap.get(raw.staff_id);
-    if (!existing || raw.service_id === service.id) {
-      uniqueMap.set(raw.staff_id, raw);
-    }
-  }
-
-  const data = paginatedStaffIds
-    .map((staffId) => uniqueMap.get(staffId))
-    .filter(Boolean);
-
-  return {
-    total,
-    page,
-    limit,
-    data,
-  };
+  return result;
 };
 
 exports.getStorefrontSubServices = async (payload) => {
