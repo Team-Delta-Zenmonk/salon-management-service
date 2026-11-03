@@ -15,7 +15,7 @@ class CartRepository extends BaseRepository {
         include: [
           {
             association: "service",
-            attributes: ["id", "uuid", "name", "logo", "gender", "duration", "price", "parent_id"],
+            attributes: ["id", "uuid", "name", "logo", "gender", "duration", "price", "parent_id", "discount", "discount_type"],
           },
           {
             association: "staff",

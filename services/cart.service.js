@@ -73,11 +73,6 @@ const syncCartState = async (cart, transaction = null) => {
     let staffId = item.staff_id;
     let basePrice = service.price;
     let duration = service.duration;
-    let finalPrice = calculateFinalPrice({
-      basePrice,
-      discount: service.discount,
-      discountType: service.discount_type,
-    });
 
     if (staffId) {
       const staff = staffMap.get(staffId);
@@ -95,11 +90,17 @@ const syncCartState = async (cart, transaction = null) => {
         } else {
           duration = staffService.duration || service.duration;
           if (staffService.price) {
-            finalPrice = parseFloat(staffService.price);
+            basePrice = parseFloat(staffService.price);
           }
         }
       }
     }
+
+    let finalPrice = calculateFinalPrice({
+      basePrice,
+      discount: service.discount,
+      discountType: service.discount_type,
+    });
 
     const updates = {};
     if (item.staff_id !== staffId) updates.staff_id = staffId;
@@ -240,11 +241,6 @@ exports.createCart = async (payload) => {
 
         let basePrice = service.price;
         let duration = service.duration;
-        let finalPrice = calculateFinalPrice({
-          basePrice,
-          discount: service.discount,
-          discountType: service.discount_type,
-        });
 
         if (staff) {
           const staffService = staffServices.find(
@@ -256,10 +252,16 @@ exports.createCart = async (payload) => {
           } else {
             duration = staffService.duration || service.duration;
             if (staffService.price) {
-              finalPrice = parseFloat(staffService.price);
+              basePrice = parseFloat(staffService.price);
             }
           }
         }
+
+        let finalPrice = calculateFinalPrice({
+          basePrice,
+          discount: service.discount,
+          discountType: service.discount_type,
+        });
 
         return {
           cart_id: cart.id,
@@ -391,9 +393,18 @@ exports.updateItem = async (payload) => {
 
     if (!staffService) throw new error.NotFound("This staff is not assigned to this service");
 
+    const itemService = await serviceRepository.findOne({ id: targetServiceId });
+    if (!itemService) throw new error.NotFound("Service not found");
+
     updateData.staff_id = staff.id;
-    updateData.final_price = staffService.price ? parseFloat(staffService.price) : item.base_price;
-    updateData.duration = staffService.duration || item.duration;
+    const effectiveBasePrice = staffService.price ? parseFloat(staffService.price) : itemService.price;
+    updateData.base_price = effectiveBasePrice;
+    updateData.final_price = calculateFinalPrice({
+      basePrice: effectiveBasePrice,
+      discount: itemService.discount,
+      discountType: itemService.discount_type,
+    });
+    updateData.duration = staffService.duration || itemService.duration || item.duration;
   }
   if (body.price !== undefined) updateData.price = body.price;
   if (body.duration !== undefined) updateData.duration = body.duration;
