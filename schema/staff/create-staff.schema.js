@@ -30,7 +30,30 @@ exports.createStaffSchema = z.object({
     email: z.string().email("Invalid email address").max(FIELD_LIMITS.EMAIL, `Email cannot exceed ${FIELD_LIMITS.EMAIL} characters`),
     phone_number: z.string().min(8, "Phone number must be valid").max(FIELD_LIMITS.PHONE, `Phone number cannot exceed ${FIELD_LIMITS.PHONE} digits`),
     additional_phone_number: z.string().min(8).max(FIELD_LIMITS.PHONE, `Phone number cannot exceed ${FIELD_LIMITS.PHONE} digits`).optional(),
-    dob: z.string().regex(/^\d{2}-\d{2}-\d{4}$/, "DOB must be in DD-MM-YYYY format"),
+    dob: z
+      .string()
+      .regex(/^\d{2}-\d{2}-\d{4}$/, "DOB must be in DD-MM-YYYY format")
+      .refine(
+        (dobStr) => {
+          const [day, month, year] = dobStr.split("-").map(Number);
+          const birthDate = new Date(year, month - 1, day);
+          if (
+            birthDate.getFullYear() !== year ||
+            birthDate.getMonth() !== month - 1 ||
+            birthDate.getDate() !== day
+          ) {
+            return false;
+          }
+          const today = new Date();
+          const min18Date = new Date(
+            today.getFullYear() - 18,
+            today.getMonth(),
+            today.getDate()
+          );
+          return birthDate <= min18Date;
+        },
+        { message: "Staff must be at least 18 years old" }
+      ),
     title: z.string().min(1, "Title is required").max(FIELD_LIMITS.TITLE, `Title cannot exceed ${FIELD_LIMITS.TITLE} characters`),
     joining_date: z.string().regex(/^\d{2}-\d{2}-\d{4}$/, "Joining date must be in DD-MM-YYYY format"),
     end_date: z

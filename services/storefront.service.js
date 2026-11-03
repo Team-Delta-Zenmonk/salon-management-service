@@ -33,6 +33,8 @@ exports.getStorefrontProfile = async (payload) => {
       photos: salon.photos,
       business_hours: salon.business_hours,
       address: salon.address,
+      phone: salon.phone,
+      email: salon.email,
       latitude: salon.latitude,
       longitude: salon.longitude,
       map_link: salon.map_link,

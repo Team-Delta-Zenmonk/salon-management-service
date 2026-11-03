@@ -2,6 +2,7 @@ const { error } = require("../libs");
 const { DayOfWeek } = require("../models/salon/salon-types");
 const { staffRepository, staffServiceRepository, salonRepository } = require("../repository");
 const { Op, fn, col, where: sequelizeWhere } = require("sequelize");
+const { sequelize } = require("../config/db/db-connection");
 const {
   formatStaffTiming,
   formatStaffListTiming,
@@ -120,7 +121,21 @@ exports.listServices = async (payload) => {
 
   const { count, rows } = await staffServiceRepository.findAndCountAll({
     criteria: { staff_id: staff.id },
-    include: ["service"],
+    include: [
+      {
+        association: "service",
+        attributes: {
+          include: [
+            [
+              sequelize.literal(
+                `(SELECT COUNT(*)::int FROM services AS child WHERE child.parent_id = "service".id AND child.deleted_at IS NULL)`
+              ),
+              "sub_services_count",
+            ],
+          ],
+        },
+      },
+    ],
     limit,
     offset,
     order: [["created_at", "DESC"]],
