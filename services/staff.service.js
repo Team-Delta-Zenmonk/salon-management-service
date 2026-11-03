@@ -132,6 +132,12 @@ exports.listServices = async (payload) => {
               ),
               "sub_services_count",
             ],
+            [
+              sequelize.literal(
+                `(SELECT COUNT(DISTINCT child_ss.service_id)::int FROM staff_services AS child_ss JOIN services AS child_svc ON child_svc.id = child_ss.service_id WHERE child_svc.parent_id = "service".id AND child_svc.deleted_at IS NULL AND child_ss.staff_id = ${staff.id} AND child_ss.deleted_at IS NULL)`
+              ),
+              "assigned_sub_services_count",
+            ],
           ],
         },
       },
@@ -141,11 +147,23 @@ exports.listServices = async (payload) => {
     order: [["created_at", "DESC"]],
   });
 
+  const formattedRows = rows.map((row) => {
+    const raw = typeof row.toJSON === "function" ? row.toJSON() : { ...row };
+    if (raw.service) {
+      const subCount = Number(raw.service.sub_services_count || 0);
+      const assignedCount = Number(raw.service.assigned_sub_services_count || 0);
+      const isParent = !raw.service.parent_id && subCount > 0;
+      raw.service.is_partial = isParent && assignedCount > 0 && assignedCount < subCount;
+      raw.service.is_full = !isParent || (assignedCount === subCount && subCount > 0);
+    }
+    return raw;
+  });
+
   return {
     total: count,
     page,
     limit,
-    data: rows,
+    data: formattedRows,
   };
 };
 
