@@ -131,7 +131,7 @@ exports.updateSalon = async (payload) => {
         const storefrontUrl = `https://${salonSlug}.${baseDomain}`;
         setImmediate(async () => {
           try {
-            const platformName = process.env.BRAND_NAME || "Vellora";
+            const platformName = process.env.BRAND_NAME || "Salops";
             const liveHtml = buildSalonLiveEmailHtml({
               ownerName: currentSalon.name || "Salon Partner",
               salonName: currentSalon.name || "Your Salon",

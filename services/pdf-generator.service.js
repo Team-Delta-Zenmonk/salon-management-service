@@ -115,7 +115,7 @@ const drawHeader = (doc, { salon, type, invoice }, logoBuffer) => {
   const logoSize = 36;
   let textLeft = PAGE.marginX;
 
-  const brandName = process.env.BRAND_NAME || "Vellora";
+  const brandName = process.env.BRAND_NAME || "Salops";
   const headerTitle =
     type === "BOOKING"
       ? (salon?.name || "Salon")
@@ -416,7 +416,7 @@ const drawPartiesInfo = (doc, startY, { salon = {}, customer = {}, type }) => {
       renderRight(customer.phone, FONTS.regular, 12, COLORS.bodyText, 3);
     }
   } else {
-    const brandName = process.env.BRAND_NAME || "Vellora";
+    const brandName = process.env.BRAND_NAME || "Salops";
     renderLeft(brandName, FONTS.bold, 13, COLORS.darkText, 4);
     renderLeft("Cloud Salon Software Suite", FONTS.regular, 12, COLORS.bodyText, 3);
     renderLeft(process.env.SUPPORT_EMAIL || "support@zenmonk.tech", FONTS.regular, 12, COLORS.mutedText, 3);

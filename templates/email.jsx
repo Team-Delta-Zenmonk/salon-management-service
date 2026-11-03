@@ -43,11 +43,11 @@ export function EmailTemplate(props) {
     city,
   } = props;
 
-  const brandName = process.env.BRAND_NAME || "Vellora";
+  const brandName = process.env.BRAND_NAME || "Salops";
   const platformName = brandName;
   const brandLogo = salon.logo || logoUrl || null;
   const isLead = type === "LEAD";
-  const recipientEmail = email || userEmail || customer.email || "vellora@gmail.com";
+  const recipientEmail = email || userEmail || customer.email || "salops@gmail.com";
   const displayName =
     ownerName ||
     (typeof userName === "string" && userName.trim() ? userName : null) ||

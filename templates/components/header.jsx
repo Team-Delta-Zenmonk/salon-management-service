@@ -5,7 +5,7 @@ import { Img } from "@react-email/img";
 import styles from "../email.styles";
 
 export function Header({ title }) {
-  const displayBrand = process.env.BRAND_NAME || "Vellora";
+  const displayBrand = process.env.BRAND_NAME || "Salops";
   const baseUrl = process.env.BACKEND_URL || "";
   const displayLogo =`${baseUrl}/static/logo.png`;
 
