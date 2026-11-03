@@ -38,7 +38,7 @@ exports.createAdminBookingSchema = z.object({
     services: z.array(
       z.object({
         service_id: z.number(),
-        staff_id: z.number().optional().nullable(),
+        staff_id: z.number({ message: "Staff is required" }).int().positive({ message: "Staff is required" }),
         sequence: z.number().optional(),
       }),
     ),

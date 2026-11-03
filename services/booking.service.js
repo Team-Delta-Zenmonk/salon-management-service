@@ -175,8 +175,46 @@ exports.createBooking = async (payload) => {
           (s) => s.service_id === cartItem.service_id,
         );
 
-        if (!staffAssignment) {
+        if (!staffAssignment || !staffAssignment.staff_id) {
           throw new error.BadRequest("Staff assignment not found");
+        }
+
+        let staffService = await staffServiceRepository.findOne(
+          {
+            service_id: cartItem.service_id,
+            staff_id: staffAssignment.staff_id,
+          },
+          [
+            {
+              association: "staff",
+              attributes: ["id", "end_date"],
+            },
+          ],
+        );
+
+        if (!staffService && cartItem.service?.parent_id) {
+          staffService = await staffServiceRepository.findOne(
+            {
+              service_id: cartItem.service.parent_id,
+              staff_id: staffAssignment.staff_id,
+            },
+            [
+              {
+                association: "staff",
+                attributes: ["id", "end_date"],
+              },
+            ],
+          );
+        }
+
+        if (!staffService) {
+          throw new error.BadRequest(
+            `Specialist is not assigned to service ID ${cartItem.service_id}`,
+          );
+        }
+
+        if (staffService.staff) {
+          assertStaffActive(staffService.staff, error, date);
         }
 
         const serviceStart = new Date(
@@ -201,7 +239,9 @@ exports.createBooking = async (payload) => {
       }
 
       for (const plan of executionPlan) {
-        if (!plan.staff_id) continue;
+        if (!plan.staff_id) {
+          throw new error.BadRequest("Staff assignment required for all services");
+        }
         await acquireTransactionAdvisoryLock({
           transaction,
           staffId: plan.staff_id,
@@ -608,14 +648,28 @@ exports.createAdminBooking = async (payload) => {
       await assertServicesBookable(fetchedServices, "booked");
 
       for (const service of sortedServices) {
+        if (!service.staff_id) {
+          throw new error.BadRequest("A specialist must be assigned to each service");
+        }
+
         let duration = 0;
         let price = 0;
 
         const serviceObj = serviceMap.get(service.service_id);
 
-        if (service.staff_id) {
-          let staffService = await staffServiceRepository.findOne({
-            service_id: service.service_id,
+        let staffService = await staffServiceRepository.findOne({
+          service_id: service.service_id,
+          staff_id: service.staff_id,
+        }, [
+          {
+            association: "staff",
+            attributes: ["id", "end_date"],
+          },
+        ]);
+
+        if (!staffService && serviceObj.parent_id) {
+          staffService = await staffServiceRepository.findOne({
+            service_id: serviceObj.parent_id,
             staff_id: service.staff_id,
           }, [
             {
@@ -623,35 +677,20 @@ exports.createAdminBooking = async (payload) => {
               attributes: ["id", "end_date"],
             },
           ]);
-
-          if (!staffService && serviceObj.parent_id) {
-            staffService = await staffServiceRepository.findOne({
-              service_id: serviceObj.parent_id,
-              staff_id: service.staff_id,
-            }, [
-              {
-                association: "staff",
-                attributes: ["id", "end_date"],
-              },
-            ]);
-          }
-
-          if (!staffService) {
-            throw new error.BadRequest(
-              `Staff is not assigned to service ID ${service.service_id}`,
-            );
-          }
-
-          if (staffService.staff) {
-            assertStaffActive(staffService.staff, error);
-          }
-
-          duration = staffService.duration || serviceObj.duration;
-          price = staffService.price !== undefined && staffService.price !== null ? staffService.price : serviceObj.price;
-        } else {
-          duration = serviceObj.duration;
-          price = serviceObj.price;
         }
+
+        if (!staffService) {
+          throw new error.BadRequest(
+            `Staff is not assigned to service ID ${service.service_id}`,
+          );
+        }
+
+        if (staffService.staff) {
+          assertStaffActive(staffService.staff, error, booking_date);
+        }
+
+        duration = staffService.duration || serviceObj.duration;
+        price = staffService.price !== undefined && staffService.price !== null ? staffService.price : serviceObj.price;
 
         price = calculateFinalPrice({
           basePrice: price,
@@ -926,14 +965,28 @@ exports.updateAdminBooking = async (payload) => {
         await assertServicesBookable(fetchedServices, "booked");
 
         for (const service of services) {
+          if (!service.staff_id) {
+            throw new error.BadRequest("A specialist must be assigned to each service");
+          }
+
           let duration = 0;
           let price = 0;
 
           const serviceObj = serviceMap.get(service.service_id);
 
-          if (service.staff_id) {
-            let staffService = await staffServiceRepository.findOne({
-              service_id: service.service_id,
+          let staffService = await staffServiceRepository.findOne({
+            service_id: service.service_id,
+            staff_id: service.staff_id,
+          }, [
+            {
+              association: "staff",
+              attributes: ["id", "end_date"],
+            },
+          ]);
+
+          if (!staffService && serviceObj.parent_id) {
+            staffService = await staffServiceRepository.findOne({
+              service_id: serviceObj.parent_id,
               staff_id: service.staff_id,
             }, [
               {
@@ -941,35 +994,20 @@ exports.updateAdminBooking = async (payload) => {
                 attributes: ["id", "end_date"],
               },
             ]);
-
-            if (!staffService && serviceObj.parent_id) {
-              staffService = await staffServiceRepository.findOne({
-                service_id: serviceObj.parent_id,
-                staff_id: service.staff_id,
-              }, [
-                {
-                  association: "staff",
-                  attributes: ["id", "end_date"],
-                },
-              ]);
-            }
-
-            if (!staffService) {
-              throw new error.BadRequest(
-                `Staff is not assigned to service ID ${service.service_id}`,
-              );
-            }
-
-            if (staffService.staff) {
-              assertStaffActive(staffService.staff, error);
-            }
-
-            duration = staffService.duration || serviceObj.duration;
-            price = staffService.price !== undefined && staffService.price !== null ? staffService.price : serviceObj.price;
-          } else {
-            duration = serviceObj.duration;
-            price = serviceObj.price;
           }
+
+          if (!staffService) {
+            throw new error.BadRequest(
+              `Staff is not assigned to service ID ${service.service_id}`,
+            );
+          }
+
+          if (staffService.staff) {
+            assertStaffActive(staffService.staff, error, new_booking_date);
+          }
+
+          duration = staffService.duration || serviceObj.duration;
+          price = staffService.price !== undefined && staffService.price !== null ? staffService.price : serviceObj.price;
 
           price = calculateFinalPrice({
             basePrice: price,
@@ -1647,6 +1685,10 @@ const isStaffAvailable = (
   staffHolidays,
   bookingsByStaff,
 ) => {
+  if (isStaffInactive(staff, dateStr)) {
+    return false;
+  }
+
   if (staffHolidays.get(staff.id)?.has(dateStr)) {
     return false;
   }

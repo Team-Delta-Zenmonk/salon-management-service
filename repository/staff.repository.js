@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const { Staff } = require("../models");
 const BaseRepository = require("./base.repository");
+const { getActiveStaffLiteral } = require("../utils/staff-status.util");
 
 class StaffRepository extends BaseRepository {
   constructor(payload) {
@@ -10,6 +11,7 @@ class StaffRepository extends BaseRepository {
   async findAndCountStorefrontStaff({ salonId, search, offset = 0, limit = 10 }) {
     const criteria = {
       salon_id: salonId,
+      [Op.and]: [getActiveStaffLiteral()],
     };
 
     if (search && search.trim()) {

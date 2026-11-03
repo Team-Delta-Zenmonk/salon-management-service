@@ -28,6 +28,7 @@ const {
 const { Op } = require("sequelize");
 const { Category, sequelize } = require("../models");
 const { formatStaffListTiming } = require("../utils/staff-timing.util");
+const { isStaffInactive } = require("../utils/staff-status.util");
 const {
   toMinutes,
   getMaxDailyOperatingMinutes,
@@ -35,6 +36,7 @@ const {
 } = require("../utils/business-hours.util");
 const themeService = require("./theme.service");
 const { syncCartState } = require("./cart.service");
+const { calculateEndOfDayExpiry } = require("../utils/subscription-date.util");
 
 exports.updateSalon = async (payload) => {
   const { uuid } = payload.salon;
@@ -113,8 +115,7 @@ exports.updateSalon = async (payload) => {
         !currentSalon.trial_ends_at &&
         currentSalon.subscription_status !== "active"
       ) {
-        const trialEndDate = new Date();
-        trialEndDate.setDate(trialEndDate.getDate() + 14);
+        const trialEndDate = calculateEndOfDayExpiry(new Date(), 14);
         payload.body.trial_ends_at = trialEndDate;
         payload.body.subscription_status = "trial";
         if (!payload.body.subscription_plan) {
@@ -372,6 +373,10 @@ const isStaffAvailable = (
   staffHolidays,
   bookingsByStaff,
 ) => {
+  if (isStaffInactive(staff, dateStr)) {
+    return false;
+  }
+
   if (staffHolidays.get(staff.id)?.has(dateStr)) {
     return false;
   }
@@ -781,12 +786,17 @@ exports.activateSubscriptionFromWebhook = async (paymentIntent) => {
         currentSalon.subscription_expires_at &&
         new Date(currentSalon.subscription_expires_at) > now;
 
+      const hasActiveUnexpiredTrial =
+        currentSalon.trial_ends_at &&
+        new Date(currentSalon.trial_ends_at) > now;
+
       let baseDate = now;
       if (hasActiveUnexpiredPlan) {
         baseDate = new Date(currentSalon.subscription_expires_at);
+      } else if (hasActiveUnexpiredTrial) {
+        baseDate = new Date(currentSalon.trial_ends_at);
       }
-      const expiresAt = new Date(baseDate.getTime());
-      expiresAt.setDate(expiresAt.getDate() + durationDays);
+      const expiresAt = calculateEndOfDayExpiry(baseDate, durationDays);
 
       await salonRepository.update({
         payload: {
@@ -992,13 +1002,18 @@ exports.upgradeSubscription = async (payload) => {
     currentSalon.subscription_expires_at &&
     new Date(currentSalon.subscription_expires_at) > now;
 
+  const hasActiveUnexpiredTrial =
+    currentSalon.trial_ends_at &&
+    new Date(currentSalon.trial_ends_at) > now;
+
   let baseDate = now;
   if (hasActiveUnexpiredPlan) {
     baseDate = new Date(currentSalon.subscription_expires_at);
+  } else if (hasActiveUnexpiredTrial) {
+    baseDate = new Date(currentSalon.trial_ends_at);
   }
 
-  const expiresAt = new Date(baseDate.getTime());
-  expiresAt.setDate(expiresAt.getDate() + durationDays);
+  const expiresAt = calculateEndOfDayExpiry(baseDate, durationDays);
 
   await salonRepository.update({
     payload: {

@@ -1,5 +1,6 @@
 const { Salon } = require("../models");
 const BaseRepository = require("./base.repository");
+const { getActiveStaffLiteral } = require("../utils/staff-status.util");
 
 class SalonRepository extends BaseRepository {
   constructor(payload) {
@@ -21,6 +22,8 @@ class SalonRepository extends BaseRepository {
       include: [
         {
           association: "staff",
+          where: getActiveStaffLiteral(),
+          required: false,
           attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos", "title", "active_hours"],
         },
         {
@@ -48,6 +51,8 @@ class SalonRepository extends BaseRepository {
       include: [
         {
           association: "staff",
+          where: getActiveStaffLiteral(),
+          required: false,
           attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos", "title", "active_hours"],
           limit: 10,
         },
@@ -89,6 +94,8 @@ class SalonRepository extends BaseRepository {
       include: [
         {
           association: "staff",
+          where: getActiveStaffLiteral(),
+          required: false,
           attributes: ["id", "uuid", "first_name", "last_name", "gender", "photos", "title", "active_hours"],
         },
         {

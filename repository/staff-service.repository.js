@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const { StaffService, Staff } = require("../models");
 const BaseRepository = require("./base.repository");
+const { getActiveStaffLiteral } = require("../utils/staff-status.util");
 
 class StaffServiceRepository extends BaseRepository {
   constructor(payload) {
@@ -18,7 +19,10 @@ class StaffServiceRepository extends BaseRepository {
         {
           model: Staff,
           as: "staff",
-          where: { salon_id },
+          where: {
+            salon_id,
+            [Op.and]: [getActiveStaffLiteral()],
+          },
           required: true,
         },
       ],

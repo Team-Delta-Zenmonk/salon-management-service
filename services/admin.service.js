@@ -20,6 +20,7 @@ const {
 } = require("../models/salon/salon-types");
 const { getCurrencyConfig } = require("../common/currencies.config");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
+const { calculateEndOfDayExpiry } = require("../utils/subscription-date.util");
 
 exports.loginAdmin = async (payload) => {
   const { email, password } = payload.body;
@@ -203,9 +204,7 @@ exports.onboardSalon = async (payload) => {
     }
 
     const hashedPassword = await hashPassword(password);
-    const trialEndsAt = new Date(
-      Date.now() + Number(trial_days) * 24 * 60 * 60 * 1000,
-    );
+    const trialEndsAt = calculateEndOfDayExpiry(new Date(), Number(trial_days));
 
     const effectivePlan = plan || subscription_plan;
     let dbPlan = null;
@@ -213,14 +212,14 @@ exports.onboardSalon = async (payload) => {
       dbPlan = await subscriptionPlanRepository.findByUuid(effectivePlan, options);
     }
     const isPaidTier = dbPlan ? dbPlan.code !== "trial" : (effectivePlan && effectivePlan !== "trial");
-    const hasSubscription = Boolean(isPaidTier || plan || amount !== undefined);
-    const effectiveStatus = hasSubscription ? SubscriptionStatus.ENUM.ACTIVE : subscription_status;
+    const hasSubscription = Boolean(isPaidTier && (plan || amount !== undefined));
+    const effectiveStatus = hasSubscription ? SubscriptionStatus.ENUM.ACTIVE : (subscription_status || SubscriptionStatus.ENUM.TRIAL);
 
     let expiresAt = null;
     if (hasSubscription) {
       const planDurationDays = dbPlan?.duration_days || 0;
       const totalDays = Number(trial_days || 0) + Number(planDurationDays);
-      expiresAt = new Date(Date.now() + totalDays * 24 * 60 * 60 * 1000);
+      expiresAt = calculateEndOfDayExpiry(new Date(), totalDays);
     }
 
     const newSalon = await salonRepository.create(
@@ -334,8 +333,7 @@ exports.updateSalonPlan = async (payload) => {
       salon.trial_ends_at && new Date(salon.trial_ends_at) > now
         ? new Date(salon.trial_ends_at)
         : now;
-    const additionalMs = Number(extend_trial_days) * 24 * 60 * 60 * 1000;
-    const newTrialEndsAt = new Date(currentBase.getTime() + additionalMs);
+    const newTrialEndsAt = calculateEndOfDayExpiry(currentBase, Number(extend_trial_days));
     updates.trial_ends_at = newTrialEndsAt;
 
     if (salon.subscription_plan && salon.subscription_plan !== "trial") {
@@ -343,7 +341,7 @@ exports.updateSalonPlan = async (payload) => {
         salon.subscription_expires_at && new Date(salon.subscription_expires_at) > now
           ? new Date(salon.subscription_expires_at)
           : now;
-      updates.subscription_expires_at = new Date(planBase.getTime() + additionalMs);
+      updates.subscription_expires_at = calculateEndOfDayExpiry(planBase, Number(extend_trial_days));
       updates.subscription_status = salon.subscription_status || "active";
     } else {
       updates.subscription_status = "trial";
@@ -361,12 +359,18 @@ exports.updateSalonPlan = async (payload) => {
       salon.subscription_expires_at &&
       new Date(salon.subscription_expires_at) > now;
 
+    const hasActiveUnexpiredTrial =
+      salon.trial_ends_at &&
+      new Date(salon.trial_ends_at) > now;
+
     let baseDate = now;
     if (hasActiveUnexpiredPlan) {
       baseDate = new Date(salon.subscription_expires_at);
+    } else if (hasActiveUnexpiredTrial) {
+      baseDate = new Date(salon.trial_ends_at);
     }
 
-    const expiresAt = new Date(baseDate.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
+    const expiresAt = calculateEndOfDayExpiry(baseDate, planDurationDays);
     updates.subscription_expires_at = expiresAt;
     updates.subscription_status = SubscriptionStatus.ENUM.ACTIVE;
 
@@ -412,9 +416,9 @@ exports.updateSalonPlan = async (payload) => {
         new Date(salon.subscription_expires_at) > now
           ? new Date(salon.subscription_expires_at)
           : now;
-      updates.subscription_expires_at = new Date(
-        currentBase.getTime() +
-          Number(extend_subscription_days) * 24 * 60 * 60 * 1000,
+      updates.subscription_expires_at = calculateEndOfDayExpiry(
+        currentBase,
+        Number(extend_subscription_days),
       );
       updates.subscription_status = "active";
     } else {
@@ -422,9 +426,9 @@ exports.updateSalonPlan = async (payload) => {
         salon.trial_ends_at && new Date(salon.trial_ends_at) > now
           ? new Date(salon.trial_ends_at)
           : now;
-      updates.trial_ends_at = new Date(
-        currentBase.getTime() +
-          Number(extend_subscription_days) * 24 * 60 * 60 * 1000,
+      updates.trial_ends_at = calculateEndOfDayExpiry(
+        currentBase,
+        Number(extend_subscription_days),
       );
       updates.subscription_status = "trial";
     }
@@ -439,8 +443,9 @@ exports.updateSalonPlan = async (payload) => {
         new Date(salon.subscription_expires_at) > now;
 
       const baseDate = isCurrentlyActive ? new Date(salon.subscription_expires_at) : now;
-      updates.subscription_expires_at = new Date(
-        baseDate.getTime() + Number(duration_days) * 24 * 60 * 60 * 1000,
+      updates.subscription_expires_at = calculateEndOfDayExpiry(
+        baseDate,
+        Number(duration_days),
       );
       updates.subscription_status = "active";
     } else {
@@ -449,8 +454,9 @@ exports.updateSalonPlan = async (payload) => {
         new Date(salon.trial_ends_at) > now;
 
       const baseDate = isTrialActive ? new Date(salon.trial_ends_at) : now;
-      updates.trial_ends_at = new Date(
-        baseDate.getTime() + Number(duration_days) * 24 * 60 * 60 * 1000,
+      updates.trial_ends_at = calculateEndOfDayExpiry(
+        baseDate,
+        Number(duration_days),
       );
       updates.subscription_status = "trial";
     }
