@@ -20,7 +20,10 @@ const {
 } = require("../models/salon/salon-types");
 const { getCurrencyConfig } = require("../common/currencies.config");
 const { enqueueInvoiceJob } = require("../jobs/invoice.worker");
-const { calculateEndOfDayExpiry } = require("../utils/subscription-date.util");
+const {
+  calculateEndOfDayExpiry,
+  resolveEffectiveSubscriptionStatus,
+} = require("../utils/subscription-date.util");
 
 exports.loginAdmin = async (payload) => {
   const { email, password } = payload.body;
@@ -284,7 +287,14 @@ exports.updateSalonStatus = async (payload) => {
 
   const updates = {};
   if (is_active !== undefined) updates.is_active = is_active;
-  if (subscription_status) updates.subscription_status = subscription_status;
+
+  if (subscription_status) {
+    if (subscription_status === "suspended") {
+      updates.subscription_status = "suspended";
+    } else {
+      updates.subscription_status = resolveEffectiveSubscriptionStatus(salon);
+    }
+  }
 
   await salon.update(updates);
 

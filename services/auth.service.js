@@ -77,6 +77,7 @@ exports.loginCustomer = async (payload) => {
       email,
       name: name,
       phone_number: phone_number || null,
+      profile_image: picture || null,
     });
   }
 

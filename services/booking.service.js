@@ -22,6 +22,9 @@ const { assertStaffActive } = require("../utils/staff-status.util");
 const { calculateFinalPrice } = require("../utils/pricing.util");
 const { assertServiceBookable, assertServicesBookable } = require("../utils/service-validation.util");
 const {
+  assertSalonOpenAndWithinOperatingHours,
+} = require("../utils/business-hours.util");
+const {
   BookingStatus,
   BookingType,
   BookingExecutionMode,
@@ -765,6 +768,15 @@ exports.createAdminBooking = async (payload) => {
         );
       }
 
+      await assertSalonOpenAndWithinOperatingHours({
+        salon,
+        bookingDate: booking_date,
+        startMinutes,
+        totalDuration: total_duration,
+        holidayRepository,
+        transaction,
+      });
+
     const adminBookingData = {
       ...(admin_booking || {}),
       customer_name: payload.body.customer_name || admin_booking?.customer_name,
@@ -1080,6 +1092,15 @@ exports.updateAdminBooking = async (payload) => {
             "Booking cannot extend past midnight into the next day. Please choose an earlier start time or adjust services."
           );
         }
+
+        await assertSalonOpenAndWithinOperatingHours({
+          salon,
+          bookingDate: new_booking_date,
+          startMinutes,
+          totalDuration: total_duration,
+          holidayRepository,
+          transaction,
+        });
       }
 
       const updatedPolicy =

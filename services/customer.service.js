@@ -1,6 +1,7 @@
 const { error } = require("../libs");
 const { customerRepository, cartRepository, salonRepository } = require("../repository");
 const cartService = require("./cart.service");
+const uploadService = require("./upload.service");
 
 exports.getCustomerCart = async ({ customerUuid, query = {} }) => {
   const customer = await customerRepository.findOne({ uuid: customerUuid });
@@ -39,4 +40,54 @@ exports.getCustomerCart = async ({ customerUuid, query = {} }) => {
   await cartService.syncCartState(cart);
 
   return await cartRepository.getCartById(cart.id);
+};
+
+exports.updateCustomerProfile = async ({ customer, body }) => {
+  if (!customer) {
+    throw new error.Unauthorized("Customer authentication required");
+  }
+
+  const existingCustomer = await customerRepository.findOne({ id: customer.id });
+  if (!existingCustomer) {
+    throw new error.NotFound("Customer not found");
+  }
+
+  const updatePayload = {};
+  if (body.name !== undefined) {
+    updatePayload.name = body.name;
+  }
+  if (body.phone_number !== undefined) {
+    updatePayload.phone_number = body.phone_number;
+  }
+  if (body.gender !== undefined) {
+    updatePayload.gender = body.gender;
+  }
+  if (body.profile_image !== undefined) {
+    updatePayload.profile_image = body.profile_image;
+  }
+
+  await customerRepository.update({
+    payload: updatePayload,
+    criteria: { id: customer.id },
+  });
+
+  const updatedCustomer = await customerRepository.findOne({ id: customer.id });
+
+  return {
+    message: "Customer profile updated successfully",
+    customer: updatedCustomer,
+  };
+};
+
+exports.generateCustomerPresignedUrl = async ({ customer, files }) => {
+  if (!customer) {
+    throw new error.Unauthorized("Customer authentication required");
+  }
+
+  const preparedFiles = files.map((file) => ({
+    ...file,
+    folder: file.folder || "customer-profiles",
+  }));
+
+  return await uploadService.generatePresignedUrls({ files: preparedFiles });
 };

@@ -197,11 +197,12 @@ const drawHeader = (doc, { salon, type, invoice }, logoBuffer) => {
     width: maxBannerWidth,
   });
 
-  return bannerY + bannerHeight + 20;
+  return bannerY + bannerHeight + 14;
 };
 
 const drawFooter = (doc, { salon, customer, type }) => {
-  let line1 = `Questions about your receipt? Reach out to ${process.env.SUPPORT_EMAIL || "support@zenmonk.tech"}.`;
+  const supportEmail = process.env.ADMIN_EMAIL || "support@zenmonk.tech";
+  let line1 = `Questions about your receipt? Reach out to ${supportEmail}.`;
   if (type === "BOOKING") {
     const contactParts = [];
     if (salon.email) contactParts.push(salon.email);
@@ -275,7 +276,16 @@ const drawStatusBadge = (doc, startY, { invoice }) => {
     doc.fillColor(COLORS.white).font(FONTS.bold).fontSize(16).text("!", iconX - iconRadius, iconY - 9, { width: iconRadius * 2, align: "center" });
   } else {
     doc.circle(iconX, iconY, iconRadius).fill(COLORS.successGreen);
-    doc.fillColor(COLORS.white).font(FONTS.bold).fontSize(14).text("✓", iconX - iconRadius, iconY - 8, { width: iconRadius * 2, align: "center" });
+    doc.save();
+    doc.lineWidth(2.5);
+    doc.strokeColor(COLORS.white);
+    doc.lineCap("round");
+    doc.lineJoin("round");
+    doc.moveTo(iconX - 6, iconY);
+    doc.lineTo(iconX - 1.5, iconY + 5);
+    doc.lineTo(iconX + 6.5, iconY - 4.5);
+    doc.stroke();
+    doc.restore();
   }
 
   doc
@@ -287,7 +297,7 @@ const drawStatusBadge = (doc, startY, { invoice }) => {
     width: maxBadgeWidth,
   });
 
-  return startY + cardHeight + 20;
+  return startY + cardHeight + 14;
 };
 
 const drawGreeting = (doc, startY, { customer, salon, type, invoice }) => {
@@ -318,7 +328,7 @@ const drawGreeting = (doc, startY, { customer, salon, type, invoice }) => {
   const titleHeight = doc.heightOfString(title, { width: PAGE.contentWidth });
   doc.text(title, PAGE.marginX, startY, { width: PAGE.contentWidth });
 
-  const subtitleY = startY + titleHeight + 10;
+  const subtitleY = startY + titleHeight + 6;
 
   doc
     .fillColor(COLORS.bodyText)
@@ -331,7 +341,7 @@ const drawGreeting = (doc, startY, { customer, salon, type, invoice }) => {
     characterSpacing: 0.2,
   });
 
-  return subtitleY + subtitleHeight + 20;
+  return subtitleY + subtitleHeight + 16;
 };
 
 const drawInvoiceMeta = (doc, startY, { invoice }) => {
@@ -353,11 +363,11 @@ const drawInvoiceMeta = (doc, startY, { invoice }) => {
   const dateHeight = doc.heightOfString(dateStr, { width: colWidth, align: "right" });
   doc.text(dateStr, rightX, y, { align: "right", width: colWidth });
 
-  y += Math.max(numHeight, dateHeight) + 14;
+  y += Math.max(numHeight, dateHeight) + 12;
 
   doc.moveTo(PAGE.marginX, y).lineTo(PAGE.width - PAGE.marginX, y).strokeColor(COLORS.border).lineWidth(0.75).stroke();
 
-  return y + 16;
+  return y + 14;
 };
 
 const drawPartiesInfo = (doc, startY, { salon = {}, customer = {}, type }) => {
@@ -417,9 +427,10 @@ const drawPartiesInfo = (doc, startY, { salon = {}, customer = {}, type }) => {
     }
   } else {
     const brandName = process.env.BRAND_NAME || "Salops";
+    const supportEmail = process.env.ADMIN_EMAIL || "support@zenmonk.tech";
     renderLeft(brandName, FONTS.bold, 13, COLORS.darkText, 4);
     renderLeft("Cloud Salon Software Suite", FONTS.regular, 12, COLORS.bodyText, 3);
-    renderLeft(process.env.SUPPORT_EMAIL || "support@zenmonk.tech", FONTS.regular, 12, COLORS.mutedText, 3);
+    renderLeft(supportEmail, FONTS.regular, 12, COLORS.mutedText, 3);
 
     renderRight(salon.name || "Salon Partner", FONTS.bold, 13, COLORS.darkText, 4);
     if (salon.email) {
@@ -532,7 +543,7 @@ const drawServicesTable = (doc, startY, { items = [], invoice, type }) => {
   const totalTableHeight = totalsY + 28 - startTableY;
   doc.roundedRect(PAGE.marginX, startTableY, PAGE.contentWidth, totalTableHeight, 6).strokeColor(COLORS.border).lineWidth(0.75).stroke();
 
-  return startTableY + totalTableHeight + 18;
+  return startTableY + totalTableHeight + 14;
 };
 
 const drawInfoCards = (doc, startY, { invoice, booking = {}, type, metadata = {} }) => {
@@ -608,7 +619,7 @@ const drawInfoCards = (doc, startY, { invoice, booking = {}, type, metadata = {}
     });
   }
 
-  return startY + cardHeight + 16;
+  return startY + cardHeight + 12;
 };
 
 const drawNotice = (doc, startY) => {
@@ -716,7 +727,7 @@ exports.generateInvoicePDF = async ({
 
   y = drawInfoCards(doc, y, { invoice, booking, type: resolvedType, metadata: invoice.metadata || {} });
 
-  if (y + 30 > PAGE.height - 110) {
+  if (y + 26 > PAGE.height - 85) {
     doc.addPage();
     y = PAGE.marginY;
   }
