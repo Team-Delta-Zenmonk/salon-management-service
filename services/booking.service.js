@@ -161,6 +161,7 @@ exports.createBooking = async (payload) => {
             booking_start_time: activePendingBooking.booking_start_time,
             booking_end_time: activePendingBooking.booking_end_time,
             expires_at: activePendingBooking.expires_at,
+            total_price: activePendingBooking.total_price,
           },
         };
       }
