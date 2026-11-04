@@ -102,7 +102,7 @@ class BookingRepository extends BaseRepository {
       include: [
         {
           association: "customer",
-          attributes: ["name", "email"],
+          attributes: ["name", "email", "phone_number"],
         },
         {
           association: "booking_services",

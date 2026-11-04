@@ -18,7 +18,7 @@ const {
 const {
   acquireTransactionAdvisoryLock,
 } = require("../utils/advisory-lock.util");
-const { assertStaffActive } = require("../utils/staff-status.util");
+const { assertStaffActive, isStaffInactive } = require("../utils/staff-status.util");
 const { calculateFinalPrice } = require("../utils/pricing.util");
 const { assertServiceBookable, assertServicesBookable } = require("../utils/service-validation.util");
 const {
@@ -1549,16 +1549,6 @@ exports.cancelBooking = async (payload) => {
         });
 
         throw new error.BadRequest("Booking already expired");
-      }
-
-      const TWO_HOURS_IN_MS = 2 * 60 * 60 * 1000;
-      if (
-        booking.booking_end_time.getTime() - new Date().getTime() <
-        TWO_HOURS_IN_MS
-      ) {
-        throw new error.BadRequest(
-          "Booking cannot be cancelled within 2 hours of its end time",
-        );
       }
 
       await bookingRepository.update({
