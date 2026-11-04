@@ -6,8 +6,18 @@ const { Service } = require("../models");
 exports.createCategory = async (payload) => {
   const { body, salon } = payload;
 
+  const existingCategory = await categoryRepository.findOne({
+    salon_id: salon.id,
+    name: { [Op.iLike]: body.name },
+  });
+
+  if (existingCategory) {
+    throw new error.Conflict("Category already exists");
+  }
+
   return await categoryRepository.create({
     ...body,
+    name: body.name,
     salon_id: salon.id,
   });
 };
@@ -45,6 +55,15 @@ exports.updateCategory = async (payload) => {
 
   const category = await categoryRepository.findOne({ uuid: params.uuid, salon_id: salon.id });
   if (!category) throw new error.NotFound("Category not found");
+
+    const duplicate = await categoryRepository.findOne({
+      salon_id: salon.id,
+      name: { [Op.iLike]: body.name },
+      uuid: { [Op.ne]: params.uuid },
+    });
+    if (duplicate) {
+      throw new error.Conflict("Category already exists");
+    }
 
   const response = await categoryRepository.update({
     payload: body,
