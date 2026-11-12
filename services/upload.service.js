@@ -57,9 +57,17 @@ exports.generatePresignedUrls = async (payload) => {
   const results = [];
 
   for (const item of files) {
-    const { filename, filetype, folder } = item;
+    const { filename, filetype, folder, category: requestedCategory } = item;
     const normalizedType = filetype.toLowerCase();
-    const category = getCategoryForMimeType(normalizedType);
+    const inferredCategory = getCategoryForMimeType(normalizedType);
+
+    if (requestedCategory === "image" && inferredCategory !== "image") {
+      throw new error.BadRequest(
+        `File '${filename || filetype}' is not an image. Only image files (JPEG, PNG, WebP, GIF) are allowed.`
+      );
+    }
+
+    const category = requestedCategory && requestedCategory !== "any" ? requestedCategory : inferredCategory;
 
     const allowedTypesForCategory = ALLOWED_TYPES_BY_CATEGORY[category];
     const maxSizeBytes = SIZE_LIMITS_BY_CATEGORY[category];

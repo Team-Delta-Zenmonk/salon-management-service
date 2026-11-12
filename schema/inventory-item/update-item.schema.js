@@ -8,7 +8,12 @@ exports.updateInventoryItemSchema = z.object({
     item_type: z.enum(Object.values(InventoryItemType.ENUM)).optional().default(InventoryItemType.ENUM.PRODUCT),
     name: z.string().min(1, { message: "Item name cannot be empty" }).max(FIELD_LIMITS.ITEM_NAME, { message: `Item name cannot exceed ${FIELD_LIMITS.ITEM_NAME} characters` }).optional(),
     brand: z.string().max(FIELD_LIMITS.NAME, { message: `Brand name cannot exceed ${FIELD_LIMITS.NAME} characters` }).nullable().optional(),
-    logo: z.string().nullable().optional(),
+    logo: z
+      .string()
+      .url("Item image must be a valid URL")
+      .max(FIELD_LIMITS.URL, `Item image URL cannot exceed ${FIELD_LIMITS.URL} characters`)
+      .nullable()
+      .optional(),
     variant_name: z.string().max(FIELD_LIMITS.CODE, { message: `Variant name cannot exceed ${FIELD_LIMITS.CODE} characters` }).nullable().optional(),
     unit: z.string().nullable().optional(),
     unit_price: z.number().min(0, { message: "Unit price cannot be negative" }).max(100000, { message: "Unit price cannot exceed 100,000" }).nullable().optional(),

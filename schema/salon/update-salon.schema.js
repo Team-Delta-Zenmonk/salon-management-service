@@ -11,15 +11,30 @@ const businessDaySchema = z
   .optional();
 
 const photoSchema = z.object({
-  url: z.url(),
+  url: z.string().url("Valid photo URL is required"),
   public_id: z.string(),
-  format: z.string().optional(),
-  resource_type: z.string().optional(),
+  format: z
+    .string()
+    .optional()
+    .refine(
+      (fmt) =>
+        !fmt ||
+        ["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(
+          fmt.toLowerCase()
+        ),
+      {
+        message:
+          "Only image formats (jpg, jpeg, png, webp, gif, svg) are allowed for salon photos",
+      }
+    ),
+  resource_type: z.literal("image", {
+    message: "Resource type must be image for salon photos",
+  }),
   bytes: z.number().optional(),
   type: z.string().optional(),
-  secure_url: z.url(),
+  secure_url: z.string().url("Valid secure photo URL is required"),
   asset_folder: z.string().optional(),
-  filename: z.string(),
+  filename: z.string().optional(),
 });
 
 exports.updateSalonSchema = z.object({
@@ -34,7 +49,7 @@ exports.updateSalonSchema = z.object({
     owner_name: z.string().max(FIELD_LIMITS.NAME, `Owner name cannot exceed ${FIELD_LIMITS.NAME} characters`).optional(),
     type: z.enum(SalonType.getValues(), { message: "Invalid salon type" }).optional(),
     map_link: z.string().max(FIELD_LIMITS.URL, `Map link cannot exceed ${FIELD_LIMITS.URL} characters`).optional(),
-    logo: z.string().optional(),
+    logo: z.string().url("Logo must be a valid URL").max(FIELD_LIMITS.URL, `Logo URL cannot exceed ${FIELD_LIMITS.URL} characters`).nullable().optional(),
     slug: z
       .string()
       .min(3, "Slug must be at least 3 characters")

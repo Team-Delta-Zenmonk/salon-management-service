@@ -9,16 +9,65 @@ const activeDaySchema = z
   .nullable()
   .optional();
 
-const docSchema = z.object({
-  url: z.url(),
+const staffPhotoSchema = z.object({
+  url: z.string().url("Valid photo URL is required"),
   public_id: z.string(),
-  format: z.string().optional(),
-  resource_type: z.string().optional(),
+  format: z
+    .string()
+    .optional()
+    .refine(
+      (fmt) =>
+        !fmt ||
+        ["jpg", "jpeg", "png", "webp", "gif", "svg"].includes(
+          fmt.toLowerCase()
+        ),
+      {
+        message:
+          "Only image formats (jpg, jpeg, png, webp, gif, svg) are allowed for staff photo",
+      }
+    ),
+  resource_type: z.literal("image", {
+    message: "Staff photo must be an image",
+  }),
   bytes: z.number().optional(),
   type: z.string().optional(),
-  secure_url: z.url(),
+  secure_url: z.string().url("Valid secure photo URL is required"),
   asset_folder: z.string().optional(),
-  filename: z.string(),
+  filename: z.string().optional(),
+});
+
+const docSchema = z.object({
+  url: z.string().url("Valid document URL is required"),
+  public_id: z.string(),
+  format: z
+    .string()
+    .optional()
+    .refine(
+      (fmt) =>
+        !fmt ||
+        [
+          "pdf",
+          "doc",
+          "docx",
+          "txt",
+          "jpg",
+          "jpeg",
+          "png",
+          "webp",
+        ].includes(fmt.toLowerCase()),
+      {
+        message:
+          "Invalid document format. Allowed: PDF, DOC, DOCX, TXT, or images",
+      }
+    ),
+  resource_type: z.enum(["raw", "image"], {
+    message: "Document must be raw or image",
+  }),
+  bytes: z.number().optional(),
+  type: z.string().optional(),
+  secure_url: z.string().url("Valid secure document URL is required"),
+  asset_folder: z.string().optional(),
+  filename: z.string().optional(),
 });
 
 const maxStaffDocs = Number(process.env.MAX_STAFF_DOCS_LIMIT) || 10;
@@ -68,7 +117,7 @@ exports.createStaffSchema = z.object({
       phone: z.string().min(8).max(FIELD_LIMITS.PHONE, `Phone cannot exceed ${FIELD_LIMITS.PHONE} digits`),
       relation: z.string().optional(),
     }),
-    photos: docSchema.nullable().optional(),
+    photos: staffPhotoSchema.nullable().optional(),
     staff_docs: z.array(docSchema).max(maxStaffDocs, `Maximum ${maxStaffDocs} staff documents allowed`).nullable().optional(),
     active_hours: z
       .object({

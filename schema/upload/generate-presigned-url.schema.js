@@ -4,6 +4,7 @@ const fileItemSchema = z.object({
   filename: z.string().optional(),
   filetype: z.string().min(1, "Filetype is required"),
   folder: z.string().optional(),
+  category: z.enum(["image", "document", "any"]).optional(),
 });
 
 exports.generatePresignedUrlSchema = z.object({
