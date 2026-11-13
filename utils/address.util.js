@@ -2,11 +2,8 @@ const formatAddress = (addr) => {
   if (!addr) return "";
   if (typeof addr === "string") return addr;
   if (typeof addr === "object") {
-    return (
-      addr.formatted_address ||
-      [addr.street, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ") ||
-      ""
-    );
+    const compiled = [addr.street, addr.city, addr.state, addr.pincode].filter(Boolean).join(", ");
+    return compiled || addr.formatted_address || "";
   }
   return "";
 };
@@ -32,11 +29,12 @@ const normalizeAddress = (addr) => {
         : null;
     const compiled = [street, city, state, pincode].filter(Boolean).join(", ");
     const formatted =
-      addr.formatted_address !== null &&
+      compiled ||
+      (addr.formatted_address !== null &&
       addr.formatted_address !== undefined &&
       String(addr.formatted_address).trim() !== ""
         ? String(addr.formatted_address).trim()
-        : compiled || null;
+        : null);
 
     if (!street && !city && !state && !pincode && !formatted) {
       return null;
