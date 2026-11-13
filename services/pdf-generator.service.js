@@ -42,6 +42,8 @@ const COLORS = {
   white: "#FFFFFF",
 };
 
+const { formatAddress } = require("../utils/address.util");
+
 const PAGE = {
   marginX: 48,
   marginY: 32,
@@ -404,8 +406,9 @@ const drawPartiesInfo = (doc, startY, { salon = {}, customer = {}, type }) => {
 
   if (type === "BOOKING") {
     renderLeft(salon.name || "Salon", FONTS.bold, 13, COLORS.darkText, 4);
-    if (salon.address) {
-      renderLeft(salon.address, FONTS.regular, 12, COLORS.bodyText, 3);
+    const formattedSalonAddress = formatAddress(salon.address);
+    if (formattedSalonAddress) {
+      renderLeft(formattedSalonAddress, FONTS.regular, 12, COLORS.bodyText, 3);
     }
     const cityState = [salon.city, salon.state, salon.zip_code].filter(Boolean).join(", ");
     if (cityState) {
@@ -439,8 +442,9 @@ const drawPartiesInfo = (doc, startY, { salon = {}, customer = {}, type }) => {
     if (salon.phone || salon.phone_number) {
       renderRight(salon.phone || salon.phone_number, FONTS.regular, 12, COLORS.bodyText, 3);
     }
-    if (salon.address) {
-      renderRight(salon.address, FONTS.regular, 12, COLORS.mutedText, 3);
+    const formattedSalonAddress = formatAddress(salon.address);
+    if (formattedSalonAddress) {
+      renderRight(formattedSalonAddress, FONTS.regular, 12, COLORS.mutedText, 3);
     }
     const cityState = [salon.city, salon.state, salon.zip_code].filter(Boolean).join(", ");
     if (cityState) {

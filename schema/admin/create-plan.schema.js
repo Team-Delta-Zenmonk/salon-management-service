@@ -97,6 +97,12 @@ exports.updatePlanSchema = z.object({
         .max(FIELD_LIMITS.CODE, { message: `Billing cycle cannot exceed ${FIELD_LIMITS.CODE} characters` })
         .optional()
         .nullable(),
+      badge: z
+        .string()
+        .trim()
+        .max(FIELD_LIMITS.CODE, { message: `Badge cannot exceed ${FIELD_LIMITS.CODE} characters` })
+        .optional()
+        .nullable(),
       description: z
         .string()
         .trim()

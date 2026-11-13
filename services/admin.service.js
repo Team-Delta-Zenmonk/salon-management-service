@@ -531,6 +531,7 @@ exports.getSubscriptionPlans = async (payload = {}) => {
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
       description: plan.description,
+      badge: plan.badge,
       duration_days: plan.duration_days,
       is_active: plan.is_active,
     };
@@ -548,7 +549,7 @@ exports.getSubscriptionPlans = async (payload = {}) => {
 
 exports.updateSubscriptionPlan = async (payload) => {
   const { uuid } = payload.params;
-  const { code, amount, name, description, billing_cycle, duration_days } = payload.body;
+  const { code, amount, name, description, billing_cycle, duration_days, badge } = payload.body;
 
   const plan = await subscriptionPlanRepository.findByUuid(uuid);
   if (!plan) {
@@ -562,6 +563,9 @@ exports.updateSubscriptionPlan = async (payload) => {
   if (description !== undefined) updates.description = description;
   if (billing_cycle !== undefined) updates.billing_cycle = billing_cycle;
   if (duration_days !== undefined) updates.duration_days = Number(duration_days);
+  if (badge !== undefined) {
+    updates.badge = (typeof badge === "string" && badge.trim() !== "") ? badge.trim() : null;
+  }
 
   await plan.update(updates);
 
@@ -583,6 +587,7 @@ exports.updateSubscriptionPlan = async (payload) => {
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
       description: plan.description,
+      badge: plan.badge,
       duration_days: plan.duration_days,
       is_active: plan.is_active,
     },
@@ -607,6 +612,7 @@ exports.createSubscriptionPlan = async (payload) => {
 
   const numAmount = Number(amount);
   const numDuration = Number(duration_days);
+  const cleanBadge = (typeof badge === "string" && badge.trim() !== "") ? badge.trim() : null;
 
   const plan = await subscriptionPlanRepository.create({
     uuid: crypto.randomUUID(),
@@ -617,7 +623,7 @@ exports.createSubscriptionPlan = async (payload) => {
     duration_days: numDuration,
     billing_cycle: billing_cycle || `${numDuration} Days`,
     description: description || "",
-    badge: badge || null,
+    badge: cleanBadge,
     is_active: true,
   });
 
@@ -635,6 +641,7 @@ exports.createSubscriptionPlan = async (payload) => {
       currency: plan.currency || "INR",
       billing_cycle: plan.billing_cycle,
       description: plan.description,
+      badge: plan.badge,
       duration_days: plan.duration_days,
       is_active: plan.is_active,
     },

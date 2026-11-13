@@ -99,7 +99,7 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
       },
       address: {
-        type: DataTypes.STRING,
+        type: DataTypes.JSON,
         allowNull: true,
       },
       latitude: {

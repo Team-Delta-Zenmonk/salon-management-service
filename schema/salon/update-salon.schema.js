@@ -43,12 +43,24 @@ exports.updateSalonSchema = z.object({
     email: z.email("Invalid email").min(1, "Email is required").max(FIELD_LIMITS.EMAIL, `Email cannot exceed ${FIELD_LIMITS.EMAIL} characters`).optional(),
     phone: z.string().max(FIELD_LIMITS.PHONE, `Phone cannot exceed ${FIELD_LIMITS.PHONE} digits`).optional(),
     about: z.string().max(FIELD_LIMITS.DESCRIPTION, `About cannot exceed ${FIELD_LIMITS.DESCRIPTION} characters`).optional(),
-    latitude: z.string().optional(),
-    longitude: z.string().optional(),
-    address: z.string().max(FIELD_LIMITS.ADDRESS, `Address cannot exceed ${FIELD_LIMITS.ADDRESS} characters`).optional(),
+    latitude: z.union([z.string(), z.number()]).nullable().optional(),
+    longitude: z.union([z.string(), z.number()]).nullable().optional(),
+    address: z
+      .union([
+        z.string().max(500),
+        z.object({
+          street: z.string().max(FIELD_LIMITS.ADDRESS).nullable().optional(),
+          city: z.string().max(FIELD_LIMITS.CITY_STATE).nullable().optional(),
+          state: z.string().max(FIELD_LIMITS.CITY_STATE).nullable().optional(),
+          pincode: z.string().max(FIELD_LIMITS.PINCODE).nullable().optional(),
+          formatted_address: z.string().max(500).nullable().optional(),
+        }),
+      ])
+      .nullable()
+      .optional(),
     owner_name: z.string().max(FIELD_LIMITS.NAME, `Owner name cannot exceed ${FIELD_LIMITS.NAME} characters`).optional(),
     type: z.enum(SalonType.getValues(), { message: "Invalid salon type" }).optional(),
-    map_link: z.string().max(FIELD_LIMITS.URL, `Map link cannot exceed ${FIELD_LIMITS.URL} characters`).optional(),
+    map_link: z.string().max(FIELD_LIMITS.URL, `Map link cannot exceed ${FIELD_LIMITS.URL} characters`).nullable().optional(),
     logo: z.string().url("Logo must be a valid URL").max(FIELD_LIMITS.URL, `Logo URL cannot exceed ${FIELD_LIMITS.URL} characters`).nullable().optional(),
     slug: z
       .string()

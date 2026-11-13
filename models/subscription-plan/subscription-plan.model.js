@@ -48,6 +48,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
+      badge: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
       duration_days: {
         type: DataTypes.INTEGER,
         allowNull: false,

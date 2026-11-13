@@ -28,6 +28,7 @@ const {
 const { Op } = require("sequelize");
 const { Category, sequelize } = require("../models");
 const { formatStaffListTiming } = require("../utils/staff-timing.util");
+const { normalizeAddress } = require("../utils/address.util");
 const { isStaffInactive } = require("../utils/staff-status.util");
 const {
   toMinutes,
@@ -157,6 +158,35 @@ exports.updateSalon = async (payload) => {
       }
     }
   }
+
+  if (payload?.body?.latitude !== undefined) {
+    const lat = payload.body.latitude;
+    payload.body.latitude =
+      lat !== null && lat !== "" && !isNaN(Number(lat)) ? parseFloat(lat) : null;
+  }
+
+  if (payload?.body?.longitude !== undefined) {
+    const lng = payload.body.longitude;
+    payload.body.longitude =
+      lng !== null && lng !== "" && !isNaN(Number(lng)) ? parseFloat(lng) : null;
+  }
+
+  if (payload?.body?.map_link !== undefined) {
+    const link = payload.body.map_link;
+    payload.body.map_link =
+      link !== null && link !== undefined && String(link).trim() !== ""
+        ? String(link).trim()
+        : null;
+  }
+
+  if (payload?.body?.address !== undefined) {
+    payload.body.address = normalizeAddress(payload.body.address);
+  }
+
+  delete payload?.body?.street;
+  delete payload?.body?.city;
+  delete payload?.body?.state;
+  delete payload?.body?.pincode;
 
   const result = await salonRepository.update({
     payload: payload.body,

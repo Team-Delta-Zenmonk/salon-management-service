@@ -6,6 +6,7 @@ const {
 } = require("../repository");
 const { NotFound } = require("../libs/error");
 const { formatStaffListTiming, formatStaffTiming } = require("../utils/staff-timing.util");
+const { formatAddress } = require("../utils/address.util");
 
 exports.getStorefrontProfile = async (payload) => {
   const { slug } = payload.params;
@@ -32,7 +33,7 @@ exports.getStorefrontProfile = async (payload) => {
       logo: salon.logo,
       photos: salon.photos,
       business_hours: salon.business_hours,
-      address: salon.address,
+      address: formatAddress(salon.address),
       phone: salon.phone,
       email: salon.email,
       latitude: salon.latitude,
